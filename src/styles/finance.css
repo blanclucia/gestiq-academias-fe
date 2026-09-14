@@ -1,0 +1,327 @@
+.finance-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.finance-header .primary-button,
+.finance-expense-row .primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.finance-main-card {
+  padding: 20px;
+}
+
+.finance-page-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 0;
+}
+
+.finance-page-tabs .primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.finance-context-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.finance-context-actions>select {
+  min-width: 190px;
+}
+
+.finance-tab-content {
+  margin-top: 0;
+}
+
+.finance-summary-date-range {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.finance-date-with-help {
+  display: grid;
+  gap: 6px;
+}
+
+.finance-date-with-help>small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.finance-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.finance-panel {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.finance-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+}
+
+.finance-panel-heading h3,
+.finance-panel-heading p {
+  margin: 0;
+}
+
+.finance-panel-heading p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.finance-reminder-list,
+.dashboard-finance-reminders {
+  display: grid;
+}
+
+.finance-reminder-list button,
+.dashboard-finance-reminders a {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 13px 18px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.finance-reminder-list button:hover,
+.dashboard-finance-reminders a:hover {
+  background: rgba(148, 163, 184, .06);
+}
+
+.finance-reminder-list button>span:first-child,
+.dashboard-finance-reminders a>span:first-child {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.finance-reminder-list .warning,
+.dashboard-finance-reminders .warning {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.finance-reminder-list .danger,
+.dashboard-finance-reminders .danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.finance-reminder-list strong,
+.finance-reminder-list small,
+.dashboard-finance-reminders strong,
+.dashboard-finance-reminders small {
+  display: block;
+}
+
+.finance-reminder-list small,
+.dashboard-finance-reminders small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.finance-balance {
+  display: grid;
+  gap: 0;
+  padding: 0 18px 18px;
+}
+
+.finance-balance>div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.finance-balance span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.finance-balance .total strong {
+  font-size: 18px;
+}
+
+.finance-expense-list {
+  display: grid;
+  gap: 10px;
+}
+
+.finance-expense-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.4fr) repeat(3, minmax(110px, .55fr)) auto auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+}
+
+.finance-expense-main {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.finance-expense-main strong,
+.finance-expense-main small,
+.finance-expense-row>div>small,
+.finance-expense-row>div>strong {
+  display: block;
+}
+
+.finance-expense-main small,
+.finance-expense-row>div>small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.finance-expense-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  color: var(--muted);
+  background: rgba(148, 163, 184, .1);
+}
+
+.finance-expense-icon.pagado {
+  color: #15803d;
+  background: rgba(34, 197, 94, .11);
+}
+
+.finance-expense-icon.vencido {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.finance-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px;
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .finance-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .finance-expense-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .finance-expense-row>div:not(.finance-expense-main) {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .finance-summary-date-range,
+  .finance-summary-date-range .toolbar-date-range {
+    width: 100%;
+  }
+
+  .finance-summary-date-range .form-input {
+    flex: 1 1 140px;
+    width: auto;
+  }
+
+  .finance-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .finance-header .primary-button {
+    justify-content: center;
+  }
+
+  .finance-main-card {
+    padding: 14px;
+  }
+
+  .finance-page-tabs {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .finance-page-tabs .primary-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .finance-context-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .finance-context-actions>select {
+    width: 100%;
+  }
+
+  .finance-expense-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .finance-expense-row>.status-badge,
+  .finance-expense-row>.primary-button {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+
+  .finance-reminder-list button,
+  .dashboard-finance-reminders a {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .finance-reminder-list button b,
+  .dashboard-finance-reminders a b {
+    grid-column: 2;
+  }
+}
