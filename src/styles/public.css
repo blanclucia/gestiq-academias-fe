@@ -1,0 +1,565 @@
+.public-enrollment-page {
+  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: grid;
+  place-items: start center;
+  align-content: start;
+  padding: 24px;
+  background: #eef0f3;
+}
+
+.public-enrollment-card {
+  width: min(560px, 100%);
+  padding: 32px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.12);
+}
+
+@media (max-width: 640px) {
+  .public-enrollment-page {
+    padding: 0;
+  }
+
+  .public-enrollment-card {
+    width: 100%;
+    min-height: 100vh;
+    padding: 24px 18px 32px;
+    border: 0;
+    border-radius: 0;
+    background: #ffffff;
+    box-shadow: none;
+  }
+}
+
+.public-enrollment-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.public-enrollment-brand img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 9px;
+}
+
+.public-enrollment-section-heading {
+  display: grid;
+  gap: 3px;
+  margin-top: 18px;
+  margin-bottom: 10px;
+}
+
+.public-enrollment-section-heading span {
+  color: var(--muted);
+  font-size: .78rem;
+  line-height: 1.45;
+}
+
+.public-enrollment-guardian-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.public-enrollment-guardian-section .public-enrollment-section-heading {
+  margin-top: 0;
+}
+
+.enrollment-student-notes {
+  width: min(420px, 100%);
+  margin-top: 10px;
+  min-height: 58px;
+}
+
+.enrollment-student-note-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  max-width: 420px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: .76rem;
+  line-height: 1.4;
+}
+
+.enrollment-student-note-preview svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--primary);
+}
+
+.public-enrollment-terms {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: .78rem;
+  line-height: 1.5;
+}
+
+.public-enrollment-terms p {
+  margin: 0;
+}
+
+.public-enrollment-terms label {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 100%;
+  gap: 8px;
+  color: var(--text);
+  text-align: left;
+}
+
+.public-enrollment-terms input {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  margin-top: 3px;
+  padding: 0;
+  accent-color: var(--primary);
+}
+
+.public-enrollment-eyebrow {
+  margin: 28px 0 6px;
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.public-enrollment-card h1 {
+  margin: 0;
+  font-size: 2rem;
+  letter-spacing: -.05em;
+}
+
+.public-enrollment-card>p {
+  color: var(--muted);
+}
+
+.public-enrollment-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 0;
+  margin: 20px 0;
+  border-block: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.public-enrollment-summary strong {
+  color: var(--text);
+}
+
+.public-enrollment-selection-action {
+  display: grid;
+  gap: 10px;
+}
+
+.public-enrollment-summary-compact {
+  align-items: center;
+}
+
+.public-enrollment-summary-compact>span {
+  display: grid;
+  gap: 2px;
+}
+
+
+.public-enrollment-form {
+  display: grid;
+  gap: 12px;
+}
+
+.public-enrollment-progress {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.public-enrollment-progress span,
+.public-enrollment-progress button {
+  padding: 8px 4px;
+  border-bottom: 2px solid var(--border);
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 750;
+  text-align: center;
+}
+
+.public-enrollment-progress button:not(:disabled) {
+  cursor: pointer;
+}
+
+.public-enrollment-progress span.active,
+.public-enrollment-progress button.active {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.public-enrollment-progress span.complete,
+.public-enrollment-progress button.complete {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.public-enrollment-step-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.public-enrollment-step-actions button {
+  flex: 1;
+}
+
+.public-enrollment-review {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--field);
+}
+
+.public-enrollment-review span {
+  display: grid;
+  gap: 2px;
+  color: var(--muted);
+  font-size: .82rem;
+}
+
+.public-enrollment-review strong {
+  color: var(--text);
+  font-size: .7rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.public-enrollment-name-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.public-enrollment-form input:not([type='checkbox']),
+.public-enrollment-form textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--field);
+  color: var(--text);
+  font: inherit;
+  font-size: .88rem;
+  line-height: 1.45;
+  box-sizing: border-box;
+}
+
+.public-enrollment-form textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.public-enrollment-field {
+  display: grid;
+  gap: 6px;
+  color: var(--text);
+  font-size: .85rem;
+  font-weight: 700;
+}
+
+.public-enrollment-form button,
+.public-enrollment-success button {
+  margin-top: 8px;
+  min-height: 44px;
+}
+
+@media (max-width: 520px) {
+  .public-enrollment-name-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+.public-enrollment-success {
+  display: grid;
+  gap: 14px;
+  margin-top: 30px;
+  text-align: center;
+  justify-items: center;
+}
+
+.public-enrollment-success svg {
+  color: var(--primary);
+}
+
+.public-enrollment-checkout {
+  display: grid;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.public-enrollment-checkout h1,
+.public-enrollment-checkout p {
+  margin: 0;
+}
+
+.public-enrollment-checkout label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: .85rem;
+  font-weight: 700;
+}
+
+.public-enrollment-checkout input {
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--field);
+  color: var(--text);
+}
+
+.mercadopago-button {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 10px;
+  background: #009ee3;
+  color: #fff;
+  font-weight: 800;
+}
+
+.mercadopago-checkout-brand {
+  color: #009ee3;
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: -.05em;
+}
+
+.mercadopago-checkout-brand span {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: .72rem;
+  letter-spacing: 0;
+}
+
+.payment-option-grid {
+  display: grid;
+  width: 100%;
+  gap: 10px;
+}
+
+.payment-method-options {
+  display: grid;
+  gap: 9px;
+}
+
+.payment-method-option {
+  display: grid;
+  gap: 3px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--field);
+  color: var(--text);
+  text-align: left;
+}
+
+.payment-method-option.selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.payment-method-option small {
+  color: var(--muted);
+  font-size: .75rem;
+}
+
+.payment-method-inline-details {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: .78rem;
+  overflow-wrap: anywhere;
+}
+
+.payment-method-inline-details strong {
+  color: var(--text);
+}
+
+.payment-method-inline-details a {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.public-final-transfer-details {
+  width: 100%;
+  margin-top: 4px;
+  text-align: left;
+}
+
+.public-final-transfer-details dd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+}
+
+.public-final-transfer-details dd button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.payment-copy-feedback {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.payment-method-details {
+  display: grid;
+  gap: 5px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--field);
+  color: var(--muted);
+  font-size: .8rem;
+  overflow-wrap: anywhere;
+}
+
+.payment-method-details strong {
+  color: var(--text);
+}
+
+.payment-method-details a {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.transfer-details {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--field);
+  color: var(--muted);
+}
+
+.transfer-details strong {
+  color: var(--text);
+}
+
+.transfer-details-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.transfer-details-heading>svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--primary);
+}
+
+.transfer-details-heading>div {
+  display: grid;
+  gap: 3px;
+}
+
+.transfer-details-heading span {
+  font-size: .76rem;
+  line-height: 1.4;
+}
+
+.transfer-details dl {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+
+.transfer-details dl>div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.transfer-details dt {
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.transfer-details dd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  color: var(--text);
+  font-size: .8rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.transfer-details dd button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.transfer-details>small {
+  color: var(--primary);
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.public-payment-unavailable {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--field);
+  color: var(--muted);
+  font-size: .8rem;
+  line-height: 1.5;
+}
+
