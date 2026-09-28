@@ -1,4 +1,4 @@
-let activeOrganizationId = 'org-puentes'
+let activeOrganizationId = 'anonymous'
 
 export function setActiveOrganizationId(organizationId: string) {
     activeOrganizationId = organizationId
@@ -10,7 +10,7 @@ export function organizationStorageKey(key: string) {
 
 export function readOrganizationStorageItem(key: string) {
     if (typeof window === 'undefined') return null
-    return window.localStorage.getItem(organizationStorageKey(key)) ?? window.localStorage.getItem(key)
+    return window.localStorage.getItem(organizationStorageKey(key))
 }
 
 export function writeOrganizationStorageItem(key: string, value: string) {

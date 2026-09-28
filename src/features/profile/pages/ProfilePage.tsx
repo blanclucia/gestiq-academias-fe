@@ -1,4 +1,5 @@
 import { Bell, ShieldCheck, UserCircle2 } from 'lucide-react'
+import { useAuth } from '@/auth/AuthContext'
 import { useState } from 'react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ChartCard } from '@/components/layout/ChartCard'
@@ -10,6 +11,7 @@ const tabs = [
 ] as const
 
 export function ProfilePage() {
+    const { session } = useAuth()
     const [activeTab, setActiveTab] = useState<(typeof tabs)[number]['id']>('datos')
 
     return (
@@ -33,12 +35,12 @@ export function ProfilePage() {
 
                 <div className="academy-tab-panel">
                     {activeTab === 'datos' && (
-                        <ChartCard title="Datos personales" subtitle="Cuenta del administrador">
+                        <ChartCard title="Datos personales" subtitle="Tu cuenta">
                             <div className="academy-placeholder">
                                 <div className="academy-placeholder-icon">
                                     <UserCircle2 size={22} />
                                 </div>
-                                <p>Próximamente se definirán los datos personales, contacto y preferencias del usuario.</p>
+                                <dl><dt>Nombre</dt><dd>{session?.user.name}</dd><dt>Email</dt><dd>{session?.user.email}</dd><dt>Academia</dt><dd>{session?.organization.name}</dd></dl>
                             </div>
                         </ChartCard>
                     )}

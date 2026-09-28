@@ -4,7 +4,6 @@ import type { UserRole } from './roleTypes'
 export type RoleContextValue = {
     activeRole: UserRole
     availableRoles: UserRole[]
-    setActiveRole: (role: UserRole) => void
 }
 
 export const RoleContext = createContext<RoleContextValue | null>(null)

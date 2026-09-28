@@ -2,7 +2,8 @@ import { ArrowLeft, Award, Mail, MessageCircle, Send } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { assignStudentsToCommission, createCommissionExam, getCommissionStudentStatus, listCommissionExams, listCourses, listStudents, listStudentsInCommission, updateCommission, updateCommissionExam, updateCommissionStudentStatus, useAcademyRepositoryVersion, type CommissionStudentStatus } from '@/services/academyRepository'
+import { createCommissionExam, listCommissionExams, listCourses, listStudents, updateCommissionExam, useAcademyRepositoryVersion, useAssignEnrollment, useCommissionRoster, useGenerateTuition, useUpdateCommission, type CommissionStudentStatus } from '@/services/academyRepository'
+import { useToast } from '@/components/ui/ToastContext'
 import { CommissionAssignmentModal } from '../components/CommissionAssignmentModal'
 import { DeleteConfirmationModal, EntityFormModal, FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
 import { getSelectedBranchId } from '@/services/branchRepository'
@@ -23,7 +24,6 @@ export function CommissionDetailPage() {
     const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'exams'>('overview')
     const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false)
     const [isCloseCommissionOpen, setIsCloseCommissionOpen] = useState(false)
-    const [manualStudentIds, setManualStudentIds] = useState<string[]>([])
     const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([])
     const [openMenuId, setOpenMenuId] = useState<string | null>(null)
     const [isCommunicationOpen, setIsCommunicationOpen] = useState(false)
@@ -43,7 +43,14 @@ export function CommissionDetailPage() {
 
     const courses = listCourses()
     const course = courses.find((item) => item.id === courseId) ?? courses[0]
-    const commission = course.commissions.find((item) => item.id === commissionId) ?? course.commissions[0]
+    const commission = course?.commissions.find((item) => item.id === commissionId) ?? course?.commissions[0]
+    // Hooks run unconditionally, before the "not found" early return below — course/commission may
+    // still be undefined here on a fresh mirror, so the roster query stays disabled until they resolve.
+    const { roster: commissionStudents } = useCommissionRoster(course?.id, commission?.id)
+    const updateCommission = useUpdateCommission()
+    const assignEnrollment = useAssignEnrollment()
+    const generateTuition = useGenerateTuition()
+    const { showToast } = useToast()
 
     if (!course || !commission) {
         return (
@@ -55,7 +62,7 @@ export function CommissionDetailPage() {
                 </div>
                 <div className="data-table-card">
                     <p>La comisión solicitada no existe o fue eliminada.</p>
-                    <Link to={path(`oferta/${course.id}`)} className="primary-button" style={{ display: 'inline-flex', marginTop: 12 }}>
+                    <Link to={path('offers')} className="primary-button" style={{ display: 'inline-flex', marginTop: 12 }}>
                         Volver a oferta académica
                     </Link>
                 </div>
@@ -64,18 +71,9 @@ export function CommissionDetailPage() {
     }
 
     const allStudents = listStudents()
-    const commissionStudents = listStudentsInCommission(course.name, commission.name, commission.id)
-        .filter((student) => manualStudentIds.includes(student.id) || student.courses.some((item) => item.name === course.name && item.group === commission.name))
-        .map((student) => ({
-            id: student.id,
-            name: student.fullName,
-            email: student.email,
-            phone: student.phone,
-            status: getCommissionStudentStatus(student.id, commission.id, course.name, commission.name),
-            globalStatus: student.status,
-        }))
+    const rosterIds = new Set(commissionStudents.map((student) => student.id))
     const assignmentStudents = allStudents.map((student) =>
-        manualStudentIds.includes(student.id) && !student.courses.some((item) => item.name === course.name && item.group === commission.name)
+        rosterIds.has(student.id) && !student.courses.some((item) => item.name === course.name && item.group === commission.name)
             ? { ...student, courses: [...student.courses, { name: course.name, group: commission.name, modality: 'Grupo' as const }] }
             : student,
     )
@@ -114,9 +112,20 @@ export function CommissionDetailPage() {
         setStatusDraft('Activo')
     }
 
-    const saveStudentStatus = () => {
+    const saveStudentStatus = async () => {
         if (!statusTarget) return
-        statusTarget.ids.forEach((studentId) => updateCommissionStudentStatus(studentId, commission.id, course.name, commission.name, statusDraft))
+        let failed = 0
+        for (const studentId of statusTarget.ids) {
+            try {
+                await assignEnrollment.mutateAsync({ courseId: course.id, commissionId: commission.id, studentId, status: statusDraft })
+                // Only generate tuition on (re)activation — marking someone Pausado/Finalizado/Baja
+                // shouldn't create new pending cuotas for them.
+                if (statusDraft === 'Activo') await generateTuition.mutateAsync({ studentId, commissionId: commission.id })
+            } catch {
+                failed += 1
+            }
+        }
+        showToast(failed === 0 ? 'success' : 'error', failed === 0 ? 'Estado actualizado correctamente.' : `No se pudo actualizar el estado de ${failed} alumno${failed === 1 ? '' : 's'}.`)
         setStatusTarget(null)
         setSelectedStudentIds([])
     }
@@ -242,9 +251,17 @@ export function CommissionDetailPage() {
                 initialCommissionId={commission.id}
                 allowStudentSelection
                 onClose={() => setIsAssignmentModalOpen(false)}
-                onConfirm={({ studentIds }) => {
-                    assignStudentsToCommission(studentIds, course.name, commission.name, commission.amount, commission.id, 'Activo')
-                    setManualStudentIds((current) => Array.from(new Set([...current, ...studentIds])))
+                onConfirm={async ({ studentIds }) => {
+                    let failed = 0
+                    for (const studentId of studentIds) {
+                        try {
+                            await assignEnrollment.mutateAsync({ courseId: course.id, commissionId: commission.id, studentId })
+                            await generateTuition.mutateAsync({ studentId, commissionId: commission.id })
+                        } catch {
+                            failed += 1
+                        }
+                    }
+                    showToast(failed === 0 ? 'success' : 'error', failed === 0 ? 'Alumnos asignados correctamente.' : `No se pudo asignar a ${failed} alumno${failed === 1 ? '' : 's'}.`)
                     setIsAssignmentModalOpen(false)
                 }}
             />
@@ -256,7 +273,10 @@ export function CommissionDetailPage() {
                 confirmLabel="Cerrar comisión"
                 onClose={() => setIsCloseCommissionOpen(false)}
                 onConfirm={() => {
-                    updateCommission(course.id, commission.id, { status: 'Cerrada' })
+                    updateCommission.mutate({ courseId: course.id, commissionId: commission.id, changes: { status: 'Cerrada' } }, {
+                        onSuccess: () => showToast('success', 'Comisión cerrada correctamente.'),
+                        onError: () => showToast('error', 'No se pudo cerrar la comisión. Intentá nuevamente.'),
+                    })
                     setIsCloseCommissionOpen(false)
                 }}
             />

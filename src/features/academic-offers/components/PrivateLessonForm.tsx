@@ -1,12 +1,11 @@
 import { FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
-import { StaffSelect } from '@/features/staff'
 import { WeekDaysCheckboxGroup } from '@/components/forms/WeekDaysCheckboxGroup'
 import { TimeRangeField } from '@/components/forms/TimeRangeField'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 
 export type PrivateLessonFormValue = {
     studentId: string
-    teacher: string
+    teacherId: string
     purpose: string
     plan: string
     startDate: string
@@ -22,16 +21,22 @@ export type PrivateLessonStudentOption = {
     label: string
 }
 
+export type PrivateLessonTeacherOption = {
+    id: string
+    fullName: string
+}
+
 type PrivateLessonFormProps = {
     value: PrivateLessonFormValue
     onChange: (updater: (current: PrivateLessonFormValue) => PrivateLessonFormValue) => void
     studentOptions: PrivateLessonStudentOption[]
+    teacherOptions: PrivateLessonTeacherOption[]
 }
 
 const dayOptions = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 const planOptions = ['Clase individual', 'Plan mensual', 'Pack 4 clases', 'Pack 8 clases', 'Pack 12 clases']
 
-export function PrivateLessonForm({ value, onChange, studentOptions }: PrivateLessonFormProps) {
+export function PrivateLessonForm({ value, onChange, studentOptions, teacherOptions }: PrivateLessonFormProps) {
     const costLabel = value.plan === 'Plan mensual' ? 'Costo por mes' : 'Costo por clase'
 
     return (
@@ -43,7 +48,7 @@ export function PrivateLessonForm({ value, onChange, studentOptions }: PrivateLe
                     </FormField>
 
                     <FormField label="Docente" required>
-                        <StaffSelect value={value.teacher} onChange={(teacher) => onChange((current) => ({ ...current, teacher }))} />
+                        <SearchableSelect value={value.teacherId} options={teacherOptions.map((option) => ({ value: option.id, label: option.fullName }))} onChange={(teacherId) => onChange((current) => ({ ...current, teacherId }))} placeholder="Buscar docente" emptyLabel="No encontramos docentes." />
                     </FormField>
 
                     <FormField label="Plan" required>

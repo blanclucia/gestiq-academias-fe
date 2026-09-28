@@ -1,21 +1,24 @@
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@/auth/AuthContext'
 import type { PaymentMethod } from '@/types/domain'
-import { addMonthsToDate } from '@/domain/shared/dateRules'
 export { getExpenseDisplayStatus } from '@/domain/finance/expenseRules'
 import { createRepositoryEvents } from '@/services/shared/repositoryEvents'
 import { readStoredValue, writeStoredValue } from '@/services/shared/storage'
+import { chargeMethodFromApi, chargeMethodToApi } from '@/services/organization/chargesMapping'
+import { createExpenseApi, deleteExpenseApi, fetchExpenses, updateExpenseApi, type ApiExpense, type ApiExpenseCreate, type ApiExpensePatch } from '@/services/organization/expensesApi'
+import { expenseCategoryFromApi, expenseCategoryToApi, expenseRecurrenceFromApi, expenseRecurrenceToApi, expenseStatusFromApi, expenseStatusToApi } from '@/services/organization/expensesMapping'
 
 export type ExpenseStatus = 'Pendiente' | 'Pagado'
 export type ExpenseCategory = 'Alquiler' | 'Servicios' | 'Sueldos' | 'Impuestos' | 'Insumos' | 'Otro'
 
 export type Expense = {
     id: string
-    branchId?: string
+    branchId: string
     seriesId?: string
     concept: string
     category: ExpenseCategory
     beneficiary: string
-    branch: string
     amount: number
     dueDate?: string
     status: ExpenseStatus
@@ -25,89 +28,114 @@ export type Expense = {
     recurrence: 'Único' | 'Mensual'
 }
 
-export type ExpenseInput = Omit<Expense, 'id' | 'seriesId' | 'paidDate' | 'method'> & {
-    repeatUntil?: string
-    paidDate?: string
-    method?: PaymentMethod
-}
+export type ExpenseInput = Omit<Expense, 'id' | 'seriesId'> & { repeatUntil?: string }
 
+// financeRepository has always kept its own storage independent of AcademyState — this stays as
+// the local mirror of the real backend (kept warm by useExpenses()/<ExpensesSync>) instead of the
+// old local-only expenses; same repositoryEvents mechanism, just repurposed as a cache.
 const storageKey = 'gestiq-finance-repository-v1'
 const repositoryEvents = createRepositoryEvents(storageKey)
 
-const initialExpenses: Expense[] = [
-    { id: 'EXP-101', seriesId: 'SER-ALQUILER', concept: 'Alquiler de la sede', category: 'Alquiler', beneficiary: 'Inmobiliaria Centro', branch: 'Sede San José', amount: 420000, dueDate: '2026-09-10', status: 'Pendiente', recurrence: 'Mensual' },
-    { id: 'EXP-102', concept: 'Servicio de internet', category: 'Servicios', beneficiary: 'Proveedor de internet', branch: 'Sede San José', amount: 46000, dueDate: '2026-09-08', status: 'Pendiente', recurrence: 'Mensual' },
-    { id: 'EXP-103', concept: 'Material didáctico', category: 'Insumos', beneficiary: 'Librería Central', branch: 'Sede San José', amount: 85000, dueDate: '2026-09-03', status: 'Pagado', paidDate: '2026-09-02', method: 'Transferencia', recurrence: 'Único' },
-    { id: 'EXP-104', seriesId: 'SER-ALQUILER', concept: 'Alquiler de la sede', category: 'Alquiler', beneficiary: 'Inmobiliaria Centro', branch: 'Sede San José', amount: 420000, dueDate: '2026-10-10', status: 'Pendiente', recurrence: 'Mensual' },
-]
-
-function read(): Expense[] {
+function readMirror(): Expense[] {
     const saved = readStoredValue<Expense[] | null>(storageKey, null)
-    return Array.isArray(saved) ? saved : initialExpenses
+    return Array.isArray(saved) ? saved : []
 }
-
-function write(expenses: Expense[]) {
+function writeMirror(expenses: Expense[]) {
     writeStoredValue(storageKey, expenses)
     repositoryEvents.emit()
+}
+function sameMirror(current: Expense[], next: Expense[]): boolean {
+    return JSON.stringify(current) === JSON.stringify(next)
 }
 
 export function useFinanceRepositoryVersion() {
     return useSyncExternalStore(repositoryEvents.subscribe, repositoryEvents.getRevision, () => 0)
 }
 
-export function listExpenses() {
-    return read().map((expense) => ({ ...expense, branchId: expense.branchId ?? 'BR-1001' })).sort((a, b) => (a.dueDate ?? '9999-12-31').localeCompare(b.dueDate ?? '9999-12-31'))
+export function listExpenses(): Expense[] {
+    return readMirror().slice().sort((a, b) => (a.dueDate ?? '9999-12-31').localeCompare(b.dueDate ?? '9999-12-31'))
 }
 
-export function createExpense(input: ExpenseInput) {
-    const baseId = Date.now()
-    const seriesId = input.recurrence === 'Mensual' ? `SER-${baseId}` : undefined
-    const limit = input.repeatUntil || (input.dueDate ? addMonthsToDate(input.dueDate, 11) : '')
-    const dates: string[] = []
-    for (let index = 0; index < (input.recurrence === 'Mensual' ? 60 : 1); index += 1) {
-        const dueDate = input.dueDate ? addMonthsToDate(input.dueDate, index) : ''
-        if (dueDate > limit) break
-        dates.push(dueDate)
+function fromApiExpense(e: ApiExpense): Expense {
+    return {
+        id: e.id, branchId: e.branchId, seriesId: e.seriesId, concept: e.concept, category: expenseCategoryFromApi(e.category),
+        beneficiary: e.beneficiary, amount: e.amount, dueDate: e.dueDate, status: expenseStatusFromApi(e.status),
+        paidDate: e.paidDate, method: e.method ? chargeMethodFromApi(e.method) : undefined,
+        notes: e.notes || undefined, recurrence: expenseRecurrenceFromApi(e.recurrence),
     }
-    const created = dates.map((dueDate, index): Expense => ({
-        id: `EXP-${baseId}-${index}`,
-        branchId: input.branchId,
-        seriesId,
-        concept: input.concept,
-        category: input.category,
-        beneficiary: input.beneficiary,
-        branch: input.branch,
-        amount: input.amount,
-        dueDate,
-        status: index === 0 ? input.status : 'Pendiente',
-        paidDate: index === 0 ? input.paidDate : undefined,
-        method: index === 0 ? input.method : undefined,
-        recurrence: input.recurrence,
-        notes: input.notes,
-    }))
-    write([...read(), ...created])
-    return created[0]
 }
 
-export function payExpense(id: string, paidDate: string, method: PaymentMethod) {
-    write(read().map((expense) => expense.id === id ? { ...expense, status: 'Pagado', paidDate, method } : expense))
+export function useExpenses(options: { enabled?: boolean } = {}) {
+    const { session } = useAuth()
+    const organizationSlug = session?.organization.slug
+    const query = useQuery({
+        queryKey: ['expenses', organizationSlug],
+        queryFn: ({ signal }) => fetchExpenses(organizationSlug!, {}, signal),
+        enabled: Boolean(organizationSlug) && (options.enabled ?? true),
+    })
+    useEffect(() => {
+        if (!query.data) return
+        const mapped = query.data.map(fromApiExpense)
+        if (!sameMirror(readMirror(), mapped)) {
+            writeMirror(mapped)
+        }
+    }, [query.data])
+    return { isLoading: query.isLoading, isError: query.isError }
 }
 
-export function updateRecurringExpenses(id: string, changes: Partial<Expense>, scope: 'single' | 'future' | 'series') {
-    const expenses = read()
-    const target = expenses.find((expense) => expense.id === id)
-    if (!target || scope === 'single' || !target.seriesId) {
-        write(expenses.map((expense) => expense.id === id ? { ...expense, ...changes } : expense))
-        return
-    }
-
-    write(expenses.map((expense) => {
-        const belongsToSeries = expense.seriesId === target.seriesId
-        const isInScope = scope === 'series' || !target.dueDate || !expense.dueDate || expense.dueDate >= target.dueDate
-        return belongsToSeries && isInScope && expense.status !== 'Pagado' ? { ...expense, ...changes, dueDate: expense.dueDate } : expense
-    }))
+export function useCreateExpense() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async (input: ExpenseInput) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            const payload: ApiExpenseCreate = {
+                branchId: input.branchId, concept: input.concept, category: expenseCategoryToApi(input.category),
+                beneficiary: input.beneficiary, amount: input.amount, dueDate: input.dueDate || undefined,
+                status: expenseStatusToApi(input.status), paidDate: input.paidDate,
+                method: input.method ? chargeMethodToApi(input.method) : undefined,
+                notes: input.notes ?? '', recurrence: expenseRecurrenceToApi(input.recurrence), repeatUntil: input.repeatUntil || undefined,
+            }
+            return createExpenseApi(organizationSlug, payload)
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['expenses', organizationSlug] }),
+    })
 }
 
-export function removeExpense(id: string) {
-    write(read().filter((expense) => expense.id !== id))
+export function useUpdateExpense() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async ({ id, changes, scope }: { id: string; changes: Partial<ExpenseInput>; scope?: 'single' | 'future' | 'series' }) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            const patch: ApiExpensePatch = {}
+            if (changes.concept !== undefined) patch.concept = changes.concept
+            if (changes.category !== undefined) patch.category = expenseCategoryToApi(changes.category)
+            if (changes.beneficiary !== undefined) patch.beneficiary = changes.beneficiary
+            if (changes.amount !== undefined) patch.amount = changes.amount
+            if (changes.dueDate !== undefined) patch.dueDate = changes.dueDate
+            if (changes.status !== undefined) patch.status = expenseStatusToApi(changes.status)
+            if (changes.paidDate !== undefined) patch.paidDate = changes.paidDate
+            if (changes.method !== undefined) patch.method = chargeMethodToApi(changes.method)
+            if (changes.notes !== undefined) patch.notes = changes.notes
+            if (scope) patch.scope = scope
+            return updateExpenseApi(organizationSlug, id, patch)
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['expenses', organizationSlug] }),
+    })
+}
+
+export function useDeleteExpense() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async (id: string) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            await deleteExpenseApi(organizationSlug, id)
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['expenses', organizationSlug] }),
+    })
 }

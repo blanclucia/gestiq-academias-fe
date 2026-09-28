@@ -13,12 +13,11 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { listAccessibleBranches, setSelectedBranchId, useBranchRepositoryVersion, useSelectedBranchId } from '@/services/branchRepository'
+import { setSelectedBranchId, useSelectedBranchId } from '@/services/branchRepository'
 import { useAcademyBrand } from '@/theme/AcademyBrandContext'
 import { useAppBrand } from '@/theme/AppBrandContext'
 import { RoleSwitcher } from './RoleSwitcher'
-import { useActiveRole } from '@/auth/RoleContext'
-import { demoAdministrativeLevel } from '@/auth/roleTypes'
+import { useAuth } from '@/auth/AuthContext'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
 type TopBarProps = {
@@ -36,9 +35,8 @@ export function TopBar({
     onToggleDarkMode,
     onLogout,
 }: TopBarProps) {
-    useBranchRepositoryVersion()
     const { brand } = useAcademyBrand()
-    const { activeRole } = useActiveRole()
+    const { session } = useAuth()
     const { path: workspacePath } = useWorkspace()
     const location = useLocation()
     const navigate = useNavigate()
@@ -47,7 +45,7 @@ export function TopBar({
     const [academyMenuOpen, setAcademyMenuOpen] = useState(false)
     const academyMenuRef = useRef<HTMLDivElement>(null)
     const userMenuRef = useRef<HTMLDivElement>(null)
-    const branches = listAccessibleBranches(activeRole, demoAdministrativeLevel === 'owner')
+    const branches = session?.accessibleBranches ?? []
     const selectedBranchId = useSelectedBranchId()
     const selectedBranch = branches.find((branch) => branch.id === selectedBranchId) ?? branches[0]
     const selectedAcademy = selectedBranch?.name ?? 'Sin sede activa'
@@ -96,7 +94,7 @@ export function TopBar({
                     <button
                         type="button"
                         className="academy-picker context-picker"
-                        aria-label="Seleccionar academia"
+                        aria-label="Seleccionar sede"
                         onClick={() => setAcademyMenuOpen((value) => !value)}
                     >
                         <span className="academy-picker-icon context-picker-icon">
@@ -107,7 +105,7 @@ export function TopBar({
                     </button>
 
                     {academyMenuOpen && (
-                        <div className="academy-menu context-picker-menu" role="menu" aria-label="Academias disponibles">
+                        <div className="academy-menu context-picker-menu" role="menu" aria-label="Sedes disponibles">
                             {branches.map((branch) => (
                                 <button
                                     key={branch.id}
@@ -116,7 +114,7 @@ export function TopBar({
                                     role="menuitem"
                                     onClick={() => {
                                         setSelectedBranchId(branch.id)
-                                        if (location.pathname.includes('/branches/')) navigate(workspacePath(`branches/${branch.id}`))
+                                        if (session?.permissions.includes('branches.update') && location.pathname.includes('/branches/')) navigate(workspacePath(`branches/${branch.id}`))
                                         setAcademyMenuOpen(false)
                                     }}
                                 >
@@ -156,7 +154,7 @@ export function TopBar({
                         aria-label="User menu"
                         onClick={() => setUserMenuOpen((value) => !value)}
                     >
-                        <span className="user-avatar">L</span>
+                        <span className="user-avatar" title={session?.user.name}>{session?.user.name.charAt(0).toUpperCase()}</span>
                         <ChevronDown size={14} />
                     </button>
 
@@ -166,14 +164,14 @@ export function TopBar({
                                 <UserCircle2 size={16} />
                                 <span>Mi perfil</span>
                             </Link>
-                            <Link to={workspacePath('academia')} className="user-panel-item" role="menuitem" onClick={() => setUserMenuOpen(false)}>
+                            {session?.permissions.includes('academy.update') && <Link to={workspacePath('academia')} className="user-panel-item" role="menuitem" onClick={() => setUserMenuOpen(false)}>
                                 <GraduationCap size={16} />
                                 <span>Mi academia</span>
-                            </Link>
-                            <Link to={workspacePath('sedes')} className="user-panel-item" role="menuitem" onClick={() => setUserMenuOpen(false)}>
+                            </Link>}
+                            {session?.permissions.includes('branches.update') && <Link to={workspacePath('sedes')} className="user-panel-item" role="menuitem" onClick={() => setUserMenuOpen(false)}>
                                 <Building2 size={16} />
                                 <span>Mis sedes</span>
-                            </Link>
+                            </Link>}
                             <button type="button" className="user-panel-item mobile-theme-menu-item" role="menuitem" onClick={() => { onToggleDarkMode?.(); setUserMenuOpen(false) }}>
                                 {darkMode ? <SunMedium size={16} /> : <Moon size={16} />}
                                 <span>{darkMode ? 'Modo claro' : 'Modo oscuro'}</span>

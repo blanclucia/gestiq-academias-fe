@@ -5,6 +5,7 @@ export type BranchSettings = {
     phone: string
     schedule: string
     timezone: string
+    status: 'Activa' | 'Inactiva'
 }
 
 export type BranchAutomation = {
@@ -21,6 +22,7 @@ export const defaultBranchSettings: BranchSettings = {
     phone: '+54 351 555-0198',
     schedule: 'Lunes a viernes, de 08:00 a 21:00',
     timezone: 'America/Argentina/Cordoba',
+    status: 'Activa',
 }
 
 export const defaultBranchAutomations: BranchAutomation[] = [
@@ -39,7 +41,10 @@ function read<T>(key: string, fallback: T): T {
 }
 
 export function getBranchSettings(branchId: string, defaults: Partial<BranchSettings> = {}) {
-    return read<BranchSettings>(settingsKey(branchId), { ...defaultBranchSettings, ...defaults })
+    // Merge per-field (not whole-object) so settings saved before a field like `status` existed
+    // still fall back to a sane value instead of leaving it undefined.
+    const stored = read<Partial<BranchSettings>>(settingsKey(branchId), {})
+    return { ...defaultBranchSettings, ...defaults, ...stored }
 }
 
 export function saveBranchSettings(branchId: string, settings: BranchSettings) {

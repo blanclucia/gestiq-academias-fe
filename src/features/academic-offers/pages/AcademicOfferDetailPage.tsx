@@ -6,7 +6,8 @@ import { CourseForm, type CourseFormValue } from '../components/CourseForm'
 import { EnrollmentForm, type EnrollmentFormValue } from '@/features/enrollments'
 import { DeleteConfirmationModal, EntityFormModal } from '@/components/crud/EntityFormModal'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { type AcademicCommission, createCommission, createEnrollmentOpening, listAcademicCycles, listCourses, listEnrollmentOpenings, listPublicRegistrations, listStudentsInCommission, removeCommission, removeEnrollmentOpening, updateCommission, updateCourse, updateEnrollmentOpening, useAcademyRepositoryVersion } from '@/services/academyRepository'
+import { type AcademicCommission, listAcademicCycles, listCourses, listEnrollmentOpenings, listStudentsInCommission, useAcademyRepositoryVersion, useCreateCommission, useCreateEnrollmentOpening, useDeleteCommission, useDeleteEnrollmentOpening, useUpdateCommission, useUpdateCourse, useUpdateEnrollmentOpening } from '@/services/academyRepository'
+import { isCommissionNameConflict } from '@/services/organization/academicOffersApi'
 import { validateCommission } from '@/features/commissions'
 import { validateEnrollment } from '@/features/enrollments'
 import { validateConditions } from '@/components/forms/formValidation'
@@ -15,6 +16,7 @@ import { OfferCommissionsCard } from '../components/OfferCommissionsCard'
 import { OfferEnrollmentsCard, type OfferEnrollmentRow } from '../components/OfferEnrollmentsCard'
 import { OfferFiltersModal } from '../components/OfferFiltersModal'
 import { calculateOccupancy, getEligibleCommissions } from '@/domain/commissions/commissionRules'
+import { useToast } from '@/components/ui/ToastContext'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
 type CourseCommission = AcademicCommission
@@ -45,7 +47,7 @@ export function AcademicOfferDetailPage() {
     const [isCreateEnrollmentOpen, setIsCreateEnrollmentOpen] = useState(false)
     const [isEditEnrollmentOpen, setIsEditEnrollmentOpen] = useState(false)
     const [newCommissionForm, setNewCommissionForm] = useState<CommissionFormValue>(() => emptyCommissionForm())
-    const [courseForm, setCourseForm] = useState<CourseFormValue>({ name: '', duration: '', description: '', status: 'Borrador' })
+    const [courseForm, setCourseForm] = useState<CourseFormValue>({ name: '', description: '', status: 'Borrador' })
     const [editingCommissionForm, setEditingCommissionForm] = useState<CommissionFormValue>(() => ({ name: requestedCommission?.name ?? '', teachers: requestedCommission?.teachers ?? (requestedCommission?.teacher ? [requestedCommission.teacher] : []), capacity: requestedCommission?.capacity ?? 20, amount: requestedCommission?.amount ?? 48000, startDate: requestedCommission?.startDate ?? '2026-03-01', endDate: requestedCommission?.endDate ?? '2026-12-15', dueDay: requestedCommission?.dueDay ?? 10, status: requestedCommission?.status ?? 'Programada', days: [], fromTime: '18:30', toTime: '20:00' }))
     const [editingCommission, setEditingCommission] = useState<CourseCommission | null>(requestedCommission)
     const [viewCommission, setViewCommission] = useState<CourseCommission | null>(null)
@@ -62,6 +64,14 @@ export function AcademicOfferDetailPage() {
     const [isEnrollmentFilterOpen, setIsEnrollmentFilterOpen] = useState(false)
     const [enrollmentFilters, setEnrollmentFilters] = useState<Record<string, string>>({})
     const course = courses.find((entry) => entry.id === courseId)
+    const updateCourse = useUpdateCourse()
+    const createCommission = useCreateCommission()
+    const updateCommission = useUpdateCommission()
+    const deleteCommission = useDeleteCommission()
+    const createEnrollmentOpening = useCreateEnrollmentOpening()
+    const updateEnrollmentOpening = useUpdateEnrollmentOpening()
+    const deleteEnrollmentOpening = useDeleteEnrollmentOpening()
+    const { showToast } = useToast()
 
     if (!course) {
         return <div className="dashboard-page"><div className="page-header"><div><h1>Oferta académica no encontrada</h1></div></div><div className="data-table-card"><p>La oferta académica solicitada no existe o fue eliminada.</p><Link to={path('offers')} className="primary-button" style={{ display: 'inline-flex', marginTop: 12 }}>Volver a oferta académica</Link></div></div>
@@ -70,7 +80,7 @@ export function AcademicOfferDetailPage() {
     const persistedEnrollmentRows = listEnrollmentOpenings(course.id)
         .map((opening) => {
             const eligibleCommissions = getEligibleCommissions(course.commissions, opening.startDate, opening.endDate)
-            const selectedCommissionIds = opening.commissionIds ?? eligibleCommissions.map((commission) => commission.id)
+            const selectedCommissionIds = opening.commissionIds.length > 0 ? opening.commissionIds : eligibleCommissions.map((commission) => commission.id)
             const eligibleCount = eligibleCommissions.filter((commission) => selectedCommissionIds.includes(commission.id)).length
             return {
                 id: opening.id,
@@ -81,7 +91,7 @@ export function AcademicOfferDetailPage() {
                 startDate: opening.startDate,
                 endDate: opening.endDate,
                 status: opening.status,
-                studentsCount: listPublicRegistrations(opening.id).length,
+                studentsCount: opening.registrationsCount,
             }
         })
     const allEnrollmentRows = persistedEnrollmentRows
@@ -155,7 +165,13 @@ export function AcademicOfferDetailPage() {
     })
 
     const handleDuplicateCommission = (commission: (typeof course.commissions)[number]) => {
-        createCommission(course.id, { ...commission, name: `${commission.name} (copia)`, studentsCount: 0, status: 'Programada' })
+        createCommission.mutate({
+            courseId: course.id,
+            commission: { name: `${commission.name} (copia)`, teacher: commission.teacher, teachers: commission.teachers, schedule: commission.schedule, capacity: commission.capacity, amount: commission.amount, startDate: commission.startDate, endDate: commission.endDate, dueDay: commission.dueDay, status: 'Programada' },
+        }, {
+            onSuccess: () => showToast('success', 'Comisión duplicada correctamente.'),
+            onError: () => showToast('error', 'No se pudo duplicar la comisión. Intentá nuevamente.'),
+        })
     }
 
     const openEditCommissionModal = (commission: (typeof course.commissions)[number]) => {
@@ -214,7 +230,12 @@ export function AcademicOfferDetailPage() {
                 validate={() => validateConditions({ courseName: !courseForm.name.trim() && 'Ingresá el nombre de la oferta.' })}
                 onClose={() => setIsEditCourseOpen(false)}
                 onSubmit={() => {
-                    if (courseForm.name.trim()) updateCourse(course.id, { ...courseForm, name: courseForm.name.trim() })
+                    if (courseForm.name.trim()) {
+                        updateCourse.mutate({ id: course.id, changes: { ...courseForm, name: courseForm.name.trim() } }, {
+                            onSuccess: () => showToast('success', 'Oferta académica actualizada correctamente.'),
+                            onError: () => showToast('error', 'No se pudo actualizar la oferta académica. Intentá nuevamente.'),
+                        })
+                    }
                     setIsEditCourseOpen(false)
                 }}
             >
@@ -237,7 +258,6 @@ export function AcademicOfferDetailPage() {
                         teacher: newCommissionForm.teachers[0] || 'Docente por asignar',
                         teachers: newCommissionForm.teachers,
                         schedule: formatCommissionSchedule(newCommissionForm),
-                        studentsCount: 0,
                         capacity: newCommissionForm.capacity,
                         amount: newCommissionForm.amount,
                         startDate: newCommissionForm.startDate,
@@ -245,15 +265,15 @@ export function AcademicOfferDetailPage() {
                         dueDay: newCommissionForm.dueDay,
                         status: newCommissionForm.status,
                     }
-                    const created = createCommission(course.id, draftCommission)
-                    if (!created) {
-                        setCommissionNameError('Ya existe una comisión con ese nombre dentro de esta oferta académica.')
-                        return
-                    }
-
-                    setIsCreateCommissionOpen(false)
-                    setCommissionNameError('')
-                    setNewCommissionForm(emptyCommissionForm(academicCycle?.startDate, academicCycle?.endDate))
+                    createCommission.mutate({ courseId: course.id, commission: draftCommission }, {
+                        onSuccess: () => {
+                            setIsCreateCommissionOpen(false)
+                            setCommissionNameError('')
+                            setNewCommissionForm(emptyCommissionForm(academicCycle?.startDate, academicCycle?.endDate))
+                            showToast('success', 'Comisión creada correctamente.')
+                        },
+                        onError: (error) => setCommissionNameError(isCommissionNameConflict(error) ? 'Ya existe una comisión con ese nombre dentro de esta oferta académica.' : 'No se pudo crear la comisión. Intentá nuevamente.'),
+                    })
                 }}
             >
                 <>
@@ -275,11 +295,16 @@ export function AcademicOfferDetailPage() {
                 onSubmit={() => {
                     if (editingCommission) {
                         const changes = { ...editingCommissionForm, name: editingCommissionForm.name.trim() || editingCommission.name, teacher: editingCommissionForm.teachers[0] || 'Docente por asignar', schedule: formatCommissionSchedule(editingCommissionForm) }
-                        const updated = updateCommission(course.id, editingCommission.id, changes)
-                        if (!updated) {
-                            setCommissionNameError('Ya existe otra comisión con ese nombre dentro de esta oferta académica.')
-                            return
-                        }
+                        updateCommission.mutate({ courseId: course.id, commissionId: editingCommission.id, changes }, {
+                            onSuccess: () => {
+                                setIsEditCommissionOpen(false)
+                                setEditingCommission(null)
+                                setCommissionNameError('')
+                                showToast('success', 'Comisión actualizada correctamente.')
+                            },
+                            onError: (error) => setCommissionNameError(isCommissionNameConflict(error) ? 'Ya existe otra comisión con ese nombre dentro de esta oferta académica.' : 'No se pudo actualizar la comisión. Intentá nuevamente.'),
+                        })
+                        return
                     }
                     setIsEditCommissionOpen(false)
                     setEditingCommission(null)
@@ -344,7 +369,10 @@ export function AcademicOfferDetailPage() {
                 onClose={() => setDeleteCommissionTarget(null)}
                 onConfirm={() => {
                     if (deleteCommissionTarget) {
-                        removeCommission(course.id, deleteCommissionTarget.id)
+                        deleteCommission.mutate({ courseId: course.id, commissionId: deleteCommissionTarget.id }, {
+                            onSuccess: () => showToast('success', 'Comisión eliminada correctamente.'),
+                            onError: () => showToast('error', 'No se pudo eliminar la comisión — puede tener alumnos activos en el roster.'),
+                        })
                     }
                     setDeleteCommissionTarget(null)
                 }}
@@ -357,10 +385,15 @@ export function AcademicOfferDetailPage() {
                 validate={() => validateEnrollment(enrollmentForm, course.commissions)}
                 onClose={() => setIsCreateEnrollmentOpen(false)}
                 onSubmit={() => {
-                    const createdEnrollmentId = createEnrollmentOpening({ ...enrollmentForm, courseId: course.id }).id
+                    createEnrollmentOpening.mutate({ ...enrollmentForm, courseId: course.id }, {
+                        onSuccess: (created) => {
+                            showToast('success', 'Inscripción creada correctamente.')
+                            navigate(path(`oferta/${course.id}/inscripciones/${created.id}`))
+                        },
+                        onError: () => showToast('error', 'No se pudo crear la inscripción. Intentá nuevamente.'),
+                    })
                     setEnrollmentForm({ courseId: course.id, commissionIds: [], amount: 48000, startDate: '2026-08-26', endDate: '2026-08-30', status: 'Abierta' })
                     setIsCreateEnrollmentOpen(false)
-                    navigate(path(`oferta/${course.id}/inscripciones/${createdEnrollmentId}`))
                 }}
             >
                 <EnrollmentForm
@@ -382,7 +415,10 @@ export function AcademicOfferDetailPage() {
                 }}
                 onSubmit={() => {
                     if (editingEnrollment && enrollmentForm.commissionIds.length > 0) {
-                        updateEnrollmentOpening(editingEnrollment.id, enrollmentForm)
+                        updateEnrollmentOpening.mutate({ id: editingEnrollment.id, changes: enrollmentForm }, {
+                            onSuccess: () => showToast('success', 'Inscripción actualizada correctamente.'),
+                            onError: () => showToast('error', 'No se pudo actualizar la inscripción. Intentá nuevamente.'),
+                        })
                     }
                     setIsEditEnrollmentOpen(false)
                     setEditingEnrollment(null)
@@ -427,7 +463,10 @@ export function AcademicOfferDetailPage() {
                 onClose={() => setDeleteEnrollmentTarget(null)}
                 onConfirm={() => {
                     if (deleteEnrollmentTarget) {
-                        removeEnrollmentOpening(deleteEnrollmentTarget.id)
+                        deleteEnrollmentOpening.mutate(deleteEnrollmentTarget.id, {
+                            onSuccess: () => showToast('success', 'Inscripción eliminada correctamente.'),
+                            onError: () => showToast('error', 'No se pudo eliminar la inscripción. Intentá nuevamente.'),
+                        })
                     }
                     setDeleteEnrollmentTarget(null)
                 }}
@@ -455,7 +494,7 @@ export function AcademicOfferDetailPage() {
                             activeCommissions={activeCommissions}
                             openEnrollments={openEnrollments.length}
                             onEdit={() => {
-                                setCourseForm({ name: course.name, duration: course.duration ?? '', description: course.description ?? '', status: course.status })
+                                setCourseForm({ name: course.name, description: course.description ?? '', status: course.status })
                                 setIsEditCourseOpen(true)
                             }}
                         />
@@ -498,7 +537,10 @@ export function AcademicOfferDetailPage() {
                             onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)}
                             onView={(enrollment) => navigate(path(`oferta/${course.id}/inscripciones/${enrollment.id}`))}
                             onEdit={openEditEnrollmentModal}
-                            onCloseEnrollment={(enrollment) => updateEnrollmentOpening(enrollment.id, { status: 'Cerrada' })}
+                            onCloseEnrollment={(enrollment) => updateEnrollmentOpening.mutate({ id: enrollment.id, changes: { status: 'Cerrada' } }, {
+                                onSuccess: () => showToast('success', 'Inscripción cerrada correctamente.'),
+                                onError: () => showToast('error', 'No se pudo cerrar la inscripción. Intentá nuevamente.'),
+                            })}
                             onDelete={setDeleteEnrollmentTarget}
                         />
                     )}

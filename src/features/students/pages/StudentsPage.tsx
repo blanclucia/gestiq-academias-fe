@@ -5,7 +5,8 @@ import { CrudListPage } from '@/components/crud/CrudListPage'
 import { DeleteConfirmationModal, EntityFormModal, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
 import { StudentForm, type StudentFormValue } from '../components/StudentForm'
 import { CommissionAssignmentModal } from '@/features/commissions'
-import { assignStudentsToCommission, createStudent, getActiveAcademicCycleId, listCourses, listStudents, removeStudent, updateStudent, useAcademyRepositoryVersion } from '@/services/academyRepository'
+import { assignStudentsToCommission, getActiveAcademicCycleId, listCourses, useAcademyRepositoryVersion, useCreateStudent, useDeleteStudent, useStudents, useUpdateStudent } from '@/services/academyRepository'
+import { isStudentDocumentConflict } from '@/services/organization/studentsApi'
 import { useCrudList } from '@/hooks/useCrudList'
 import type { Student } from '@/types/domain'
 import { useSelectedBranchId } from '@/services/branchRepository'
@@ -14,6 +15,7 @@ import { csvHeaders, importFieldLabels, parseStudentCsv, requiredImportFields, s
 import { validateStudent } from '../model/studentValidation'
 import { validateConditions } from '@/components/forms/formValidation'
 import { StudentsTable } from '../components/StudentsTable'
+import { useToast } from '@/components/ui/ToastContext'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
 type StudentFilters = {
@@ -41,7 +43,12 @@ export function StudentsPage() {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false)
     const [editingStudent, setEditingStudent] = useState<Student | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Student | null>(null)
-    const studentList = listStudents()
+    const { students: allStudents } = useStudents()
+    const studentList = allStudents.filter((student) => student.branchId === selectedBranchId)
+    const createStudent = useCreateStudent()
+    const updateStudent = useUpdateStudent()
+    const deleteStudent = useDeleteStudent()
+    const { showToast } = useToast()
     const academicCourses = listCourses().filter((course) => course.cycleId === getActiveAcademicCycleId())
     const [studentForm, setStudentForm] = useState<StudentFormValue>(emptyStudentForm)
     const [statusChangeRequest, setStatusChangeRequest] = useState<StatusChangeRequest | null>(null)
@@ -64,6 +71,7 @@ export function StudentsPage() {
     })
     const [importFileName, setImportFileName] = useState('')
     const [importFileError, setImportFileError] = useState('')
+    const [createError, setCreateError] = useState('')
     const [rowCourseAssignments, setRowCourseAssignments] = useState<Record<number, string>>({})
     const [globalCourseAssignment, setGlobalCourseAssignment] = useState('')
     const [appliedFilters, setAppliedFilters] = useState<StudentFilters>({
@@ -266,32 +274,34 @@ export function StudentsPage() {
         setGlobalCourseAssignment('')
     }
 
-    const applyImport = () => {
+    const applyImport = async () => {
         if (validImportRows.length === 0) {
             return
         }
+        if (!selectedBranchId) {
+            showToast('error', 'Elegí una sede en la barra superior antes de importar alumnos.')
+            return
+        }
 
-        const newStudents = validImportRows.map((row) => ({
-            firstName: row.firstName,
-            lastName: row.lastName,
-            fullName: `${row.firstName} ${row.lastName}`,
-            document: row.document,
-            email: row.email || '',
-            phone: row.phone || '',
-            birthDate: row.birthDate,
-            status: 'Pendiente' as const,
-            notes: undefined,
-            courses: (function () {
-                const selectedCourseKey = Object.prototype.hasOwnProperty.call(rowCourseAssignments, row.rowNumber)
-                    ? rowCourseAssignments[row.rowNumber]
-                    : ''
-                const selectedCourse = selectedCourseKey ? importCourseOptionMap.get(selectedCourseKey) : undefined
-
-                return selectedCourse ? [selectedCourse] : []
-            })(),
-        }))
-
-        newStudents.forEach((student) => createStudent(student))
+        let created = 0
+        let failed = 0
+        for (const row of validImportRows) {
+            const selectedCourseKey = Object.prototype.hasOwnProperty.call(rowCourseAssignments, row.rowNumber)
+                ? rowCourseAssignments[row.rowNumber]
+                : ''
+            const selectedCourse = selectedCourseKey ? importCourseOptionMap.get(selectedCourseKey) : undefined
+            try {
+                const student = await createStudent.mutateAsync({
+                    firstName: row.firstName, lastName: row.lastName, document: row.document,
+                    email: row.email || '', phone: row.phone || '', birthDate: row.birthDate, status: 'Pendiente',
+                })
+                created += 1
+                if (selectedCourse) assignStudentsToCommission([student.id], selectedCourse.name, selectedCourse.group, 0, undefined, 'Activo')
+            } catch {
+                failed += 1
+            }
+        }
+        showToast(failed === 0 ? 'success' : 'error', failed === 0 ? `Se importaron ${created} alumnos.` : `Se importaron ${created} alumnos. ${failed} filas fallaron (documento duplicado u otro error).`)
         setIsImportModalOpen(false)
         setImportHeaders([])
         setImportRawRows([])
@@ -471,14 +481,25 @@ export function StudentsPage() {
                 title="Nuevo alumno"
                 subtitle="Completa los datos principales del estudiante."
                 validate={() => validateStudent(studentForm)}
-                onClose={() => { setIsCreateModalOpen(false); setStudentForm(emptyStudentForm) }}
+                onClose={() => { setIsCreateModalOpen(false); setStudentForm(emptyStudentForm); setCreateError('') }}
                 onSubmit={() => {
-                    createStudent({ ...studentForm, fullName: `${studentForm.firstName.trim()} ${studentForm.lastName.trim()}`, notes: studentForm.notes || undefined, courses: [] })
-                    setIsCreateModalOpen(false)
-                    setStudentForm(emptyStudentForm)
+                    setCreateError('')
+                    if (!selectedBranchId) {
+                        showToast('error', 'Elegí una sede en la barra superior antes de crear un alumno.')
+                        return
+                    }
+                    createStudent.mutate(studentForm, {
+                        onSuccess: () => {
+                            setIsCreateModalOpen(false)
+                            setStudentForm(emptyStudentForm)
+                            showToast('success', 'Alumno creado correctamente.')
+                        },
+                        onError: (error) => setCreateError(isStudentDocumentConflict(error) ? 'Ya existe un alumno con ese documento en esta organización.' : 'No se pudo crear el alumno. Intentá nuevamente.'),
+                    })
                 }}
             >
                 <StudentForm value={studentForm} onChange={setStudentForm} />
+                {createError && <p style={{ margin: 0, color: 'var(--red)', fontSize: 13 }}>{createError}</p>}
             </EntityFormModal>
 
             <EntityFormModal
@@ -492,7 +513,10 @@ export function StudentsPage() {
                 }}
                 onSubmit={() => {
                     if (editingStudent) {
-                        updateStudent(editingStudent.id, { ...studentForm, fullName: `${studentForm.firstName.trim()} ${studentForm.lastName.trim()}`, notes: studentForm.notes || undefined })
+                        updateStudent.mutate({ id: editingStudent.id, changes: studentForm }, {
+                            onSuccess: () => showToast('success', 'Alumno actualizado correctamente.'),
+                            onError: (error) => showToast('error', isStudentDocumentConflict(error) ? 'Ya existe un alumno con ese documento en esta organización.' : 'No se pudo actualizar el alumno. Intentá nuevamente.'),
+                        })
                     }
                     setIsEditModalOpen(false)
                     setEditingStudent(null)
@@ -524,7 +548,10 @@ export function StudentsPage() {
                 onClose={() => setDeleteTarget(null)}
                 onConfirm={() => {
                     if (deleteTarget) {
-                        removeStudent(deleteTarget.id)
+                        deleteStudent.mutate(deleteTarget.id, {
+                            onSuccess: () => showToast('success', 'Alumno eliminado correctamente.'),
+                            onError: () => showToast('error', 'No se pudo eliminar el alumno. Intentá nuevamente.'),
+                        })
                     }
                     setDeleteTarget(null)
                 }}
@@ -542,7 +569,10 @@ export function StudentsPage() {
                 onClose={() => setStatusChangeRequest(null)}
                 onConfirm={() => {
                     if (statusChangeRequest) {
-                        updateStudent(statusChangeRequest.studentId, { status: statusChangeRequest.nextStatus })
+                        updateStudent.mutate({ id: statusChangeRequest.studentId, changes: { status: statusChangeRequest.nextStatus } }, {
+                            onSuccess: () => showToast('success', statusChangeRequest.nextStatus === 'Inactivo' ? 'Alumno pausado correctamente.' : 'Alumno reactivado correctamente.'),
+                            onError: () => showToast('error', 'No se pudo actualizar el estado del alumno.'),
+                        })
                     }
                     setStatusChangeRequest(null)
                 }}
@@ -554,10 +584,19 @@ export function StudentsPage() {
                 description={`¿Querés pasar a Inactivo a ${selectedActiveStudents.length} alumno${selectedActiveStudents.length === 1 ? '' : 's'} seleccionado${selectedActiveStudents.length === 1 ? '' : 's'}?`}
                 confirmLabel="Confirmar baja"
                 onClose={() => setIsBulkDeactivateOpen(false)}
-                onConfirm={() => {
+                onConfirm={async () => {
                     const selectedSet = new Set(selectedActiveStudents.map((student) => student.id))
-
-                    selectedSet.forEach((studentId) => updateStudent(studentId, { status: 'Inactivo' }))
+                    let succeeded = 0
+                    let failed = 0
+                    for (const studentId of selectedSet) {
+                        try {
+                            await updateStudent.mutateAsync({ id: studentId, changes: { status: 'Inactivo' } })
+                            succeeded += 1
+                        } catch {
+                            failed += 1
+                        }
+                    }
+                    showToast(failed === 0 ? 'success' : 'error', failed === 0 ? `${succeeded} alumnos pasados a Inactivo.` : `${succeeded} alumnos pasados a Inactivo. ${failed} fallaron.`)
                     resetSelection()
                     setIsBulkDeactivateOpen(false)
                 }}

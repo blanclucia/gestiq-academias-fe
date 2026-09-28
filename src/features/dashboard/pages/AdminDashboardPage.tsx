@@ -7,6 +7,7 @@ import { getExpenseDisplayStatus, listExpenses, useFinanceRepositoryVersion } fr
 import { listUpcomingAgendaEvents, useAgendaRepositoryVersion } from '@/services/agendaRepository'
 import { calculateOccupancy } from '@/domain/commissions/commissionRules'
 import { formatCurrencyARS, formatShortDate } from '@/domain/shared/formattingRules'
+import { useSelectedBranchId } from '@/services/branchRepository'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
 const currency = { format: formatCurrencyARS }
@@ -16,6 +17,7 @@ export function AdminDashboardPage() {
     useAcademyRepositoryVersion()
     useFinanceRepositoryVersion()
     useAgendaRepositoryVersion()
+    const selectedBranchId = useSelectedBranchId()
     const activeCycleId = getActiveAcademicCycleId()
     const activeCycle = listAcademicCycles().find((cycle) => cycle.id === activeCycleId)
     const today = new Date()
@@ -25,15 +27,16 @@ export function AdminDashboardPage() {
     const reminderLimit = new Date(today)
     reminderLimit.setDate(reminderLimit.getDate() + 14)
     const reminderLimitKey = `${reminderLimit.getFullYear()}-${String(reminderLimit.getMonth() + 1).padStart(2, '0')}-${String(reminderLimit.getDate()).padStart(2, '0')}`
-    const expenseReminders = listExpenses().filter((expense) => expense.status !== 'Pagado' && expense.dueDate && expense.dueDate <= reminderLimitKey).slice(0, 4)
+    const expenseReminders = listExpenses().filter((expense) => expense.branchId === selectedBranchId && expense.status !== 'Pagado' && expense.dueDate && expense.dueDate <= reminderLimitKey).slice(0, 4)
     const upcomingAgendaEvents = listUpcomingAgendaEvents(todayKey, 5, ['clase'])
 
     const data = (() => {
-        const students = listStudents()
-        const courses = listCourses().filter((course) => course.cycleId === activeCycleId)
+        const students = listStudents().filter((student) => student.branchId === selectedBranchId)
+        const studentIdsInBranch = new Set(students.map((student) => student.id))
+        const courses = listCourses().filter((course) => course.cycleId === activeCycleId && course.branchId === selectedBranchId)
         const payments = listPayments().filter((payment) => {
             const referenceDate = payment.status === 'Pagado' ? payment.date : payment.dueDate
-            return referenceDate.startsWith(currentMonthKey)
+            return referenceDate.startsWith(currentMonthKey) && payment.studentId !== undefined && studentIdsInBranch.has(payment.studentId)
         })
         const commissions = courses.flatMap((course) => course.commissions.map((commission) => ({ ...commission, courseName: course.name })))
         const confirmedPayments = payments.filter((payment) => payment.status === 'Pagado')

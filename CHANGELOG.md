@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Backend authentication with DNI, mandatory initial password change and logout.
+- In-memory tokens with coordinated refresh and server-derived session context.
+- Browser coverage for authentication, role isolation and mobile light/dark forms.
 - Initial app shell with persistent desktop/mobile sidebar behavior.
 - Global dashboard layout with top bar, academy branding, and responsive navigation.
 - Route structure for dashboard, students, teachers, courses, commissions, enrollments, and payments.
@@ -12,6 +15,8 @@ All notable changes to this project will be documented in this file.
 - Brand-aware theme foundation using app-level and academy-level providers.
 
 ### Changed
+- Removed demo authentication and locally assigned roles from private navigation.
+- Scoped local demonstration storage to the authenticated organization.
 - Kept the sidebar state stable across route changes by mounting the shell once at the app level.
 - Adjusted navigation behavior so desktop mode does not collapse/expand unexpectedly on click.
 - Persisted sidebar collapse preference in localStorage for a better UX across sessions.

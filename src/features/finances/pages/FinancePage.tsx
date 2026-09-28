@@ -8,13 +8,14 @@ import { RowActionMenu } from '@/components/ui/RowActionMenu'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { listPayments, useAcademyRepositoryVersion } from '@/services/academyRepository'
-import { createExpense, getExpenseDisplayStatus, listExpenses, payExpense, removeExpense, updateRecurringExpenses, useFinanceRepositoryVersion, type Expense, type ExpenseCategory, type ExpenseInput } from '@/services/financeRepository'
+import { getExpenseDisplayStatus, listExpenses, useCreateExpense, useDeleteExpense, useFinanceRepositoryVersion, useUpdateExpense, type Expense, type ExpenseCategory, type ExpenseInput } from '@/services/financeRepository'
 import type { PaymentMethod } from '@/types/domain'
-import { listBranches, useSelectedBranchId } from '@/services/branchRepository'
+import { useBranches, useSelectedBranchId } from '@/services/branchRepository'
 import { validateConditions } from '@/components/forms/formValidation'
 import { formatCurrencyARS, formatShortDate as formatDate } from '@/domain/shared/formattingRules'
 import { DateRangeControl } from '@/components/ui/DateRangeControl'
 import { calculateFinancialProjection } from '@/domain/finance/expenseRules'
+import { useToast } from '@/components/ui/ToastContext'
 
 type FinanceTab = 'summary' | 'expenses'
 const currency = { format: formatCurrencyARS }
@@ -25,20 +26,24 @@ function localDate() {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-function emptyExpense(branchId: string, branchName: string): ExpenseInput {
-    return { concept: '', category: 'Alquiler', beneficiary: '', branchId, branch: branchName, amount: 0, dueDate: '', status: 'Pendiente', paidDate: localDate(), method: 'Transferencia', recurrence: 'Único', repeatUntil: '', notes: '' }
+function emptyExpense(branchId: string): ExpenseInput {
+    return { concept: '', category: 'Alquiler', beneficiary: '', branchId, amount: 0, dueDate: '', status: 'Pendiente', paidDate: localDate(), method: 'Transferencia', recurrence: 'Único', repeatUntil: '', notes: '' }
 }
 
 export function FinancePage() {
     const [searchParams] = useSearchParams()
     useAcademyRepositoryVersion()
     useFinanceRepositoryVersion()
+    const { showToast } = useToast()
+    const createExpense = useCreateExpense()
+    const updateExpense = useUpdateExpense()
+    const deleteExpense = useDeleteExpense()
     const today = localDate()
     const selectedBranchId = useSelectedBranchId()
-    const branches = listBranches()
+    const { branches } = useBranches()
     const selectedBranch = branches.find((branch) => branch.id === selectedBranchId) ?? branches[0]
     const [activeTab, setActiveTab] = useState<FinanceTab>(() => searchParams.get('tab') === 'expenses' ? 'expenses' : 'summary')
-    const [expenseForm, setExpenseForm] = useState<ExpenseInput>(() => emptyExpense(selectedBranchId, selectedBranch?.name ?? 'Sede actual'))
+    const [expenseForm, setExpenseForm] = useState<ExpenseInput>(() => emptyExpense(selectedBranchId))
     const [isExpenseOpen, setIsExpenseOpen] = useState(false)
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
     const [editScope, setEditScope] = useState<'single' | 'future' | 'series'>('future')
@@ -75,13 +80,22 @@ export function FinancePage() {
     })
     const activeFilterCount = Object.values(filters).filter(Boolean).length
 
-    const openCreate = () => { setEditingExpense(null); setExpenseForm(emptyExpense(selectedBranchId, selectedBranch?.name ?? 'Sede actual')); setIsExpenseOpen(true) }
+    const openCreate = () => { setEditingExpense(null); setExpenseForm(emptyExpense(selectedBranchId)); setIsExpenseOpen(true) }
     const openEdit = (expense: Expense) => { setEditingExpense(expense); setEditScope(expense.seriesId ? 'future' : 'single'); setExpenseForm({ ...expense, repeatUntil: '' }); setIsExpenseOpen(true) }
 
     return <div className="dashboard-page finance-page">
         <EntityFormModal open={isExpenseOpen} title={editingExpense ? 'Editar egreso' : 'Nuevo egreso'} subtitle={editingExpense ? 'Actualizá este vencimiento o los pendientes de la serie.' : 'Registrá un gasto único o calendarizá sus próximos vencimientos.'} submitLabel={editingExpense ? 'Guardar cambios' : 'Crear egreso'} validate={() => validateConditions({ expenseConcept: !expenseForm.concept.trim() && 'Ingresá el concepto.', expenseAmount: expenseForm.amount <= 0 && 'Ingresá un importe válido.', expenseDueDate: expenseForm.recurrence === 'Mensual' && !expenseForm.dueDate && 'Ingresá el primer vencimiento.', expensePaidDate: expenseForm.recurrence === 'Único' && expenseForm.status === 'Pagado' && !expenseForm.paidDate && 'Ingresá la fecha de pago.' }, 'Revisá los datos del egreso.')} onClose={() => setIsExpenseOpen(false)} onSubmit={() => {
-            if (editingExpense) updateRecurringExpenses(editingExpense.id, expenseForm, editScope)
-            else createExpense(expenseForm)
+            if (editingExpense) {
+                updateExpense.mutate({ id: editingExpense.id, changes: expenseForm, scope: editScope }, {
+                    onSuccess: () => showToast('success', 'Egreso actualizado correctamente.'),
+                    onError: () => showToast('error', 'No se pudo actualizar el egreso. Intentá nuevamente.'),
+                })
+            } else {
+                createExpense.mutate(expenseForm, {
+                    onSuccess: () => showToast('success', 'Egreso creado correctamente.'),
+                    onError: () => showToast('error', 'No se pudo crear el egreso. Intentá nuevamente.'),
+                })
+            }
             setActiveTab('expenses')
             setIsExpenseOpen(false)
         }}>
@@ -101,8 +115,20 @@ export function FinancePage() {
             </FormGrid></FormSection>}</div>
         </EntityFormModal>
 
-        <EntityFormModal open={Boolean(payTarget)} title="Registrar pago" subtitle={payTarget ? `${payTarget.concept} · ${currency.format(payTarget.amount)}` : ''} submitLabel="Confirmar pago" onClose={() => setPayTarget(null)} onSubmit={() => { if (payTarget) payExpense(payTarget.id, paymentForm.paidDate, paymentForm.method); setPayTarget(null) }}><FormGrid><FormField label="Fecha de pago"><input className="form-input" type="date" value={paymentForm.paidDate} onChange={(event) => setPaymentForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio"><select className="form-input" value={paymentForm.method} onChange={(event) => setPaymentForm((current) => ({ ...current, method: event.target.value as PaymentMethod }))}><option>Transferencia</option><option>Tarjeta</option><option>Efectivo</option></select></FormField></FormGrid></EntityFormModal>
-        <DeleteConfirmationModal open={Boolean(deleteTarget)} title="Eliminar egreso" description={`Se eliminará solamente el vencimiento de “${deleteTarget?.concept ?? ''}”.`} onClose={() => setDeleteTarget(null)} onConfirm={() => { if (deleteTarget) removeExpense(deleteTarget.id); setDeleteTarget(null) }} />
+        <EntityFormModal open={Boolean(payTarget)} title="Registrar pago" subtitle={payTarget ? `${payTarget.concept} · ${currency.format(payTarget.amount)}` : ''} submitLabel="Confirmar pago" onClose={() => setPayTarget(null)} onSubmit={() => {
+            if (payTarget) {
+                updateExpense.mutate({ id: payTarget.id, changes: { status: 'Pagado', paidDate: paymentForm.paidDate, method: paymentForm.method } }, {
+                    onError: () => showToast('error', 'No se pudo registrar el pago. Intentá nuevamente.'),
+                })
+            }
+            setPayTarget(null)
+        }}><FormGrid><FormField label="Fecha de pago"><input className="form-input" type="date" value={paymentForm.paidDate} onChange={(event) => setPaymentForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio"><select className="form-input" value={paymentForm.method} onChange={(event) => setPaymentForm((current) => ({ ...current, method: event.target.value as PaymentMethod }))}><option>Transferencia</option><option>Tarjeta</option><option>Efectivo</option></select></FormField></FormGrid></EntityFormModal>
+        <DeleteConfirmationModal open={Boolean(deleteTarget)} title="Eliminar egreso" description={`Se eliminará solamente el vencimiento de “${deleteTarget?.concept ?? ''}”.`} onClose={() => setDeleteTarget(null)} onConfirm={() => {
+            if (deleteTarget) {
+                deleteExpense.mutate(deleteTarget.id, { onError: () => showToast('error', 'No se pudo eliminar el egreso. Intentá nuevamente.') })
+            }
+            setDeleteTarget(null)
+        }} />
         <EntityFormModal open={isFiltersOpen} title="Filtrar egresos" subtitle="Combiná los criterios para acotar los vencimientos." submitLabel="Aplicar filtros" cancelLabel="Cancelar" onClose={() => setIsFiltersOpen(false)} onSubmit={() => { setFilters(filterDraft); setIsFiltersOpen(false) }}><FormGrid><FormField label="Estado"><select className="form-input" value={filterDraft.status} onChange={(event) => setFilterDraft((current) => ({ ...current, status: event.target.value }))}><option value="">Todos</option><option>Pendiente</option><option>Vencido</option><option>Pagado</option></select></FormField><FormField label="Categoría"><select className="form-input" value={filterDraft.category} onChange={(event) => setFilterDraft((current) => ({ ...current, category: event.target.value }))}><option value="">Todas</option>{categories.map((item) => <option key={item}>{item}</option>)}</select></FormField><FormField label="Frecuencia"><select className="form-input" value={filterDraft.recurrence} onChange={(event) => setFilterDraft((current) => ({ ...current, recurrence: event.target.value }))}><option value="">Todas</option><option value="Único">Pago único</option><option value="Mensual">Mensual</option></select></FormField></FormGrid></EntityFormModal>
 
         <div className="page-header finance-header"><div><h1>Finanzas</h1><p>Ingresos, egresos y compromisos de {selectedBranch?.name ?? 'la sede'}.</p></div></div>

@@ -1,18 +1,17 @@
 import { FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
 import { useState } from 'react'
 
-export type CourseFormValue = { name: string; duration: string; description: string; status: 'Activo' | 'Borrador' | 'Cerrado' }
+export type CourseFormValue = { name: string; description: string; status: 'Activo' | 'Borrador' | 'Cerrado' }
 
 export function CourseForm({ initialValues, value, onValueChange }: {
     initialValues?: {
         name?: string
-        duration?: string
         description?: string
     }
     value?: CourseFormValue
     onValueChange?: (value: CourseFormValue) => void
 }) {
-    const [internalValue, setInternalValue] = useState<CourseFormValue>({ name: initialValues?.name ?? '', duration: initialValues?.duration ?? '', description: initialValues?.description ?? '', status: 'Borrador' })
+    const [internalValue, setInternalValue] = useState<CourseFormValue>({ name: initialValues?.name ?? '', description: initialValues?.description ?? '', status: 'Borrador' })
     const formValue = value ?? internalValue
     const update = (changes: Partial<CourseFormValue>) => {
         const next = { ...formValue, ...changes }
@@ -27,9 +26,6 @@ export function CourseForm({ initialValues, value, onValueChange }: {
                         <input className="form-input" type="text" value={formValue.name} onChange={(event) => update({ name: event.target.value })} placeholder="Ej: Inglés General" />
                     </FormField>
 
-                    <FormField label="Duración">
-                        <input className="form-input" type="text" value={formValue.duration} onChange={(event) => update({ duration: event.target.value })} placeholder="Ej: 12 semanas" />
-                    </FormField>
                 </FormGrid>
             </FormSection>
 

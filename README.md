@@ -34,4 +34,8 @@ npm run lint
 
 ## Estado
 
-El proyecto se encuentra en una primera fase de shell y estructura base, lista para continuar con los CRUDs reales y módulos de negocio.
+Login con DNI, cambio inicial de contraseña y contexto de sesión conectados al backend Go.
+La sesión permanece en memoria; recargar requiere volver a ingresar.
+Los demás módulos todavía usan datos locales de demostración.
+
+Ver [configuración y pruebas de la integración](docs/guide/integracion-auth.md).

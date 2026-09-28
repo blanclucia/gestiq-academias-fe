@@ -1,10 +1,12 @@
+import { useAuth } from '@/auth/AuthContext'
 import { CalendarDays, ClipboardCheck, Clock3, Users } from 'lucide-react'
 import { ChartCard } from '@/components/layout/ChartCard'
 import { KpiCard } from '@/components/layout/KpiCard'
 
 export function TeacherDashboardPage() {
+    const { session } = useAuth()
     return <div className="dashboard-page">
-        <div className="page-header"><div><h1>Hola, Lucía</h1><p>Tu jornada docente en Sede San José.</p></div></div>
+        <div className="page-header"><div><h1>Hola, {session?.user.name}</h1><p>Tu jornada docente.</p></div></div>
         <div className="kpi-grid">
             <KpiCard title="Clases de hoy" value="3" change="La próxima comienza a las 16:00" />
             <KpiCard title="Alumnos hoy" value="24" change="En 3 comisiones" />

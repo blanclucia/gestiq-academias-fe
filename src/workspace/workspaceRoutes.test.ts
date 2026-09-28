@@ -10,8 +10,8 @@ describe('workspace routes', () => {
     })
 
     it('migrates legacy deep links and query parameters', () => {
-        expect(getLegacyRedirect('/offers/COURSE-1/commissions/COM-1', '?tab=students')).toBe('/puentes/admin/offers/COURSE-1/commissions/COM-1?tab=students')
-        expect(getLegacyRedirect('/inscripcion/ingles-2027')).toBe('/puentes/enrollments/ingles-2027')
+        expect(getLegacyRedirect('/offers/COURSE-1/commissions/COM-1', '?tab=students', 'puentes')).toBe('/puentes/admin/offers/COURSE-1/commissions/COM-1?tab=students')
+        expect(getLegacyRedirect('/inscripcion/ingles-2027', '', 'puentes')).toBe('/puentes/enrollments/ingles-2027')
         expect(getLegacyRedirect('/puentes/profe/clases')).toBe('/puentes/teacher/classes')
         expect(getLegacyRedirect('/puentes/admin/alumnos')).toBe('/puentes/admin/students')
     })

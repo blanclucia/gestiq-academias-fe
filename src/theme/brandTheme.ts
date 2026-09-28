@@ -22,7 +22,7 @@ export const defaultAcademyBrand: AcademyBrand = {
     shortName: 'AP',
     primary: '#4f46e5',
     primaryStrong: '#3730a3',
-    primarySoft: 'rgba(79, 70, 229, 0.14)',
+    primarySoft: '#4f46e524',
     primaryContrast: '#ffffff',
     accent: '#22c55e',
 }

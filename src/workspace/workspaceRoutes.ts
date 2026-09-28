@@ -3,7 +3,7 @@ import { modeByRole } from './workspaceTypes'
 
 export const modulePaths = {
     dashboard: '', agenda: 'schedule', students: 'students', offers: 'offers', billing: 'billing', finances: 'finances',
-    academy: 'academy', branches: 'branches', branchList: 'branches/list', profile: 'profile',
+    academy: 'academy', branches: 'branches', profile: 'profile',
     teacherClasses: 'classes', teacherAttendance: 'attendance', teacherSchedule: 'schedule',
     studentCourses: 'courses', studentCalendar: 'calendar', studentPayments: 'payments',
 } as const

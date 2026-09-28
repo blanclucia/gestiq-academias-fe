@@ -1,16 +1,18 @@
-import { initialPayments } from '@/data/payments'
+import { useEffect } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@/auth/AuthContext'
 import { getCommissionMonthlyDueDates, getInstallmentMonthLabel } from '@/domain/billing/billingRules'
 import { getLocalDateString } from '@/domain/shared/dateRules'
 import type { ChargePaymentSnapshot, Payment } from '@/types/domain'
 import { paymentReadModelToChargeSnapshot } from '@/domain/billing/paymentRules'
 import { readAcademyState, updateAcademyState } from '@/services/academy/academyState'
-import type { ManualCharge, PaymentChannel, PaymentUpdate } from '@/services/academy/academyTypes'
+import type { PaymentUpdate, RealCharge } from '@/services/academy/academyTypes'
 import { listCourses } from '@/services/academy/coursesRepository'
-import { getPublicEnrollmentOffer, listEnrollmentOpenings } from '@/services/academy/enrollmentsRepository'
-import { listPrivateLessons } from '@/services/academy/privateLessonsRepository'
 import { listStudents } from '@/services/academy/studentsRepository'
+import { createChargeApi, deleteChargeApi, fetchCharges, generateTuitionApi, updateChargeApi, type ApiCharge, type ApiChargeInput, type ApiChargePatch } from '@/services/organization/chargesApi'
+import { chargeMethodFromApi, chargeStatusFromApiWithPartial } from '@/services/organization/chargesMapping'
 
-type LegacyPaymentRecord = Payment & { originalAmount: number; lastReminderAt?: string }
+type LegacyPaymentRecord = Payment & { originalAmount: number; lastReminderAt?: string; isReal?: boolean }
 export type PaymentRecord = LegacyPaymentRecord & { chargeSnapshot: ChargePaymentSnapshot }
 
 export function confirmPaymentRecord(id: string, method: Payment['method'], date = getLocalDateString()) {
@@ -18,53 +20,129 @@ export function confirmPaymentRecord(id: string, method: Payment['method'], date
 }
 
 export function updatePaymentRecord(id: string, changes: PaymentUpdate) {
-    updateAcademyState((current) => {
-        const paymentUpdate = { ...current.paymentUpdates[id], ...changes }
-        const registrationId = id.startsWith('PAY-REG-') ? id.slice(4) : null
-        const paymentMethod = paymentUpdate.method === 'Tarjeta' ? 'Mercado Pago' : paymentUpdate.method
-        return { ...current, paymentUpdates: { ...current.paymentUpdates, [id]: paymentUpdate }, registrations: registrationId && paymentUpdate.status === 'Pagado' ? current.registrations.map((registration) => registration.id === registrationId ? { ...registration, paid: true, paidAt: paymentUpdate.date ?? getLocalDateString(), transferReported: false, paymentMethod: paymentMethod as PaymentChannel } : registration) : current.registrations }
-    })
+    updateAcademyState((current) => ({ ...current, paymentUpdates: { ...current.paymentUpdates, [id]: { ...current.paymentUpdates[id], ...changes } } }))
 }
 
+// Una inscripción pública ya crea un Charge real (ver el módulo de Inscripciones) — no queda ningún
+// id sintético "PAY-REG-*" que pudiera bloquear su borrado, único caso que esta función cubría.
+export function getPaymentRemovalBlocker(): string | null {
+    return null
+}
+
+function fromApiCharge(charge: ApiCharge): RealCharge {
+    return {
+        id: charge.id,
+        studentId: charge.studentId,
+        commissionId: charge.commissionId,
+        source: charge.source,
+        concept: charge.concept,
+        amount: charge.amount,
+        dueDate: charge.dueDate,
+        status: chargeStatusFromApiWithPartial(charge),
+        method: charge.method ? chargeMethodFromApi(charge.method) : 'Transferencia',
+        date: charge.status === 'paid' && charge.paidAt ? charge.paidAt : '-',
+        notes: charge.notes,
+    }
+}
+
+function sameChargesMirror(current: RealCharge[], next: RealCharge[]): boolean {
+    return JSON.stringify(current) === JSON.stringify(next)
+}
+
+// listPayments() stays synchronous — BillingPage and its modals read it outside a data-fetching
+// lifecycle. Real charges (cuotas de comisión + cargos manuales + cuotas de inscripción, desde que
+// Inscripciones es real) come from the local mirror kept warm by useCharges()/<ChargesSync>;
+// old-assignment/exam rows stay exactly as before — those sources are still 100% mock.
 export function listPayments(): PaymentRecord[] {
     const state = readAcademyState()
-    const registrationPayments = state.registrations.flatMap((registration): LegacyPaymentRecord[] => {
-        const offer = getPublicEnrollmentOffer(registration.offerSlug)
-        const opening = offer ? listEnrollmentOpenings().find((item) => item.id === offer.openingId) : null
-        const commission = offer?.commissions.find((item) => item.id === registration.commissionId) ?? offer?.commissions[0]
-        return offer && commission ? [{ id: `PAY-${registration.id}`, student: registration.fullName, concept: `Inscripción · ${offer.courseName} · ${commission.name}`, method: registration.paymentMethod === 'Mercado Pago' ? 'Tarjeta' : registration.paymentMethod === 'Efectivo' ? 'Efectivo' : 'Transferencia', date: registration.paid ? registration.paidAt ?? registration.createdAt ?? getLocalDateString() : '-', dueDate: opening?.endDate ?? registration.createdAt ?? getLocalDateString(), amount: offer.amount, originalAmount: offer.amount, status: registration.paid ? 'Pagado' : registration.transferReported ? 'En verificación' : 'Pendiente' }] : []
-    })
-    const tuitionPayments = state.registrations.filter((registration) => registration.paid).flatMap((registration): LegacyPaymentRecord[] => {
-        const offer = getPublicEnrollmentOffer(registration.offerSlug)
-        const course = offer ? listCourses().find((item) => item.id === offer.courseId) : null
-        const commission = course?.commissions.find((item) => item.id === registration.commissionId) ?? course?.commissions[0]
-        if (!offer || !course || !commission) return []
-        return getCommissionMonthlyDueDates(commission).map((dueDate) => ({ id: `PAY-TUITION-${registration.id}-${dueDate.slice(0, 7)}`, student: registration.fullName, concept: `Cuota ${getInstallmentMonthLabel(dueDate)} · ${course.name} · ${commission.name}`, method: 'Transferencia', date: '-', dueDate, amount: commission.amount, originalAmount: commission.amount, status: 'Pendiente' }))
-    })
     const studentNames = new Map(listStudents().map((student) => [student.id, student.fullName]))
+    const realCharges: LegacyPaymentRecord[] = state.charges.map((charge) => ({
+        id: charge.id, student: studentNames.get(charge.studentId) ?? 'Alumno no encontrado', studentId: charge.studentId, concept: charge.concept,
+        method: charge.method, date: charge.date, dueDate: charge.dueDate, amount: charge.amount, originalAmount: charge.amount,
+        status: charge.status, isReal: true,
+    }))
     const assignmentPayments = state.assignments.flatMap((assignment): LegacyPaymentRecord[] => {
         const match = listCourses().flatMap((course) => course.commissions.map((commission) => ({ course, commission }))).find(({ course, commission }) => assignment.commissionId ? commission.id === assignment.commissionId : course.name === assignment.courseName && commission.name === assignment.commissionName)
         const amount = match?.commission.amount ?? assignment.amount
         const student = studentNames.get(assignment.studentId)
         if (!student || !amount || !match) return []
-        return getCommissionMonthlyDueDates(match.commission).map((dueDate) => ({ id: `PAY-ASSIGN-${assignment.studentId}-${match.commission.id}-${dueDate.slice(0, 7)}`, student, concept: `Cuota ${getInstallmentMonthLabel(dueDate)} · ${match.course.name} · ${match.commission.name}`, method: 'Transferencia', date: '-', dueDate, amount, originalAmount: amount, status: 'Pendiente' }))
+        return getCommissionMonthlyDueDates(match.commission).map((dueDate) => ({ id: `PAY-ASSIGN-${assignment.studentId}-${match.commission.id}-${dueDate.slice(0, 7)}`, student, studentId: assignment.studentId, concept: `Cuota ${getInstallmentMonthLabel(dueDate)} · ${match.course.name} · ${match.commission.name}`, method: 'Transferencia', date: '-', dueDate, amount, originalAmount: amount, status: 'Pendiente' }))
     })
-    const privateLessonPayments = listPrivateLessons().flatMap((lesson): LegacyPaymentRecord[] => {
-        const student = studentNames.get(lesson.studentId)
-        if (!student || lesson.status !== 'Activa') return []
-        const count = lesson.plan === 'Pack 4 clases' ? 4 : lesson.plan === 'Pack 8 clases' ? 8 : lesson.plan === 'Pack 12 clases' ? 12 : 1
-        const amount = lesson.plan === 'Plan mensual' ? lesson.costPerClass : lesson.costPerClass * count
-        return [{ id: `PAY-PRIVATE-${lesson.id}`, student, concept: `Clases particulares · ${lesson.plan}`, method: 'Transferencia', date: '-', dueDate: '2026-08-31', amount, originalAmount: amount, status: 'Pendiente' }]
-    })
-    const manualPayments = state.manualCharges.map((charge): LegacyPaymentRecord => ({ id: charge.id, student: charge.student || 'Sin alumno asociado', concept: `${charge.category}${charge.detail ? ` · ${charge.detail}` : ''}`, method: charge.method, date: charge.date, dueDate: charge.dueDate, amount: charge.amount, originalAmount: charge.amount, status: charge.status }))
-    return [...initialPayments, ...registrationPayments, ...tuitionPayments, ...assignmentPayments, ...privateLessonPayments, ...manualPayments]
+    // Exam-fee installments (examinationsRepository.ts) still write directly into state.manualCharges
+    // — that module remains 100% mock, unrelated to the real "Nuevo cobro" flow in BillingPage.
+    const examManualCharges: LegacyPaymentRecord[] = state.manualCharges.map((charge) => ({ id: charge.id, student: charge.student || 'Sin alumno asociado', concept: `${charge.category}${charge.detail ? ` · ${charge.detail}` : ''}`, method: charge.method, date: charge.date, dueDate: charge.dueDate, amount: charge.amount, originalAmount: charge.amount, status: charge.status }))
+    return [...realCharges, ...assignmentPayments, ...examManualCharges]
         .map((payment) => state.paymentUpdates[payment.id] ? { ...payment, ...state.paymentUpdates[payment.id] } : payment)
         .filter((payment) => !state.paymentUpdates[payment.id]?.deleted)
         .map((payment) => ({ ...payment, chargeSnapshot: paymentReadModelToChargeSnapshot(payment) }))
 }
 
-export function createManualCharge(charge: Omit<ManualCharge, 'id'>) {
-    const next = { ...charge, id: `PAY-MANUAL-${Date.now()}` }
-    updateAcademyState((current) => ({ ...current, manualCharges: [...current.manualCharges, next] }))
-    return next
+export function useCharges(options: { enabled?: boolean } = {}) {
+    const { session } = useAuth()
+    const organizationSlug = session?.organization.slug
+    const query = useQuery({
+        queryKey: ['charges', organizationSlug],
+        queryFn: ({ signal }) => fetchCharges(organizationSlug!, {}, signal),
+        enabled: Boolean(organizationSlug) && (options.enabled ?? true),
+    })
+    useEffect(() => {
+        if (!query.data) return
+        const mapped = query.data.map(fromApiCharge)
+        if (!sameChargesMirror(readAcademyState().charges, mapped)) {
+            updateAcademyState((current) => ({ ...current, charges: mapped }))
+        }
+    }, [query.data])
+    return { isLoading: query.isLoading, isError: query.isError }
+}
+
+export function useCreateCharge() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async (input: ApiChargeInput) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            return createChargeApi(organizationSlug, input)
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['charges', organizationSlug] }),
+    })
+}
+
+export function useUpdateCharge() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async ({ id, changes }: { id: string; changes: ApiChargePatch }) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            return updateChargeApi(organizationSlug, id, changes)
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['charges', organizationSlug] }),
+    })
+}
+
+export function useDeleteCharge() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async (id: string) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            await deleteChargeApi(organizationSlug, id)
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['charges', organizationSlug] }),
+    })
+}
+
+export function useGenerateTuition() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async ({ studentId, commissionId }: { studentId: string; commissionId: string }) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            return generateTuitionApi(organizationSlug, studentId, commissionId)
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['charges', organizationSlug] }),
+    })
 }
