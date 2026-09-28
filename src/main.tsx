@@ -1,4 +1,7 @@
 import { StrictMode } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { AuthProvider } from './auth/AuthProvider'
+import { ToastProvider } from './components/ui/ToastProvider'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './styles/tokens.css'
@@ -17,10 +20,14 @@ import './styles/detail-pages.css'
 import './styles/pages.css'
 import App from './app/App.tsx'
 
+document.documentElement.classList.toggle('dark', window.localStorage.getItem('gestiq-dark-mode') === 'true')
+
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
+    <QueryClientProvider client={queryClient}><ToastProvider><AuthProvider><BrowserRouter>
       <App />
-    </BrowserRouter>
+    </BrowserRouter></AuthProvider></ToastProvider></QueryClientProvider>
   </StrictMode>,
 )

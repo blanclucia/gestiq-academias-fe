@@ -1,4 +1,4 @@
-import { MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal, Plus } from 'lucide-react'
 import { type ReactNode } from 'react'
 
 type Column<T> = {
@@ -22,6 +22,7 @@ type DataTableProps<T> = {
     rows: T[]
     getRowKey: (row: T) => string
     onAdd?: () => void
+    addLabel?: string
     onExport?: () => void
     filters?: ReactNode
     renderActions?: (row: T) => ReactNode
@@ -38,6 +39,7 @@ export function DataTable<T>({
     rows,
     getRowKey,
     onAdd,
+    addLabel = 'Agregar',
     onExport,
     filters,
     renderActions,
@@ -57,9 +59,9 @@ export function DataTable<T>({
                         {subtitle && <p>{subtitle}</p>}
                     </div>
 
-                    <div className="data-table-actions" aria-hidden="true">
-                        {onExport && <span />}
-                        {onAdd && <span />}
+                    <div className="data-table-actions">
+                        {onExport && <span aria-hidden="true" />}
+                        {onAdd && <button type="button" className="secondary-button compact-button" onClick={onAdd}><Plus size={15} />{addLabel}</button>}
                     </div>
                 </div>
             )}

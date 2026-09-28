@@ -1,4 +1,4 @@
-import { BookOpenCheck, CalendarDays, CheckCircle2, Clock3, Gauge, PencilLine, Users } from 'lucide-react'
+import { BookOpenCheck, CalendarDays, CheckCircle2, Gauge, PencilLine, Users } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import type { AcademicCourse } from '@/services/academyRepository'
 
@@ -22,7 +22,7 @@ export function OfferSummaryCard({ course, assignedStudents, totalCapacity, occu
                     <div>
                         <div className="offer-overview-eyebrow"><BookOpenCheck size={15} /> Información general</div>
                         <p className="offer-overview-description">{course.description || 'Esta oferta todavía no tiene una descripción. Completala para darle más contexto al equipo.'}</p>
-                        <div className="offer-overview-meta"><span><Clock3 size={15} /> {course.duration || 'Duración sin definir'}</span><StatusBadge label={course.status} tone={statusTone} /></div>
+                        <div className="offer-overview-meta"><StatusBadge label={course.status} tone={statusTone} /></div>
                     </div>
                     <div className="offer-overview-actions"><button type="button" className="secondary-button compact-button" onClick={onEdit}><PencilLine size={15} /> Editar oferta</button></div>
                 </section>

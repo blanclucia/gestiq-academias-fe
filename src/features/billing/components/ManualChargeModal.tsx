@@ -4,7 +4,7 @@ import type { Payment, Student } from '@/types/domain'
 import { validateManualCharge } from '../model/billingValidation'
 
 export type ManualChargeValue = {
-    student: string
+    studentId: string
     category: string
     detail: string
     amount: string
@@ -21,7 +21,7 @@ const paymentMethods: Payment['method'][] = ['Transferencia', 'Tarjeta', 'Efecti
 type ManualChargeModalProps = {
     open: boolean
     value: ManualChargeValue
-    students: Pick<Student, 'fullName' | 'document'>[]
+    students: Pick<Student, 'id' | 'fullName' | 'document'>[]
     onChange: (value: ManualChargeValue) => void
     onClose: () => void
     onSubmit: () => void
@@ -54,8 +54,8 @@ export function ManualChargeModal({ open, value, students, onChange, onClose, on
                         <FormField label="Importe" required>
                             <input name="amount" className="form-input" type="number" min={1} step={1000} value={value.amount} onChange={(event) => update({ amount: event.target.value })} />
                         </FormField>
-                        <FormField label="Alumno (opcional)">
-                            <SearchableSelect value={value.student} options={[{ value: '', label: 'Sin alumno asociado' }, ...students.map((student) => ({ value: student.fullName, label: `${student.fullName} · ${student.document}` }))]} onChange={(student) => update({ student })} placeholder="Buscar alumno" emptyLabel="No encontramos alumnos." />
+                        <FormField label="Alumno" required>
+                            <SearchableSelect value={value.studentId} options={students.map((student) => ({ value: student.id, label: `${student.fullName} · ${student.document}` }))} onChange={(studentId) => update({ studentId })} placeholder="Buscar alumno" emptyLabel="No encontramos alumnos." />
                         </FormField>
                     </FormGrid>
                 </FormSection>

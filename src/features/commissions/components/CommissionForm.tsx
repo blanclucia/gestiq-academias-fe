@@ -1,7 +1,8 @@
-import { Check, ChevronDown, Search } from 'lucide-react'
+import { Check, ChevronDown, Plus, Search } from 'lucide-react'
 import { FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
 import { WeekDaysCheckboxGroup } from '@/components/forms/WeekDaysCheckboxGroup'
 import { TimeRangeField } from '@/components/forms/TimeRangeField'
+import { QuickCreateTeacherModal } from '@/features/staff'
 import { getActiveAcademicCycleId, listCourses, listStaff, useAcademyRepositoryVersion } from '@/services/academyRepository'
 import { useEffect, useRef, useState } from 'react'
 
@@ -10,6 +11,7 @@ const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado
 function TeacherMultiSelect({ options, value, onChange }: { options: Array<{ id: string; fullName: string }>; value: string[]; onChange: (value: string[]) => void }) {
     const [open, setOpen] = useState(false)
     const [search, setSearch] = useState('')
+    const [isCreateTeacherOpen, setIsCreateTeacherOpen] = useState(false)
     const pickerRef = useRef<HTMLDivElement>(null)
     const filteredOptions = options.filter((teacher) => teacher.fullName.toLocaleLowerCase('es-AR').includes(search.trim().toLocaleLowerCase('es-AR')))
     const summary = value.length === 0 ? 'Seleccionar profesores' : value.length === 1 ? value[0] : `${value.length} profesores seleccionados`
@@ -39,7 +41,19 @@ function TeacherMultiSelect({ options, value, onChange }: { options: Array<{ id:
                 })}
                 {filteredOptions.length === 0 && <div className="commission-teacher-no-results">No se encontraron profesores.</div>}
             </div>
+            <button type="button" className="commission-teacher-create" onClick={() => setIsCreateTeacherOpen(true)}>
+                <Plus size={14} /> Crear profesor nuevo
+            </button>
         </div>}
+        <QuickCreateTeacherModal
+            open={isCreateTeacherOpen}
+            onClose={() => setIsCreateTeacherOpen(false)}
+            onCreated={(fullName) => {
+                onChange([...value, fullName])
+                setIsCreateTeacherOpen(false)
+                setOpen(false)
+            }}
+        />
     </div>
 }
 

@@ -8,6 +8,7 @@ export type PrivateStudentRow = {
     id: string
     studentId: string
     student: string
+    teacherId: string
     teacher: string
     purpose: string
     plan: string

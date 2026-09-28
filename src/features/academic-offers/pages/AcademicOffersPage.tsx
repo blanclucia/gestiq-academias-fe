@@ -1,4 +1,4 @@
-import { Eye, PencilLine, Trash2, BookOpen, CalendarPlus, Copy } from 'lucide-react'
+import { Eye, PencilLine, Trash2, BookOpen, CalendarPlus } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CourseForm, type CourseFormValue } from '../components/CourseForm'
@@ -12,8 +12,10 @@ import { EntityCell } from '@/components/ui/PersonCell'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
 import { StatusBadge, type StatusBadgeTone } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { type AcademicCourse, createAcademicCycle, createCourse, createPrivateLesson, getActiveAcademicCycleId, getCourseRemovalBlockers, listAcademicCycles, listCourses, listPrivateLessons, listStudents, removeCourse, replicateAcademicOffer, setActiveAcademicCycle, updateCourse, updatePrivateLesson, useAcademyRepositoryVersion } from '@/services/academyRepository'
+import { type AcademicCourse, getActiveAcademicCycleId, getCourseRemovalBlockers, listAcademicCycles, listCourses, listPrivateLessons, listStaff, listStudents, useAcademyRepositoryVersion, useActivateCycle, useCreateCourse, useCreateCycle, useCreatePrivateLesson, useDeleteCourse, useUpdateCourse, useUpdatePrivateLesson } from '@/services/academyRepository'
 import { PrivateLessonsTable, type PrivateStudentRow } from '../components/PrivateLessonsTable'
+import { useToast } from '@/components/ui/ToastContext'
+import { useSelectedBranchId } from '@/services/branchRepository'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
 export type Course = AcademicCourse
@@ -37,18 +39,22 @@ export function AcademicOffersPage() {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [editingCourse, setEditingCourse] = useState<Course | null>(null)
-    const [courseForm, setCourseForm] = useState<CourseFormValue>({ name: '', duration: '', description: '', status: 'Borrador' })
+    const [courseForm, setCourseForm] = useState<CourseFormValue>({ name: '', description: '', status: 'Borrador' })
     const [deleteTarget, setDeleteTarget] = useState<Course | null>(null)
     const cycles = listAcademicCycles()
     const activeCycleId = getActiveAcademicCycleId()
-    const activeCycle = cycles.find((cycle) => cycle.id === activeCycleId)
     const [isCreateCycleOpen, setIsCreateCycleOpen] = useState(false)
-    const [isReplicateCycleOpen, setIsReplicateCycleOpen] = useState(false)
-    const [replicateAfterCreate, setReplicateAfterCreate] = useState(false)
     const [cycleForm, setCycleForm] = useState({ name: '', startDate: '2027-01-01', endDate: '2027-12-31' })
-    const [replicateSourceCycleId, setReplicateSourceCycleId] = useState(activeCycleId)
-    const [includeCommissions, setIncludeCommissions] = useState(true)
-    const courseItems = listCourses().filter((course) => course.cycleId === activeCycleId)
+    const createCycle = useCreateCycle()
+    const activateCycle = useActivateCycle()
+    const createCourse = useCreateCourse()
+    const updateCourse = useUpdateCourse()
+    const deleteCourse = useDeleteCourse()
+    const createPrivateLesson = useCreatePrivateLesson()
+    const updatePrivateLesson = useUpdatePrivateLesson()
+    const { showToast } = useToast()
+    const selectedBranchId = useSelectedBranchId()
+    const courseItems = listCourses().filter((course) => course.cycleId === activeCycleId && course.branchId === selectedBranchId)
     const [courseFilters, setCourseFilters] = useState({ course: '', teacher: '', status: '' })
     const [privateFilters, setPrivateFilters] = useState({ teacher: '', plan: '', status: '' })
     const filteredCourseItems = courseItems.filter((course) =>
@@ -61,7 +67,7 @@ export function AcademicOffersPage() {
     const [editingPrivateLessonId, setEditingPrivateLessonId] = useState<string | null>(null)
     const [privateLessonForm, setPrivateLessonForm] = useState<PrivateLessonFormValue>({
         studentId: requestedStudentId,
-        teacher: '',
+        teacherId: '',
         purpose: 'Apoyo escolar',
         plan: 'Clase individual',
         startDate: '2026-03-01',
@@ -72,6 +78,8 @@ export function AcademicOffersPage() {
         costPerClass: '',
     })
     const studentsById = new Map(students.map((student) => [student.id, student]))
+    const teacherOptions = listStaff().filter((teacher) => teacher.role === 'Docente' && teacher.status === 'Activo').map((teacher) => ({ id: teacher.id, fullName: teacher.fullName }))
+    const teachersById = new Map(listStaff().map((teacher) => [teacher.id, teacher]))
     const privateStudentsItems: PrivateStudentRow[] = listPrivateLessons().flatMap((lesson) => {
         const student = studentsById.get(lesson.studentId)
         if (!student) return []
@@ -81,7 +89,8 @@ export function AcademicOffersPage() {
             id: lesson.id,
             studentId: lesson.studentId,
             student: student.fullName,
-            teacher: lesson.teacher,
+            teacherId: lesson.teacherId,
+            teacher: teachersById.get(lesson.teacherId)?.fullName ?? 'Docente no encontrado',
             purpose: lesson.purpose,
             plan: lesson.plan,
             startDate: lesson.startDate,
@@ -142,7 +151,7 @@ export function AcademicOffersPage() {
 
         const lessonData = {
             studentId: student.id,
-            teacher: privateLessonForm.teacher,
+            teacherId: privateLessonForm.teacherId,
             purpose: privateLessonForm.purpose,
             plan: privateLessonForm.plan,
             startDate: privateLessonForm.startDate,
@@ -154,14 +163,20 @@ export function AcademicOffersPage() {
         }
 
         if (editingPrivateLessonId) {
-            updatePrivateLesson(editingPrivateLessonId, { ...lessonData, status: 'Activa' })
+            updatePrivateLesson.mutate({ id: editingPrivateLessonId, changes: { ...lessonData, status: 'Activa' } }, {
+                onSuccess: () => showToast('success', 'Clase particular actualizada correctamente.'),
+                onError: () => showToast('error', 'No se pudo actualizar la clase particular. Intentá nuevamente.'),
+            })
         } else {
-            createPrivateLesson(lessonData)
+            createPrivateLesson.mutate(lessonData, {
+                onSuccess: (result) => showToast(result.chargeFailed ? 'error' : 'success', result.chargeFailed ? 'Se creó la clase particular, pero no se pudo generar el cargo en Facturación.' : 'Clase particular creada correctamente.'),
+                onError: () => showToast('error', 'No se pudo crear la clase particular. Intentá nuevamente.'),
+            })
         }
 
         setPrivateLessonForm({
             studentId: students[0]?.id ?? '',
-            teacher: '',
+            teacherId: '',
             purpose: 'Apoyo escolar',
             plan: 'Clase individual',
             startDate: '2026-03-01',
@@ -180,16 +195,16 @@ export function AcademicOffersPage() {
             <EntityFormModal
                 open={isCreateCycleOpen}
                 title="Nuevo ciclo lectivo"
-                subtitle={replicateAfterCreate ? `Creá el ciclo de destino. La oferta de ${activeCycle?.name ?? 'este ciclo'} se copiará automáticamente.` : 'Creá el período que organizará la oferta, las comisiones y sus inscripciones.'}
-                submitLabel={replicateAfterCreate ? 'Crear y replicar' : 'Crear ciclo'}
+                subtitle="Creá el período que organizará la oferta, las comisiones y sus inscripciones."
+                submitLabel="Crear ciclo"
                 validate={() => validateConditions({ cycleName: !cycleForm.name.trim() && 'Ingresá el nombre.', cycleStartDate: !cycleForm.startDate && 'Ingresá el inicio.', cycleEndDate: (!cycleForm.endDate || cycleForm.endDate < cycleForm.startDate) && 'Ingresá una fecha de fin válida.' }, 'Revisá los datos del ciclo.')}
-                onClose={() => { setIsCreateCycleOpen(false); setReplicateAfterCreate(false) }}
+                onClose={() => setIsCreateCycleOpen(false)}
                 onSubmit={() => {
-                    const sourceCycleId = activeCycleId
-                    const nextCycle = createAcademicCycle({ ...cycleForm, name: cycleForm.name.trim(), status: 'Borrador' })
-                    if (replicateAfterCreate) replicateAcademicOffer(sourceCycleId, nextCycle.id, true)
+                    createCycle.mutate({ ...cycleForm, name: cycleForm.name.trim(), status: 'Borrador' }, {
+                        onSuccess: () => showToast('success', 'Ciclo lectivo creado correctamente.'),
+                        onError: () => showToast('error', 'No se pudo crear el ciclo lectivo. Intentá nuevamente.'),
+                    })
                     setIsCreateCycleOpen(false)
-                    setReplicateAfterCreate(false)
                 }}
             >
                 <div className="form-grid">
@@ -200,30 +215,23 @@ export function AcademicOffersPage() {
             </EntityFormModal>
 
             <EntityFormModal
-                open={isReplicateCycleOpen}
-                title="Replicar oferta académica"
-                subtitle={`Copiá la estructura de otro ciclo hacia ${activeCycle?.name ?? 'el ciclo actual'}, sin alumnos, pagos, asistencias ni inscripciones.`}
-                submitLabel="Replicar oferta"
-                validate={() => validateConditions({ replicateCycle: (!replicateSourceCycleId || replicateSourceCycleId === activeCycleId) && 'Seleccioná un ciclo de origen diferente.' })}
-                onClose={() => setIsReplicateCycleOpen(false)}
-                onSubmit={() => {
-                    if (replicateSourceCycleId && replicateSourceCycleId !== activeCycleId) replicateAcademicOffer(replicateSourceCycleId, activeCycleId, includeCommissions)
-                    setIsReplicateCycleOpen(false)
-                }}
-            >
-                <div className="form-grid">
-                    <label className="form-field"><span className="form-field-label">Ciclo de origen</span><select className="form-input" value={replicateSourceCycleId} onChange={(event) => setReplicateSourceCycleId(event.target.value)}><option value="">Seleccionar ciclo</option>{cycles.filter((cycle) => cycle.id !== activeCycleId).map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.name}</option>)}</select></label>
-                    <label className="form-checkbox-row"><input type="checkbox" checked={includeCommissions} onChange={(event) => setIncludeCommissions(event.target.checked)} /><span>Copiar también las comisiones, docentes, horarios y valores</span></label>
-                </div>
-            </EntityFormModal>
-
-            <EntityFormModal
                 open={isCreateModalOpen}
                 title="Nueva oferta académica"
                 subtitle="Completa los datos principales de la oferta académica."
                 validate={() => validateConditions({ courseName: !courseForm.name.trim() && 'Ingresá el nombre de la oferta.' })}
                 onClose={() => setIsCreateModalOpen(false)}
-                onSubmit={() => { if (courseForm.name.trim()) createCourse({ ...courseForm, name: courseForm.name.trim() }); setIsCreateModalOpen(false) }}
+                onSubmit={() => {
+                    if (!courseForm.name.trim()) { setIsCreateModalOpen(false); return }
+                    if (!selectedBranchId) {
+                        showToast('error', 'Elegí una sede en la barra superior antes de crear un curso.')
+                        return
+                    }
+                    createCourse.mutate({ form: courseForm, cycleId: activeCycleId }, {
+                        onSuccess: () => showToast('success', 'Oferta académica creada correctamente.'),
+                        onError: () => showToast('error', 'No se pudo crear la oferta académica. Intentá nuevamente.'),
+                    })
+                    setIsCreateModalOpen(false)
+                }}
             >
                 <CourseForm value={courseForm} onValueChange={setCourseForm} />
             </EntityFormModal>
@@ -238,7 +246,12 @@ export function AcademicOffersPage() {
                     setEditingCourse(null)
                 }}
                 onSubmit={() => {
-                    if (editingCourse && courseForm.name.trim()) updateCourse(editingCourse.id, { ...courseForm, name: courseForm.name.trim() })
+                    if (editingCourse && courseForm.name.trim()) {
+                        updateCourse.mutate({ id: editingCourse.id, changes: courseForm }, {
+                            onSuccess: () => showToast('success', 'Oferta académica actualizada correctamente.'),
+                            onError: () => showToast('error', 'No se pudo actualizar la oferta académica. Intentá nuevamente.'),
+                        })
+                    }
                     setIsEditModalOpen(false)
                     setEditingCourse(null)
                 }}
@@ -248,7 +261,6 @@ export function AcademicOffersPage() {
                     onValueChange={setCourseForm}
                     initialValues={{
                         name: editingCourse?.name,
-                        duration: '12 semanas',
                         description: 'Oferta académica orientada a nivel inicial con foco en speaking y listening.',
                     }}
                 />
@@ -262,7 +274,10 @@ export function AcademicOffersPage() {
                 onClose={() => setDeleteTarget(null)}
                 onConfirm={() => {
                     if (deleteTarget && removalBlockers.length === 0) {
-                        removeCourse(deleteTarget.id)
+                        deleteCourse.mutate(deleteTarget.id, {
+                            onSuccess: () => showToast('success', 'Oferta académica eliminada correctamente.'),
+                            onError: () => showToast('error', 'No se pudo eliminar la oferta académica. Intentá nuevamente.'),
+                        })
                     }
                     setDeleteTarget(null)
                 }}
@@ -273,14 +288,14 @@ export function AcademicOffersPage() {
                 title={editingPrivateLessonId ? 'Reprogramar clase particular' : 'Nuevo particular'}
                 subtitle={editingPrivateLessonId ? 'Actualizá la agenda o las condiciones de la clase.' : 'Seleccioná un alumno y completá los datos de la clase particular.'}
                 submitLabel={editingPrivateLessonId ? 'Guardar cambios' : 'Crear particular'}
-                validate={() => validateConditions({ privateStudent: !students.some((student) => student.id === privateLessonForm.studentId) && 'Seleccioná un alumno.', privateTeacher: !privateLessonForm.teacher && 'Seleccioná un docente.', privatePurpose: !privateLessonForm.purpose.trim() && 'Ingresá el motivo.', privateCost: Number(privateLessonForm.costPerClass) <= 0 && 'Ingresá un costo válido.', privateStart: !privateLessonForm.startDate && 'Ingresá el inicio.', privateEnd: (!privateLessonForm.endDate || privateLessonForm.endDate < privateLessonForm.startDate) && 'Ingresá una fecha de fin válida.', privateDays: privateLessonForm.days.length === 0 && 'Seleccioná al menos un día.', privateTime: (!privateLessonForm.fromTime || !privateLessonForm.toTime || privateLessonForm.toTime <= privateLessonForm.fromTime) && 'Ingresá un horario válido.' }, 'Revisá los datos de la clase particular.')}
+                validate={() => validateConditions({ privateStudent: !students.some((student) => student.id === privateLessonForm.studentId) && 'Seleccioná un alumno.', privateTeacher: !privateLessonForm.teacherId && 'Seleccioná un docente.', privatePurpose: !privateLessonForm.purpose.trim() && 'Ingresá el motivo.', privateCost: Number(privateLessonForm.costPerClass) <= 0 && 'Ingresá un costo válido.', privateStart: !privateLessonForm.startDate && 'Ingresá el inicio.', privateEnd: (!privateLessonForm.endDate || privateLessonForm.endDate < privateLessonForm.startDate) && 'Ingresá una fecha de fin válida.', privateDays: privateLessonForm.days.length === 0 && 'Seleccioná al menos un día.', privateTime: (!privateLessonForm.fromTime || !privateLessonForm.toTime || privateLessonForm.toTime <= privateLessonForm.fromTime) && 'Ingresá un horario válido.' }, 'Revisá los datos de la clase particular.')}
                 onClose={() => {
                     setEditingPrivateLessonId(null)
                     setIsPrivateModalOpen(false)
                 }}
                 onSubmit={submitPrivateLesson}
             >
-                <PrivateLessonForm value={privateLessonForm} onChange={setPrivateLessonForm} studentOptions={privateStudentOptions} />
+                <PrivateLessonForm value={privateLessonForm} onChange={setPrivateLessonForm} studentOptions={privateStudentOptions} teacherOptions={teacherOptions} />
             </EntityFormModal>
 
             <CrudListPage
@@ -311,7 +326,7 @@ export function AcademicOffersPage() {
                 toolbar={{
                     filters: { label: 'Filtros', variant: 'secondary' },
                     create: activeTab === 'groups'
-                        ? { label: 'Nuevo', onClick: () => { setCourseForm({ name: '', duration: '', description: '', status: 'Borrador' }); setIsCreateModalOpen(true) }, variant: 'primary' }
+                        ? { label: 'Nuevo', onClick: () => { setCourseForm({ name: '', description: '', status: 'Borrador' }); setIsCreateModalOpen(true) }, variant: 'primary' }
                         : { label: 'Nuevo', onClick: () => setIsPrivateModalOpen(true), variant: 'primary' },
                 }}
                 postHeaderContent={(
@@ -324,20 +339,11 @@ export function AcademicOffersPage() {
                         </Tabs>
                         <div className="cycle-context-compact">
                             <label>
-                                <select aria-label="Ciclo lectivo" value={activeCycleId} onChange={(event) => setActiveAcademicCycle(event.target.value)}>
+                                <select aria-label="Ciclo lectivo" value={activeCycleId} onChange={(event) => activateCycle.mutate(event.target.value, { onError: () => showToast('error', 'No se pudo cambiar el ciclo lectivo activo.') })}>
                                     {cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.name}</option>)}
                                 </select>
                             </label>
-                            <button type="button" className="secondary-button cycle-icon-action" aria-label="Replicar oferta de otro ciclo" data-tooltip={cycles.length < 2 ? 'Crear un nuevo ciclo copiando la oferta actual' : 'Copiar cursos y comisiones desde otro ciclo lectivo'} onClick={() => {
-                                if (cycles.length < 2) {
-                                    setReplicateAfterCreate(true)
-                                    setIsCreateCycleOpen(true)
-                                    return
-                                }
-                                setReplicateSourceCycleId(cycles.find((cycle) => cycle.id !== activeCycleId)?.id ?? '')
-                                setIsReplicateCycleOpen(true)
-                            }}><Copy size={16} /></button>
-                            <button type="button" className="secondary-button cycle-icon-action" aria-label="Crear nuevo ciclo lectivo" data-tooltip="Crear y configurar un nuevo ciclo lectivo" onClick={() => { setReplicateAfterCreate(false); setIsCreateCycleOpen(true) }}><CalendarPlus size={16} /></button>
+                            <button type="button" className="secondary-button cycle-icon-action" aria-label="Crear nuevo ciclo lectivo" data-tooltip="Crear y configurar un nuevo ciclo lectivo" onClick={() => setIsCreateCycleOpen(true)}><CalendarPlus size={16} /></button>
                         </div>
                     </div>
                 )}
@@ -381,7 +387,7 @@ export function AcademicOffersPage() {
                                     {
                                         label: 'Editar', icon: <PencilLine size={15} />, onClick: () => {
                                             setEditingCourse(course)
-                                            setCourseForm({ name: course.name, duration: course.duration ?? '', description: course.description ?? '', status: course.status })
+                                            setCourseForm({ name: course.name, description: course.description ?? '', status: course.status })
                                             setIsEditModalOpen(true)
                                         }
                                     },
@@ -405,11 +411,14 @@ export function AcademicOffersPage() {
                         onView={(item) => navigate(path(`students/${item.studentId}`))}
                         onCollect={() => navigate(path('billing'))}
                         onEdit={(item) => {
-                            setPrivateLessonForm({ studentId: item.studentId, teacher: item.teacher, purpose: item.purpose, plan: item.plan, startDate: item.startDate, endDate: item.endDate, days: item.days, fromTime: item.fromTime, toTime: item.toTime, costPerClass: String(item.costPerClass) })
+                            setPrivateLessonForm({ studentId: item.studentId, teacherId: item.teacherId, purpose: item.purpose, plan: item.plan, startDate: item.startDate, endDate: item.endDate, days: item.days, fromTime: item.fromTime, toTime: item.toTime, costPerClass: String(item.costPerClass) })
                             setEditingPrivateLessonId(item.id)
                             setIsPrivateModalOpen(true)
                         }}
-                        onCancel={(item) => updatePrivateLesson(item.id, { status: 'Finalizada' })}
+                        onCancel={(item) => updatePrivateLesson.mutate({ id: item.id, changes: { status: 'Finalizada' } }, {
+                            onSuccess: () => showToast('success', 'Clase particular cancelada correctamente.'),
+                            onError: () => showToast('error', 'No se pudo cancelar la clase particular. Intentá nuevamente.'),
+                        })}
                     />
                 )}
             </CrudListPage>

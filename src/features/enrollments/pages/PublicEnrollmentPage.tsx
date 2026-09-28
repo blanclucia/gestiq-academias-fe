@@ -9,27 +9,27 @@ import {
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import {
-    createPublicRegistration,
     getPublicEnrollmentAvailability,
-    getPublicEnrollmentOffer,
-    type PublicRegistration,
+    usePublicOffer,
+    useRegisterPublicly,
 } from "@/services/academyRepository";
-import { getAcademySettings } from "@/services/academySettingsRepository";
+import { usePublicEnrollmentSettings } from "@/services/organization/publicSettingsApi";
+import { requiredFieldsFromApi } from "@/services/organization/settingsMapping";
+import type { ApiPublicRegistrationResult } from "@/services/organization/enrollmentsApi";
 import { calculateAge } from "@/domain/students/studentRules";
 
 export function PublicEnrollmentPage() {
-    const { slug } = useParams();
-    const offer = slug ? getPublicEnrollmentOffer(slug) : null;
-    const settings = getAcademySettings();
+    const { organizationSlug, slug } = useParams();
+    const { offer, isLoading: offerLoading, isError: offerError } = usePublicOffer(organizationSlug, slug);
+    const settingsQuery = usePublicEnrollmentSettings(organizationSlug);
+    const registerMutation = useRegisterPublicly();
     const [selectedCommissionId, setSelectedCommissionId] = useState("");
     const [commissionConfirmed, setCommissionConfirmed] = useState(false);
-    const availability = slug
-        ? getPublicEnrollmentAvailability(slug, selectedCommissionId || undefined)
-        : { available: false, reason: "Este link no existe o ya no está vigente." };
+    const availability = getPublicEnrollmentAvailability(offer, selectedCommissionId || undefined);
     const selectedCommission = offer?.commissions.find(
         (commission) => commission.id === selectedCommissionId,
     );
-    const [registration, setRegistration] = useState<PublicRegistration | null>(
+    const [registration, setRegistration] = useState<ApiPublicRegistrationResult | null>(
         null,
     );
     const [paymentOption, setPaymentOption] = useState<
@@ -52,24 +52,33 @@ export function PublicEnrollmentPage() {
         priorStudies: "",
     });
 
+    if (offerLoading || settingsQuery.isPending)
+        return (
+            <main className="public-enrollment-page">
+                <div className="public-enrollment-card">
+                    <h1>Cargando…</h1>
+                </div>
+            </main>
+        );
+
+    const settings = settingsQuery.data;
+
     if (
+        offerError ||
         !offer ||
+        settingsQuery.isError ||
+        !settings ||
         (!availability.available && !registration && !selectedCommissionId)
     )
         return (
             <main className="public-enrollment-page">
                 <div className="public-enrollment-card">
                     <h1>Inscripción no disponible</h1>
-                    <p>{availability.reason}</p>
+                    <p>{availability.reason || "Este link no existe o ya no está vigente."}</p>
                 </div>
             </main>
         );
 
-    const registrationCommission = registration
-        ? offer.commissions.find(
-            (commission) => commission.id === registration.commissionId,
-        )
-        : selectedCommission;
     const update = (key: keyof typeof form, value: string) => {
         setForm((current) => ({ ...current, [key]: value }));
         setFormError("");
@@ -83,7 +92,7 @@ export function PublicEnrollmentPage() {
             setCopyFeedback(`No se pudo copiar ${label.toLowerCase()}`);
         }
     };
-    const requiredFields = new Set(settings.enrollments.requiredFields);
+    const requiredFields = new Set(requiredFieldsFromApi(settings.enrollments.requiredFields));
     const age = form.birthDate ? calculateAge(form.birthDate) : null;
     const isMinor = age !== null && age < 18;
     const submit = (event: React.FormEvent) => {
@@ -101,19 +110,27 @@ export function PublicEnrollmentPage() {
             setFormError("Completá los datos de contacto del tutor para continuar.");
             return;
         }
-        const confirmed =
-            settings.enrollments.confirmationMode === "Automática" &&
-            !settings.enrollments.requirePayment;
-        setRegistration(
-            createPublicRegistration({
-                ...form,
-                fullName: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
-                offerSlug: offer.slug,
-                openingId: offer.openingId,
+        registerMutation.mutate({
+            organizationSlug: organizationSlug!,
+            slug: slug!,
+            input: {
                 commissionId: selectedCommission.id,
-                confirmed,
-            }),
-        );
+                firstName: form.firstName.trim(),
+                lastName: form.lastName.trim(),
+                document: form.document.trim(),
+                email: form.email.trim() || undefined,
+                phone: form.phone.trim() || undefined,
+                birthDate: form.birthDate || undefined,
+                address: form.address.trim() || undefined,
+                tutorName: form.tutorName.trim() || undefined,
+                tutorEmail: form.tutorEmail.trim() || undefined,
+                tutorPhone: form.tutorPhone.trim() || undefined,
+                priorStudies: form.priorStudies.trim() || undefined,
+            },
+        }, {
+            onSuccess: (result) => setRegistration(result),
+            onError: () => setFormError("No pudimos completar la inscripción. Intentá nuevamente."),
+        });
     };
 
     const goToContactStep = () => {
@@ -148,9 +165,9 @@ export function PublicEnrollmentPage() {
         <main className="public-enrollment-page">
             <section className="public-enrollment-card">
                 <div className="public-enrollment-brand">
-                    {settings.brand.logoDataUrl ? (
+                    {settings.brand.logoUrl ? (
                         <img
-                            src={settings.brand.logoDataUrl}
+                            src={settings.brand.logoUrl}
                             alt={`Logo de ${settings.general.commercialName}`}
                         />
                     ) : (
@@ -175,7 +192,7 @@ export function PublicEnrollmentPage() {
                             >
                                 {offer.commissions.map((commission) => {
                                     const commissionAvailability =
-                                        getPublicEnrollmentAvailability(offer.slug, commission.id);
+                                        getPublicEnrollmentAvailability(offer, commission.id);
                                     const selected = selectedCommissionId === commission.id;
                                     return (
                                         <button
@@ -568,7 +585,7 @@ export function PublicEnrollmentPage() {
                         <CheckCircle2 size={40} />
                         <h1>Inscripción registrada</h1>
                         <p>
-                            {registration.fullName} quedó inscripto/a en {offer.courseName} · {registrationCommission?.name}.
+                            {registration.fullName} quedó inscripto/a en {offer.courseName} · {selectedCommission?.name}.
                         </p>
                         {paymentOption === "mercadopago" && <><p>Completá el pago para confirmar tu vacante.</p><a className="mercadopago-button" href={settings.payments.paymentLink} target="_blank" rel="noreferrer">Abrir link de pago</a></>}
                         {paymentOption === "transferencia" && <><p>Realizá la transferencia con estos datos y aguardá la verificación.</p><div className="transfer-details public-final-transfer-details"><div><dt>Alias</dt><dd>{settings.payments.transferAlias || "Sin configurar"}<button type="button" aria-label="Copiar alias" onClick={() => void copyPaymentValue("Alias", settings.payments.transferAlias)}><Copy size={14} /></button></dd></div><div><dt>CBU / CVU</dt><dd>{settings.payments.transferCbu || "Sin configurar"}<button type="button" aria-label="Copiar CBU o CVU" onClick={() => void copyPaymentValue("CBU / CVU", settings.payments.transferCbu)}><Copy size={14} /></button></dd></div><div><dt>Titular</dt><dd>{settings.payments.accountHolder}</dd></div><div><dt>CUIT</dt><dd>{settings.payments.accountTaxId}</dd></div></div>{copyFeedback && <small className="payment-copy-feedback">{copyFeedback}</small>}</>}

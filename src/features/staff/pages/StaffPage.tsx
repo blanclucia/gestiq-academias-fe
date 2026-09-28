@@ -8,8 +8,10 @@ import { DataTable } from '@/components/ui/DataTable'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
 import { StatusBadge, type StatusBadgeTone } from '@/components/ui/StatusBadge'
 import type { Teacher } from '@/data/teachers'
-import { createStaff, listStaff, removeStaff, updateStaff, useAcademyRepositoryVersion } from '@/services/academyRepository'
+import { listStaff, useAcademyRepositoryVersion, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from '@/services/academyRepository'
+import { isMemberConflict } from '@/services/organization/membersApi'
 import { validateConditions } from '@/components/forms/formValidation'
+import { useToast } from '@/components/ui/ToastContext'
 
 type StaffPageProps = {
     compact?: boolean
@@ -34,9 +36,12 @@ const emptyTeacherForm = {
     email: '',
     phone: '',
     specialty: '',
+    dni: '',
     role: 'Docente' as Teacher['role'],
     status: 'Activo' as Teacher['status'],
 }
+
+const dniPattern = /^[0-9]{7,8}$/
 
 export function StaffPage({
     compact = false,
@@ -49,6 +54,10 @@ export function StaffPage({
     onStaffCreated,
 }: StaffPageProps = {}) {
     useAcademyRepositoryVersion()
+    const { showToast } = useToast()
+    const createStaffMember = useCreateStaffMember()
+    const updateStaffMember = useUpdateStaffMember()
+    const deleteStaffMember = useDeleteStaffMember()
     const [openMenuId, setOpenMenuId] = useState<string | null>(null)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [newTeacher, setNewTeacher] = useState(emptyTeacherForm)
@@ -91,7 +100,7 @@ export function StaffPage({
                 title="Nuevo integrante del staff"
                 subtitle="Completá los datos para incorporarlo a esta sede."
                 submitLabel="Agregar al staff"
-                validate={() => validateConditions({ teacherFirstName: !newTeacher.firstName.trim() && 'Ingresá el nombre.', teacherLastName: !newTeacher.lastName.trim() && 'Ingresá el apellido.', teacherEmail: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newTeacher.email) && 'Ingresá un email válido.', teacherRole: newTeacher.role !== 'Docente' && !newIsAdministrator && 'Asigná permisos de administración.' }, 'Revisá los datos del integrante.')}
+                validate={() => validateConditions({ teacherFirstName: !newTeacher.firstName.trim() && 'Ingresá el nombre.', teacherLastName: !newTeacher.lastName.trim() && 'Ingresá el apellido.', teacherEmail: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newTeacher.email) && 'Ingresá un email válido.', teacherDni: !dniPattern.test(newTeacher.dni.trim()) && 'Ingresá un DNI válido (7 u 8 dígitos, sin puntos).', teacherRole: newTeacher.role !== 'Docente' && !newIsAdministrator && 'Asigná permisos de administración.' }, 'Revisá los datos del integrante.')}
                 onClose={() => {
                     setIsCreateModalOpen(false)
                     setNewTeacher(emptyTeacherForm)
@@ -99,22 +108,26 @@ export function StaffPage({
                     setCreateError('')
                 }}
                 onSubmit={() => {
-                    if (!newTeacher.firstName.trim() || !newTeacher.lastName.trim() || !newTeacher.email.trim()) {
-                        setCreateError('Completá nombre, apellido y email.')
+                    if (!newTeacher.firstName.trim() || !newTeacher.lastName.trim() || !newTeacher.email.trim() || !dniPattern.test(newTeacher.dni.trim())) {
+                        setCreateError('Completá nombre, apellido, email y un DNI válido.')
                         return
                     }
                     if (newTeacher.role !== 'Docente' && !newIsAdministrator) {
                         setCreateError('Seleccioná al menos un rol.')
                         return
                     }
-
-                    const created = createStaff({ ...newTeacher, fullName: `${newTeacher.firstName.trim()} ${newTeacher.lastName.trim()}`, email: newTeacher.email.trim(), phone: newTeacher.phone.trim(), specialty: newTeacher.specialty.trim() })
-                    onStaffCreated?.(created.id)
-                    if (newIsAdministrator) onToggleAdministrator?.(created.id, true)
-                    setIsCreateModalOpen(false)
-                    setNewTeacher(emptyTeacherForm)
-                    setNewIsAdministrator(false)
                     setCreateError('')
+                    createStaffMember.mutate({ ...newTeacher, fullName: `${newTeacher.firstName.trim()} ${newTeacher.lastName.trim()}`, email: newTeacher.email.trim(), phone: newTeacher.phone.trim(), specialty: newTeacher.specialty.trim(), dni: newTeacher.dni.trim(), isAdministrator: newIsAdministrator }, {
+                        onSuccess: (created) => {
+                            onStaffCreated?.(created.id)
+                            if (newIsAdministrator) onToggleAdministrator?.(created.id, true)
+                            setIsCreateModalOpen(false)
+                            setNewTeacher(emptyTeacherForm)
+                            setNewIsAdministrator(false)
+                            setCreateError('')
+                        },
+                        onError: (error) => setCreateError(isMemberConflict(error) ? 'Ya existe un miembro con ese DNI en esta organización.' : 'No se pudo crear el integrante. Intentá nuevamente.'),
+                    })
                 }}
             >
                 <div className="form-stack">
@@ -126,8 +139,11 @@ export function StaffPage({
                             <FormField label="Apellido" required>
                                 <input className="form-input" type="text" value={newTeacher.lastName} onChange={(event) => setNewTeacher((current) => ({ ...current, lastName: event.target.value }))} />
                             </FormField>
-                            <FormField label="Email" required>
+                            <FormField label="Email" required hint="Se va a crear un usuario del sistema para esta persona con estos datos — completalo con cuidado.">
                                 <input className="form-input" type="email" value={newTeacher.email} onChange={(event) => setNewTeacher((current) => ({ ...current, email: event.target.value }))} />
+                            </FormField>
+                            <FormField label="DNI" required hint="Sin puntos ni espacios. Se usa para crear su usuario y, si corresponde, para asignarla como administradora.">
+                                <input className="form-input" type="text" inputMode="numeric" value={newTeacher.dni} onChange={(event) => setNewTeacher((current) => ({ ...current, dni: event.target.value.replace(/\D/g, '').slice(0, 8) }))} />
                             </FormField>
                             <FormField label="Teléfono">
                                 <input className="form-input" type="tel" value={newTeacher.phone} onChange={(event) => setNewTeacher((current) => ({ ...current, phone: event.target.value }))} />
@@ -154,7 +170,7 @@ export function StaffPage({
                 open={isEditModalOpen}
                 title="Editar docente"
                 subtitle="Actualiza la información del docente."
-                validate={() => validateConditions({ teacherFirstName: !editingTeacherForm.firstName.trim() && 'Ingresá el nombre.', teacherLastName: !editingTeacherForm.lastName.trim() && 'Ingresá el apellido.', teacherEmail: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editingTeacherForm.email) && 'Ingresá un email válido.', teacherRole: editingTeacherForm.role !== 'Docente' && !editingIsAdministrator && 'Asigná permisos de administración.' }, 'Revisá los datos del integrante.')}
+                validate={() => validateConditions({ teacherFirstName: !editingTeacherForm.firstName.trim() && 'Ingresá el nombre.', teacherLastName: !editingTeacherForm.lastName.trim() && 'Ingresá el apellido.', teacherEmail: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editingTeacherForm.email) && 'Ingresá un email válido.', teacherDni: editingIsAdministrator && !editingTeacher?.userId && !dniPattern.test(editingTeacherForm.dni.trim()) && 'Para asignarla como administradora, ingresá un DNI válido (7 u 8 dígitos).', teacherRole: editingTeacherForm.role !== 'Docente' && !editingIsAdministrator && 'Asigná permisos de administración.' }, 'Revisá los datos del integrante.')}
                 onClose={() => {
                     setIsEditModalOpen(false)
                     setEditingTeacher(null)
@@ -162,16 +178,23 @@ export function StaffPage({
                     setEditingIsAdministrator(false)
                 }}
                 onSubmit={() => {
-                    if (editingTeacher && editingTeacherForm.firstName.trim() && editingTeacherForm.lastName.trim() && editingTeacherForm.email.trim()) {
-                        updateStaff(editingTeacher.id, {
+                    if (!editingTeacher) { setIsEditModalOpen(false); return }
+                    const id = editingTeacher.id
+                    updateStaffMember.mutate({
+                        id,
+                        changes: {
                             ...editingTeacherForm,
                             fullName: `${editingTeacherForm.firstName.trim()} ${editingTeacherForm.lastName.trim()}`,
                             email: editingTeacherForm.email.trim(),
                             phone: editingTeacherForm.phone.trim(),
                             specialty: editingTeacherForm.specialty.trim(),
-                        })
-                        onToggleAdministrator?.(editingTeacher.id, editingIsAdministrator)
-                    }
+                            dni: editingTeacherForm.dni.trim() || undefined,
+                        },
+                        isAdministrator: editingIsAdministrator,
+                    }, {
+                        onSuccess: () => onToggleAdministrator?.(id, editingIsAdministrator),
+                        onError: (error) => showToast('error', isMemberConflict(error) ? 'Ya existe un miembro con ese DNI en esta organización.' : 'No se pudieron guardar los cambios. Intentá nuevamente.'),
+                    })
                     setIsEditModalOpen(false)
                     setEditingTeacher(null)
                     setEditingTeacherForm(emptyTeacherForm)
@@ -189,6 +212,9 @@ export function StaffPage({
                             </FormField>
                             <FormField label="Email" required>
                                 <input className="form-input" type="email" value={editingTeacherForm.email} onChange={(event) => setEditingTeacherForm((current) => ({ ...current, email: event.target.value }))} />
+                            </FormField>
+                            <FormField label="DNI" hint={editingTeacher?.userId ? 'Ya tiene un usuario del sistema vinculado.' : 'Sin puntos ni espacios. Hace falta para asignarla como administradora.'}>
+                                <input className="form-input" type="text" inputMode="numeric" value={editingTeacherForm.dni} onChange={(event) => setEditingTeacherForm((current) => ({ ...current, dni: event.target.value.replace(/\D/g, '').slice(0, 8) }))} />
                             </FormField>
                             <FormField label="Teléfono">
                                 <input className="form-input" type="tel" value={editingTeacherForm.phone} onChange={(event) => setEditingTeacherForm((current) => ({ ...current, phone: event.target.value }))} />
@@ -217,7 +243,10 @@ export function StaffPage({
                 onClose={() => setDeleteTarget(null)}
                 onConfirm={() => {
                     if (deleteTarget) {
-                        removeStaff(deleteTarget.id)
+                        deleteStaffMember.mutate(deleteTarget.id, {
+                            onSuccess: () => showToast('success', 'Integrante eliminado correctamente.'),
+                            onError: () => showToast('error', 'No se pudo eliminar al integrante. Intentá nuevamente.'),
+                        })
                     }
                     setDeleteTarget(null)
                 }}
@@ -298,7 +327,7 @@ export function StaffPage({
                                 {
                                     label: 'Editar', icon: <PencilLine size={15} />, onClick: () => {
                                         setEditingTeacher(teacher)
-                                        setEditingTeacherForm({ ...teacher })
+                                        setEditingTeacherForm({ ...emptyTeacherForm, ...teacher })
                                         setEditingIsAdministrator(administratorIds?.includes(teacher.id) ?? false)
                                         setIsEditModalOpen(true)
                                     }

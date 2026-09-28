@@ -1,15 +1,20 @@
-import { ArrowLeft, CalendarDays, CreditCard, ExternalLink, StickyNote, Users } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CheckCircle2, CreditCard, ExternalLink, StickyNote, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { confirmPaymentRecord, getPublicEnrollmentOffer, listCourses, listEnrollmentOpenings, listPublicRegistrations, updateEnrollmentOpening, updatePublicRegistration, useAcademyRepositoryVersion, type PublicRegistration } from '@/services/academyRepository'
+import {
+    listCourses, listEnrollmentOpenings, useAcademyRepositoryVersion, useConfirmRegistration, useEnrollmentRegistrations,
+    useUpdateCharge, useUpdateEnrollmentOpening, useUpdateRegistrationNotes, type EnrollmentRegistrationRow,
+} from '@/services/academyRepository'
+import { chargeMethodToApi } from '@/services/organization/chargesMapping'
 import { DeleteConfirmationModal, EntityFormModal, FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
 import { EnrollmentForm, type EnrollmentFormValue } from '../components/EnrollmentForm'
 import { EnrollmentSharePanel } from '../components/EnrollmentSharePanel'
 import type { Payment } from '@/types/domain'
 import { validateEnrollment } from '../model/enrollmentValidation'
 import { validateConditions } from '@/components/forms/formValidation'
+import { useToast } from '@/components/ui/ToastContext'
 import { useWorkspace } from '@/workspace/useWorkspace'
 import { getEligibleCommissions } from '@/domain/commissions/commissionRules'
 
@@ -22,18 +27,24 @@ export function EnrollmentDetailPage() {
     const { organization, path } = useWorkspace()
     useAcademyRepositoryVersion()
     const { courseId, enrollmentId } = useParams()
+    const { showToast } = useToast()
     const [activeTab, setActiveTab] = useState<'overview' | 'students'>('overview')
     const [isEditOpen, setIsEditOpen] = useState(false)
     const [isCloseOpen, setIsCloseOpen] = useState(false)
     const [formValue, setFormValue] = useState<EnrollmentFormValue | null>(null)
-    const [collectTarget, setCollectTarget] = useState<PublicRegistration | null>(null)
+    const [collectTarget, setCollectTarget] = useState<EnrollmentRegistrationRow | null>(null)
     const [collectForm, setCollectForm] = useState<{ date: string; method: Payment['method'] }>({ date: getTodayString(), method: 'Transferencia' })
-    const [noteTarget, setNoteTarget] = useState<PublicRegistration | null>(null)
+    const [noteTarget, setNoteTarget] = useState<EnrollmentRegistrationRow | null>(null)
     const [noteDraft, setNoteDraft] = useState('')
+    const updateOpening = useUpdateEnrollmentOpening()
+    const updateCharge = useUpdateCharge()
+    const updateNotes = useUpdateRegistrationNotes()
+    const confirmRegistration = useConfirmRegistration()
 
     const courses = listCourses()
     const course = courses.find((item) => item.id === courseId)
     const opening = enrollmentId ? listEnrollmentOpenings().find((item) => item.id === enrollmentId) : undefined
+    const { registrations } = useEnrollmentRegistrations(opening?.id)
 
     if (!course || !opening || opening.courseId !== course.id) {
         return (
@@ -47,7 +58,6 @@ export function EnrollmentDetailPage() {
         )
     }
 
-    const registrations = listPublicRegistrations(opening.id)
     const enrollment = {
         id: opening.id,
         commissions: getEligibleCommissions(course.commissions, opening.startDate, opening.endDate, opening.commissionIds),
@@ -57,34 +67,24 @@ export function EnrollmentDetailPage() {
         status: opening.status,
         studentsCount: registrations.length,
     }
-    const publicOffer = getPublicEnrollmentOffer(opening.slug)
-    const publicEnrollmentLink = publicOffer
-        ? `${typeof window === 'undefined' ? '' : window.location.origin}/${organization.slug}/enrollments/${publicOffer.slug}`
-        : ''
+    const publicEnrollmentLink = `${typeof window === 'undefined' ? '' : window.location.origin}/${organization.slug}/enrollments/${opening.slug}`
 
     const statusTone = enrollment.status === 'Abierta' ? 'success' : enrollment.status === 'Programada' ? 'warning' : 'neutral'
-    const sampleStudents = registrations.map((registration) => ({
-        id: registration.id,
-        name: registration.fullName,
-        payment: registration.paid ? 'Pagado' : registration.transferReported ? 'En verificación' : 'Pendiente',
-        paymentMethod: registration.paymentMethod ?? 'Sin definir',
-        status: registration.paid ? 'Alumno activo' : 'Inscripción recibida',
-        registration,
-        commissionId: registration.commissionId || course.commissions[0]?.id || 'unassigned',
-        notes: registration.adminNotes ?? '',
-    }))
     const commissionGroups = course.commissions
         .map((commission) => ({
             ...commission,
-            students: sampleStudents.filter((student) => student.commissionId === commission.id),
+            students: registrations.filter((registration) => registration.commissionId === commission.id),
         }))
         .filter((commission) => enrollment.commissions.some((eligible) => eligible.id === commission.id) || commission.students.length > 0)
-    const unassignedStudents = sampleStudents.filter((student) => !course.commissions.some((commission) => commission.id === student.commissionId))
-    const paidCount = sampleStudents.filter((student) => student.payment === 'Pagado').length
-    const pendingCount = sampleStudents.length - paidCount
+    const unassignedStudents = registrations.filter((registration) => !course.commissions.some((commission) => commission.id === registration.commissionId))
+    const paidCount = registrations.filter((registration) => registration.payment === 'Pagado').length
+    const pendingCount = registrations.length - paidCount
     const saveRegistrationNote = () => {
         if (!noteTarget) return
-        updatePublicRegistration(noteTarget.id, { adminNotes: noteDraft.trim() })
+        updateNotes.mutate({ id: noteTarget.id, notes: noteDraft.trim() }, {
+            onSuccess: () => showToast('success', 'Nota guardada correctamente.'),
+            onError: () => showToast('error', 'No se pudo guardar la nota. Intentá nuevamente.'),
+        })
         setNoteTarget(null)
     }
 
@@ -92,8 +92,8 @@ export function EnrollmentDetailPage() {
         <div className="dashboard-page">
             <EntityFormModal
                 open={Boolean(noteTarget)}
-                title={noteTarget?.adminNotes ? 'Editar nota' : 'Agregar nota'}
-                subtitle={noteTarget?.fullName}
+                title={noteTarget?.notes ? 'Editar nota' : 'Agregar nota'}
+                subtitle={noteTarget?.name}
                 submitLabel="Guardar nota"
                 onClose={() => setNoteTarget(null)}
                 onSubmit={saveRegistrationNote}
@@ -110,7 +110,10 @@ export function EnrollmentDetailPage() {
                 validate={() => formValue ? validateEnrollment(formValue, course.commissions) : { valid: false, message: 'No hay datos de inscripción para guardar.' }}
                 onClose={() => setIsEditOpen(false)}
                 onSubmit={() => {
-                    if (formValue) updateEnrollmentOpening(enrollment.id, formValue)
+                    if (formValue) updateOpening.mutate({ id: enrollment.id, changes: formValue }, {
+                        onSuccess: () => showToast('success', 'Inscripción actualizada correctamente.'),
+                        onError: () => showToast('error', 'No se pudo actualizar la inscripción. Intentá nuevamente.'),
+                    })
                     setIsEditOpen(false)
                 }}
             >
@@ -130,7 +133,10 @@ export function EnrollmentDetailPage() {
                 confirmLabel="Cerrar inscripción"
                 onClose={() => setIsCloseOpen(false)}
                 onConfirm={() => {
-                    updateEnrollmentOpening(enrollment.id, { status: 'Cerrada' })
+                    updateOpening.mutate({ id: enrollment.id, changes: { status: 'Cerrada' } }, {
+                        onSuccess: () => showToast('success', 'Inscripción cerrada correctamente.'),
+                        onError: () => showToast('error', 'No se pudo cerrar la inscripción. Intentá nuevamente.'),
+                    })
                     setIsCloseOpen(false)
                 }}
             />
@@ -138,20 +144,23 @@ export function EnrollmentDetailPage() {
             <EntityFormModal
                 open={Boolean(collectTarget)}
                 title="Registrar cobro"
-                subtitle="Confirmá fecha y medio de pago. La persona será dada de alta como alumna de esta comisión."
-                submitLabel="Confirmar pago y alta"
+                subtitle="Confirmá fecha y medio de pago del cargo real de esta inscripción."
+                submitLabel="Confirmar pago"
                 validate={() => validateConditions({ collectionTarget: !collectTarget && 'No hay una inscripción seleccionada.', collectionDate: !collectForm.date && 'Ingresá la fecha del cobro.' }, 'Revisá los datos del cobro.')}
                 onClose={() => setCollectTarget(null)}
                 onSubmit={() => {
-                    confirmPaymentRecord(`PAY-${collectTarget!.id}`, collectForm.method, collectForm.date)
+                    if (collectTarget) updateCharge.mutate({ id: collectTarget.chargeId, changes: { status: 'paid', method: chargeMethodToApi(collectForm.method), paidAt: collectForm.date, paidAmount: collectTarget.chargeAmount } }, {
+                        onSuccess: () => showToast('success', 'Cobro registrado correctamente.'),
+                        onError: () => showToast('error', 'No se pudo registrar el cobro. Intentá nuevamente.'),
+                    })
                     setCollectTarget(null)
                 }}
             >
                 <div className="form-stack">
                     <FormSection title="Confirmación del cobro">
                         <FormGrid>
-                            <FormField label="Alumno"><input className="form-input" value={collectTarget?.fullName ?? ''} readOnly /></FormField>
-                            <FormField label="Importe"><input className="form-input" value={`$${enrollment.amount.toLocaleString('es-AR')}`} readOnly /></FormField>
+                            <FormField label="Alumno"><input className="form-input" value={collectTarget?.name ?? ''} readOnly /></FormField>
+                            <FormField label="Importe"><input className="form-input" value={`$${(collectTarget?.chargeAmount ?? enrollment.amount).toLocaleString('es-AR')}`} readOnly /></FormField>
                             <FormField label="Fecha de cobro"><input className="form-input" type="date" value={collectForm.date} onChange={(event) => setCollectForm((current) => ({ ...current, date: event.target.value }))} /></FormField>
                             <FormField label="Medio de pago"><select className="form-input" value={collectForm.method} onChange={(event) => setCollectForm((current) => ({ ...current, method: event.target.value as Payment['method'] }))}><option value="Transferencia">Transferencia</option><option value="Tarjeta">Tarjeta</option><option value="Efectivo">Efectivo</option></select></FormField>
                         </FormGrid>
@@ -249,14 +258,14 @@ export function EnrollmentDetailPage() {
                             </div>
                         </div>
 
-                        <EnrollmentSharePanel publicLink={publicEnrollmentLink} fileName={`inscripcion-${course.name}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')} />
+                        <EnrollmentSharePanel publicLink={publicEnrollmentLink} fileName={`inscripcion-${course.name}`.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')} />
                     </div>
                 )}
 
                 {activeTab === 'students' && (
                     <div className="enrollment-students-view">
                         <div className="detail-list-heading">
-                            <div><strong>Inscriptos</strong><span className="detail-list-meta">{sampleStudents.length} alumnos</span></div>
+                            <div><strong>Inscriptos</strong><span className="detail-list-meta">{registrations.length} alumnos</span></div>
                             {publicEnrollmentLink && <a className="secondary-button compact-button" href={publicEnrollmentLink} target="_blank" rel="noreferrer"><ExternalLink size={15} />Abrir formulario público</a>}
                         </div>
 
@@ -276,16 +285,19 @@ export function EnrollmentDetailPage() {
                                             <div className="enrollment-student-row" key={student.id}>
                                                 <div>
                                                     <div className="detail-row-title">{student.name}</div>
-                                                    <div className="detail-row-meta">{student.status} · Medio: {student.paymentMethod}</div>
+                                                    <div className="detail-row-meta">{student.rosterConfirmed ? 'Alumno activo' : 'Inscripción recibida'}</div>
                                                     {student.notes && <div className="enrollment-student-note-preview"><StickyNote size={13} />{student.notes}</div>}
                                                 </div>
                                                 <div className="detail-row-actions">
                                                     <StatusBadge label={student.payment} tone={student.payment === 'Pagado' ? 'success' : student.payment === 'En verificación' ? 'warning' : 'neutral'} />
-                                                    <button type="button" className="secondary-button compact-button" onClick={() => { setNoteTarget(student.registration); setNoteDraft(student.notes) }}><StickyNote size={15} />{student.notes ? 'Editar nota' : 'Agregar nota'}</button>
+                                                    <button type="button" className="secondary-button compact-button" onClick={() => { setNoteTarget(student); setNoteDraft(student.notes) }}><StickyNote size={15} />{student.notes ? 'Editar nota' : 'Agregar nota'}</button>
+                                                    {!student.rosterConfirmed && <button type="button" className="secondary-button compact-button" onClick={() => confirmRegistration.mutate(student.id, {
+                                                        onSuccess: () => showToast('success', 'Inscripción confirmada correctamente.'),
+                                                        onError: () => showToast('error', 'No se pudo confirmar la inscripción. Intentá nuevamente.'),
+                                                    })}><CheckCircle2 size={15} /> Confirmar</button>}
                                                     {student.payment !== 'Pagado' && <button type="button" className="primary-button compact-button" onClick={() => {
-                                                        const method: Payment['method'] = student.paymentMethod === 'Mercado Pago' ? 'Tarjeta' : student.paymentMethod === 'Efectivo' ? 'Efectivo' : 'Transferencia'
-                                                        setCollectForm({ date: getTodayString(), method })
-                                                        setCollectTarget(student.registration)
+                                                        setCollectForm({ date: getTodayString(), method: 'Transferencia' })
+                                                        setCollectTarget(student)
                                                     }}><CreditCard size={15} /> Registrar pago</button>}
                                                 </div>
                                             </div>

@@ -1,10 +1,11 @@
 import { invalidForm, validForm, type FormValidationResult } from '@/components/forms/formValidation'
 
-type ManualChargeValue = { category: string; detail: string; amount: string; status: 'Pendiente' | 'Pagado'; dueDate: string; date: string }
+type ManualChargeValue = { studentId: string; category: string; detail: string; amount: string; status: 'Pendiente' | 'Pagado'; dueDate: string; date: string }
 type AdjustmentValue = { type: 'Bonificacion total' | 'Promocion' | 'Importe manual'; mode: 'percentage' | 'fixed'; value: string; reason: string }
 
 export function validateManualCharge(value: ManualChargeValue): FormValidationResult {
     const fieldErrors: Record<string, string> = {}
+    if (!value.studentId) fieldErrors.studentId = 'Seleccioná un alumno.'
     if (!value.category) fieldErrors.category = 'Seleccioná una categoría.'
     if (value.category === 'Otro' && !value.detail.trim()) fieldErrors.detail = 'Ingresá el concepto del cobro.'
     if (!Number.isFinite(Number(value.amount)) || Number(value.amount) <= 0) fieldErrors.amount = 'Ingresá un importe mayor a cero.'

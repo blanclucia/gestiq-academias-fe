@@ -4,6 +4,8 @@ import { useAcademyBrand } from '../../theme/AcademyBrandContext'
 import { useAppBrand } from '../../theme/AppBrandContext'
 import { useActiveRole } from '@/auth/RoleContext'
 import { roleLabels } from '@/auth/roleTypes'
+import { useAuth } from '@/auth/AuthContext'
+import { canOpenModule } from '@/auth/permissions'
 import { navigationByRole } from '@/auth/roleNavigation'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
@@ -31,9 +33,10 @@ type SidebarProps = {
 export function Sidebar({ collapsed = false, mobileOpen = true, onClose, isMobile = false, onNavigate }: SidebarProps) {
     const { brand } = useAcademyBrand()
     const { config } = useAppBrand()
+    const { session } = useAuth()
     const { activeRole } = useActiveRole()
     const { path: workspacePath } = useWorkspace()
-    const sidebarGroups: SidebarGroup[] = [{ title: roleLabels[activeRole].toUpperCase(), items: navigationByRole[activeRole] }]
+    const sidebarGroups: SidebarGroup[] = [{ title: roleLabels[activeRole].toUpperCase(), items: navigationByRole[activeRole].filter((item) => canOpenModule(activeRole, item.path, session?.permissions ?? [])) }]
 
     const academyName = config.visibleName || brand.name
     const brandMark = config.logoText || brand.shortName || brand.name.charAt(0).toUpperCase()

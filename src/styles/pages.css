@@ -1758,6 +1758,28 @@ html.dark .donut-chart {
   font-size: 13px;
 }
 
+.commission-teacher-create {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 8px 8px;
+  color: var(--primary);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.commission-teacher-create:hover {
+  background: rgba(148, 163, 184, 0.1);
+}
+
 .commission-amount-field {
   display: grid;
   gap: 6px;

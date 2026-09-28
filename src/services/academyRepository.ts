@@ -1,12 +1,16 @@
-export type { AcademyState, AcademicCommission, AcademicCourse, AcademicCycle, AttendanceRecord, CommissionAssignment, CommissionExam, CommissionStudentStatus, EnrollmentOpening, ExamEnrollment, ManualCharge, PaymentChannel, PrivateLesson, PublicRegistration } from '@/services/academy/academyTypes'
+export type { AcademyState, AcademicCommission, AcademicCourse, AcademicCycle, AttendanceRecord, CommissionAssignment, CommissionExam, CommissionStudentStatus, EnrollmentOpening, ExamEnrollment, ManualCharge, PaymentChannel, PrivateLesson } from '@/services/academy/academyTypes'
 export { readAcademyState, subscribeAcademyChanges, useAcademyRepositoryVersion, writeAcademyState } from '@/services/academy/academyState'
 export { createCommissionExam, listCommissionExams, updateCommissionExam } from '@/services/academy/examinationsRepository'
-export { createStaff, listStaff, removeStaff, updateStaff } from '@/services/academy/staffRepository'
-export { createStudent, listStudents, listStudentsInCommission, removeStudent, updateStudent } from '@/services/academy/studentsRepository'
-export { createAcademicCycle, createCourse, getActiveAcademicCycleId, listAcademicCycles, listCourses, removeCourse, replicateAcademicOffer, setActiveAcademicCycle, updateCourse } from '@/services/academy/coursesRepository'
-export { createCommission, getCommissionRemovalBlockers, getCourseRemovalBlockers, removeCommission, updateCommission } from '@/services/academy/commissionsRepository'
-export { confirmPayment, createEnrollmentOpening, createPublicRegistration, getPaymentRemovalBlocker, getPublicEnrollmentAvailability, getPublicEnrollmentOffer, listEnrollmentOpenings, listPublicRegistrations, removeEnrollmentOpening, reportRegistrationTransfer, setRegistrationPaymentMethod, updateEnrollmentOpening, updatePublicRegistration, type PublicEnrollmentOffer } from '@/services/academy/enrollmentsRepository'
+export { listStaff, useCreateStaffMember, useDeleteStaffMember, useStaff, useUpdateStaffMember } from '@/services/academy/staffRepository'
+export { listStudents, listStudentsInCommission, useCreateStudent, useDeleteStudent, useStudents, useUpdateStudent } from '@/services/academy/studentsRepository'
+export { getActiveAcademicCycleId, listAcademicCycles, listCourses, useAcademicCycles, useActivateCycle, useCourses, useCreateCourse, useCreateCycle, useDeleteCourse, useUpdateCourse } from '@/services/academy/coursesRepository'
+export { getCommissionRemovalBlockers, getCourseRemovalBlockers, useAssignEnrollment, useCommissionRoster, useCreateCommission, useDeleteCommission, useRevokeEnrollment, useUpdateCommission } from '@/services/academy/commissionsRepository'
+export {
+    getPublicEnrollmentAvailability, listEnrollmentOpenings, useConfirmRegistration, useCreateEnrollmentOpening, useDeleteEnrollmentOpening,
+    useEnrollmentOpenings, useEnrollmentRegistrations, usePublicOffer, useRegisterPublicly, useUpdateEnrollmentOpening, useUpdateRegistrationNotes,
+    type EnrollmentRegistrationRow, type PublicEnrollmentOffer,
+} from '@/services/academy/enrollmentsRepository'
 export { assignStudentsToCommission, getCommissionStudentStatus, listStudentCommissionHistory, updateCommissionStudentStatus, type StudentCommissionHistory } from '@/services/academy/assignmentsRepository'
-export { createPrivateLesson, listPrivateLessons, updatePrivateLesson } from '@/services/academy/privateLessonsRepository'
+export { listPrivateLessons, usePrivateLessons, useCreatePrivateLesson, useUpdatePrivateLesson } from '@/services/academy/privateLessonsRepository'
 export { listAttendanceForStudent, listAttendanceRecords, recordAttendance } from '@/services/academy/attendanceRepository'
-export { confirmPaymentRecord, createManualCharge, listPayments, updatePaymentRecord, type PaymentRecord } from '@/services/billing/paymentsRepository'
+export { confirmPaymentRecord, getPaymentRemovalBlocker, listPayments, updatePaymentRecord, useCharges, useCreateCharge, useDeleteCharge, useGenerateTuition, useUpdateCharge, type PaymentRecord } from '@/services/billing/paymentsRepository'

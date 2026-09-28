@@ -3,12 +3,13 @@ import type { ReactNode } from 'react'
 type SettingsFieldProps = {
     label: string
     hint?: string
+    required?: boolean
     children: ReactNode
     full?: boolean
 }
 
-export function SettingsField({ label, hint, children, full = false }: SettingsFieldProps) {
-    return <label className={`form-field ${full ? 'academy-field-full' : ''}`}><span className="form-field-label">{label}{hint && <small>{hint}</small>}</span>{children}</label>
+export function SettingsField({ label, hint, required = false, children, full = false }: SettingsFieldProps) {
+    return <label className={`form-field ${full ? 'academy-field-full' : ''}`}><span className="form-field-label"><span>{label}{required && <b aria-hidden="true" className="form-required-mark"> *</b>}</span>{hint && <small>{hint}</small>}</span>{children}</label>
 }
 
 type SettingsToggleOptionProps = {

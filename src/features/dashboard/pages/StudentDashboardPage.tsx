@@ -1,10 +1,12 @@
+import { useAuth } from '@/auth/AuthContext'
 import { BookOpen, CalendarDays, CheckCircle2, CreditCard } from 'lucide-react'
 import { ChartCard } from '@/components/layout/ChartCard'
 import { KpiCard } from '@/components/layout/KpiCard'
 
 export function StudentDashboardPage() {
+    const { session } = useAuth()
     return <div className="dashboard-page">
-        <div className="page-header"><div><h1>Hola, Lucía</h1><p>Este es el resumen de tu actividad académica.</p></div></div>
+        <div className="page-header"><div><h1>Hola, {session?.user.name}</h1><p>Este es el resumen de tu actividad académica.</p></div></div>
         <div className="kpi-grid">
             <KpiCard title="Próxima clase" value="Hoy 18:00" change="Inglés General · Aula 2" />
             <KpiCard title="Asistencia" value="92%" change="11 de 12 clases" />

@@ -9,6 +9,10 @@ export type Teacher = {
     specialty: string
     role: 'Docente' | 'Administrativo'
     status: 'Activo' | 'Inactivo'
+    // DNI/userId link this local staff record to a real backend user (organizations/{slug}/members).
+    // Absent for staff created before that integration, until they're edited with a DNI.
+    dni?: string
+    userId?: string
 }
 
 export const initialTeachers: Teacher[] = [

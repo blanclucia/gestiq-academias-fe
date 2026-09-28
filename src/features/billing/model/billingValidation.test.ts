@@ -3,7 +3,7 @@ import { validateManualCharge, validatePaymentAdjustment, validatePaymentCollect
 
 describe('billing form validation', () => {
     it('reports every missing manual charge field', () => {
-        expect(validateManualCharge({ category: 'Otro', detail: '', amount: '0', status: 'Pendiente', dueDate: '', date: '' })).toMatchObject({ valid: false, fieldErrors: { detail: expect.any(String), amount: expect.any(String), dueDate: expect.any(String) } })
+        expect(validateManualCharge({ studentId: '', category: 'Otro', detail: '', amount: '0', status: 'Pendiente', dueDate: '', date: '' })).toMatchObject({ valid: false, fieldErrors: { studentId: expect.any(String), detail: expect.any(String), amount: expect.any(String), dueDate: expect.any(String) } })
     })
     it('validates collection and edit dates', () => {
         expect(validatePaymentCollection({ date: '' }).valid).toBe(false)

@@ -1,0 +1,25 @@
+import { test, expect } from '@playwright/test'
+
+// Run only against a disposable backend fixture, never against the user's owner account.
+test('Go + PostgreSQL: mandatory password change, authenticated context and logout', async ({ page }) => {
+    test.skip(process.env.E2E_DISPOSABLE_API !== '1', 'Requires disposable Platform/Tenant databases')
+    await page.goto('/login')
+    await page.getByLabel('DNI', { exact: true }).fill('90000001')
+    await page.getByLabel('Contraseña', { exact: true }).fill('90000001')
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Elegí tu nueva contraseña' })).toBeVisible()
+    await page.getByLabel('Nueva contraseña', { exact: true }).fill('disposable-browser-password')
+    await page.getByLabel('Confirmar contraseña').fill('disposable-browser-password')
+    await page.getByRole('button', { name: 'Guardar contraseña' }).click()
+    await expect(page.getByRole('status')).toContainText('Contraseña actualizada')
+    await page.getByLabel('DNI', { exact: true }).fill('90000001')
+    await page.getByLabel('Contraseña', { exact: true }).fill('disposable-browser-password')
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
+    await expect(page).toHaveURL(/\/academy-demo\/admin$/)
+    await page.getByRole('button', { name: 'User menu' }).click()
+    await page.getByRole('menuitem', { name: 'Mi perfil' }).click()
+    await expect(page.getByText('Owner', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'User menu' }).click()
+    await page.getByRole('menuitem', { name: 'Cerrar sesión' }).click()
+    await expect(page.getByRole('heading', { name: 'Ingresá a tu academia' })).toBeVisible()
+})

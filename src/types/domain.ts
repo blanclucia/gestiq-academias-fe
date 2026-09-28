@@ -29,6 +29,7 @@ export type CourseSummary = {
 
 export type Student = {
     id: string
+    branchId: string
     firstName: string
     lastName: string
     fullName: string
@@ -96,6 +97,7 @@ export type Enrollment = {
 export type Payment = {
     id: string
     student: string
+    studentId?: string
     concept: string
     method: PaymentMethod
     date: string

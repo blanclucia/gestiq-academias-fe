@@ -1,5 +1,9 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@/auth/AuthContext'
 import { defaultAcademyBrand, type AcademyBrand } from '@/theme/brandTheme'
 import { readOrganizationStorageItem, writeOrganizationStorageItem } from '@/workspace/organizationScope'
+import { fetchOrganizationSettings, updateOrganizationSettings, type ApiSettings, type ApiSettingsPatch } from '@/services/organization/settingsApi'
+import { confirmationModeFromApi, confirmationModeToApi, orgStatusFromApi, orgStatusToApi, paymentMethodsFromApi, paymentMethodsToApi, requiredFieldsFromApi, requiredFieldsToApi } from '@/services/organization/settingsMapping'
 
 export type AcademyGeneralSettings = {
     commercialName: string
@@ -83,21 +87,20 @@ export const defaultAcademySettings: AcademySettings = {
     },
 }
 
+// Public, unauthenticated pages (enrollment/payment links shared with prospective students) read
+// academy settings without a session. The backend's settings API requires an authenticated owner
+// (academy.update) and there is no public equivalent for payments/enrollments data, only branding.
+// So this local mirror stays the source of truth for those public pages; the authenticated admin
+// flow below (useAcademySettings/useSaveAcademySettings) keeps it in sync on every save.
 export function getAcademySettings(): AcademySettings {
     if (typeof window === 'undefined') return defaultAcademySettings
     try {
         const stored = JSON.parse(readOrganizationStorageItem(storageKey) ?? 'null') as Partial<AcademySettings> | null
         if (!stored) return defaultAcademySettings
-        const legacyPayments = stored.payments as (Partial<AcademyPaymentSettings> & { bankAccount?: string }) | undefined
-        const legacyAlias = legacyPayments?.bankAccount?.replace(/^Alias:\s*/i, '') ?? ''
         return {
             general: { ...defaultAcademySettings.general, ...stored.general },
             brand: { ...defaultAcademySettings.brand, ...stored.brand },
-            payments: {
-                ...defaultAcademySettings.payments,
-                ...legacyPayments,
-                transferAlias: legacyPayments?.transferAlias ?? (legacyAlias || defaultAcademySettings.payments.transferAlias),
-            },
+            payments: { ...defaultAcademySettings.payments, ...stored.payments },
             enrollments: { ...defaultAcademySettings.enrollments, ...stored.enrollments },
         }
     } catch {
@@ -105,6 +108,68 @@ export function getAcademySettings(): AcademySettings {
     }
 }
 
-export function saveAcademySettings(settings: AcademySettings) {
+function saveLocalMirror(settings: AcademySettings) {
     writeOrganizationStorageItem(storageKey, JSON.stringify(settings))
+}
+
+function fromApi(settings: ApiSettings): AcademySettings {
+    return {
+        general: { ...settings.general, status: orgStatusFromApi(settings.general.status) },
+        brand: {
+            name: settings.brand.name, shortName: settings.brand.shortName || undefined,
+            primary: settings.brand.primary, primaryStrong: settings.brand.primaryStrong, primarySoft: settings.brand.primarySoft,
+            primaryContrast: settings.brand.primaryContrast, accent: settings.brand.accent || undefined,
+            logoDataUrl: getAcademySettings().brand.logoDataUrl,
+        },
+        payments: { ...settings.payments, enabledMethods: paymentMethodsFromApi(settings.payments.enabledMethods) },
+        enrollments: {
+            ...settings.enrollments,
+            confirmationMode: confirmationModeFromApi(settings.enrollments.confirmationMode),
+            requiredFields: requiredFieldsFromApi(settings.enrollments.requiredFields),
+        },
+    }
+}
+
+function toApiPatch(settings: AcademySettings): ApiSettingsPatch {
+    return {
+        general: { ...settings.general, status: orgStatusToApi(settings.general.status) },
+        brand: {
+            name: settings.brand.name, shortName: settings.brand.shortName ?? '',
+            primary: settings.brand.primary, primaryStrong: settings.brand.primaryStrong, primarySoft: settings.brand.primarySoft,
+            primaryContrast: settings.brand.primaryContrast, accent: settings.brand.accent ?? '',
+        },
+        payments: { ...settings.payments, enabledMethods: paymentMethodsToApi(settings.payments.enabledMethods) },
+        enrollments: {
+            ...settings.enrollments,
+            confirmationMode: confirmationModeToApi(settings.enrollments.confirmationMode),
+            requiredFields: requiredFieldsToApi(settings.enrollments.requiredFields),
+        },
+    }
+}
+
+export function useAcademySettings(options: { enabled?: boolean } = {}) {
+    const { session } = useAuth()
+    const organizationSlug = session?.organization.slug
+    const query = useQuery({
+        queryKey: ['academy-settings', organizationSlug],
+        queryFn: async ({ signal }) => fromApi(await fetchOrganizationSettings(organizationSlug!, signal)),
+        enabled: Boolean(organizationSlug) && (options.enabled ?? true),
+    })
+    return { settings: query.data, isLoading: query.isLoading, isError: query.isError, error: query.error }
+}
+
+export function useSaveAcademySettings() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async (settings: AcademySettings) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            const updated = fromApi(await updateOrganizationSettings(organizationSlug, toApiPatch(settings)))
+            const merged: AcademySettings = { ...updated, brand: { ...updated.brand, logoDataUrl: settings.brand.logoDataUrl } }
+            saveLocalMirror(merged)
+            return merged
+        },
+        onSuccess: (settings) => queryClient.setQueryData(['academy-settings', organizationSlug], settings),
+    })
 }

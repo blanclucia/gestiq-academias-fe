@@ -1,12 +1,11 @@
 import { Copy, Download, ExternalLink, ImageDown, QrCode } from 'lucide-react'
 import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
-
-type Feedback = 'link' | 'qr' | 'error' | null
+import { useToast } from '@/components/ui/ToastContext'
 
 export function EnrollmentSharePanel({ publicLink, fileName }: { publicLink: string; fileName: string }) {
     const [qrDataUrl, setQrDataUrl] = useState('')
-    const [feedback, setFeedback] = useState<Feedback>(null)
+    const { showToast } = useToast()
 
     useEffect(() => {
         let active = true
@@ -15,20 +14,17 @@ export function EnrollmentSharePanel({ publicLink, fileName }: { publicLink: str
         }
         void QRCode.toDataURL(publicLink, { width: 320, margin: 3, errorCorrectionLevel: 'M' })
             .then((value) => { if (active) setQrDataUrl(value) })
-            .catch(() => { if (active) setFeedback('error') })
+            .catch(() => { if (active) showToast('error', 'No se pudo generar el código QR.') })
         return () => { active = false }
-    }, [publicLink])
-
-    const clearFeedbackSoon = () => window.setTimeout(() => setFeedback(null), 1800)
+    }, [publicLink, showToast])
 
     const copyLink = async () => {
         try {
             await navigator.clipboard.writeText(publicLink)
-            setFeedback('link')
+            showToast('success', 'Link copiado.')
         } catch {
-            setFeedback('error')
+            showToast('error', 'No se pudo copiar. Podés descargar el QR.')
         }
-        clearFeedbackSoon()
     }
 
     const copyQr = async () => {
@@ -36,11 +32,10 @@ export function EnrollmentSharePanel({ publicLink, fileName }: { publicLink: str
         try {
             const blob = await fetch(qrDataUrl).then((response) => response.blob())
             await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
-            setFeedback('qr')
+            showToast('success', 'Código QR copiado.')
         } catch {
-            setFeedback('error')
+            showToast('error', 'No se pudo copiar. Podés descargar el QR.')
         }
-        clearFeedbackSoon()
     }
 
     const downloadQr = () => {
@@ -70,9 +65,6 @@ export function EnrollmentSharePanel({ publicLink, fileName }: { publicLink: str
                     <button type="button" className="secondary-button compact-button" disabled={!qrDataUrl} onClick={() => void copyQr()}><ImageDown size={15} /> Copiar QR</button>
                     <button type="button" className="secondary-button compact-button" disabled={!qrDataUrl} onClick={downloadQr}><Download size={15} /> Descargar PNG</button>
                     <a className="primary-button compact-button" href={publicLink} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Abrir</a>
-                </div>
-                <div className="share-enrollment-feedback" aria-live="polite">
-                    {feedback === 'link' ? 'Link copiado.' : feedback === 'qr' ? 'Código QR copiado.' : feedback === 'error' ? 'No se pudo copiar. Podés descargar el QR.' : ''}
                 </div>
             </div>
         </section>

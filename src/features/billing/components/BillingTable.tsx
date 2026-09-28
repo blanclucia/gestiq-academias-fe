@@ -9,6 +9,7 @@ import type { PaymentAdjustmentMode, PaymentAdjustmentType } from './PaymentAdju
 export type BillingPaymentRecord = Payment & {
     originalAmount: number
     chargeSnapshot: ChargePaymentSnapshot
+    isReal?: boolean
     adjustment?: {
         type: PaymentAdjustmentType
         mode?: PaymentAdjustmentMode

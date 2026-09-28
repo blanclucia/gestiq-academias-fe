@@ -1,26 +1,48 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { confirmPayment, createEnrollmentOpening, createPublicRegistration, getPublicEnrollmentAvailability, getPublicEnrollmentOffer, listPublicRegistrations } from './enrollmentsRepository'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { updateAcademyState } from './academyState'
+import type { EnrollmentOpening } from './academyTypes'
+import { getPublicEnrollmentAvailability, listEnrollmentOpenings, type PublicEnrollmentOffer } from './enrollmentsRepository'
+
+const opening: EnrollmentOpening = {
+    id: '11111111-1111-4111-8111-000000000001', slug: 'curso-abcd1234', courseId: '22222222-2222-4222-8222-000000000001',
+    commissionIds: ['33333333-3333-4333-8333-000000000001'], amount: 48000, startDate: '2026-08-01', endDate: '2026-09-30',
+    status: 'Abierta', registrationsCount: 0,
+}
 
 describe('enrollments repository', () => {
-    beforeEach(() => { window.localStorage.clear(); vi.restoreAllMocks() })
+    beforeEach(() => window.localStorage.clear())
 
-    it('resolves seed offers and their availability', () => {
-        expect(getPublicEnrollmentOffer('ingles-general-open-1001')).toMatchObject({ courseId: 'C-220', courseName: 'Inglés General' })
-        expect(getPublicEnrollmentAvailability('ingles-general-open-1001', 'COM-101', '2026-09-09')).toEqual({ available: true, reason: '' })
-        expect(getPublicEnrollmentAvailability('missing', undefined, '2026-09-09').available).toBe(false)
+    it('reads the local mirror kept warm by useEnrollmentOpenings()', () => {
+        expect(listEnrollmentOpenings()).toEqual([])
+        updateAcademyState((current) => ({ ...current, openings: [opening] }))
+        expect(listEnrollmentOpenings()).toEqual([opening])
+        expect(listEnrollmentOpenings(opening.courseId)).toEqual([opening])
+        expect(listEnrollmentOpenings('other-course')).toEqual([])
     })
+})
 
-    it('creates and confirms a public registration', () => {
-        vi.spyOn(Date, 'now').mockReturnValue(6_000)
-        const registration = createPublicRegistration({ offerSlug: 'ingles-general-open-1001', openingId: 'OPEN-1001', commissionId: 'COM-101', firstName: 'Ada', lastName: 'Lovelace', fullName: 'Ada Lovelace', document: 'DOC-6000', email: 'ada@example.com', phone: '555', birthDate: '2000-01-01' })
-        expect(registration.id).toBe('REG-6000')
-        expect(confirmPayment(registration.id, 'Transferencia')).toMatchObject({ paid: true, confirmed: true, paymentMethod: 'Transferencia' })
-        expect(listPublicRegistrations('OPEN-1001')[0].paid).toBe(true)
+describe('getPublicEnrollmentAvailability', () => {
+    const offer: PublicEnrollmentOffer = {
+        slug: 'curso-abcd1234', openingId: 'o1', courseId: 'c1', courseName: 'Curso Inglés', amount: 48000,
+        status: 'Abierta', startDate: '2026-08-01', endDate: '2026-09-30',
+        commissions: [{ id: 'com1', name: 'Grupo A', schedule: 'Lun 18:00', amount: 48000, capacity: 2, occupied: 0, startDate: '2026-08-01', endDate: '2026-12-15' }],
+    }
+
+    it('is available when the opening is open, in range, and a commission has room', () => {
+        expect(getPublicEnrollmentAvailability(offer, 'com1', '2026-09-09')).toEqual({ available: true, reason: '' })
     })
-
-    it('generates a stable slug for a new opening', () => {
-        vi.spyOn(Date, 'now').mockReturnValue(6_001)
-        expect(createEnrollmentOpening({ courseId: 'C-220', startDate: '2026-10-01', endDate: '2026-10-31', status: 'Programada', amount: 20_000 }).slug).toBe('ingles-general-open-6001')
+    it('is not available when the offer is missing', () => {
+        expect(getPublicEnrollmentAvailability(undefined).available).toBe(false)
+    })
+    it('is not available when the selected commission has no capacity left', () => {
+        const full: PublicEnrollmentOffer = { ...offer, commissions: [{ ...offer.commissions[0], occupied: 2 }] }
+        expect(getPublicEnrollmentAvailability(full, 'com1', '2026-09-09').available).toBe(false)
+    })
+    it('is not available outside the opening period', () => {
+        expect(getPublicEnrollmentAvailability(offer, 'com1', '2026-10-01').available).toBe(false)
+    })
+    it('is not available when the opening is not Abierta', () => {
+        expect(getPublicEnrollmentAvailability({ ...offer, status: 'Cerrada' }, 'com1', '2026-09-09').available).toBe(false)
     })
 })
