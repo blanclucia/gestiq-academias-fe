@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { MobileBottomNav } from './MobileBottomNav'
+import { NoBranchBanner } from './NoBranchBanner'
 
 type AppShellProps = {
     children: ReactNode
@@ -97,6 +98,7 @@ export function AppShell({ children, onLogout }: AppShellProps) {
                     onToggleDarkMode={() => setDarkMode((value) => !value)}
                     onLogout={onLogout}
                 />
+                <NoBranchBanner />
                 <main className="page-content">{children}</main>
             </div>
             <MobileBottomNav menuOpen={mobileMenuOpen} onToggleMenu={() => setMobileMenuOpen((value) => !value)} />

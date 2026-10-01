@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { setSelectedBranchId, useSelectedBranchId } from '@/services/branchRepository'
+import { setSelectedBranchId, useBranches, useSelectedBranchId } from '@/services/branchRepository'
 import { useAcademyBrand } from '@/theme/AcademyBrandContext'
 import { useAppBrand } from '@/theme/AppBrandContext'
 import { RoleSwitcher } from './RoleSwitcher'
@@ -45,10 +45,20 @@ export function TopBar({
     const [academyMenuOpen, setAcademyMenuOpen] = useState(false)
     const academyMenuRef = useRef<HTMLDivElement>(null)
     const userMenuRef = useRef<HTMLDivElement>(null)
-    const branches = session?.accessibleBranches ?? []
+    const { branches, isLoading: branchesLoading } = useBranches()
     const selectedBranchId = useSelectedBranchId()
     const selectedBranch = branches.find((branch) => branch.id === selectedBranchId) ?? branches[0]
     const selectedAcademy = selectedBranch?.name ?? 'Sin sede activa'
+
+    // La sede seleccionada se persiste en localStorage y puede quedar apuntando a una sede que ya
+    // no existe (por ejemplo, tras una limpieza de datos) — se autolimpia acá en vez de dejar que
+    // cada pantalla que lee getSelectedBranchId() choque con un id inválido contra el backend.
+    useEffect(() => {
+        if (branchesLoading) return
+        if (selectedBranchId && !branches.some((branch) => branch.id === selectedBranchId)) {
+            setSelectedBranchId('')
+        }
+    }, [branchesLoading, branches, selectedBranchId])
     const academyName = config.visibleName || brand.name
     const academyMark = config.logoText || brand.shortName || brand.name.charAt(0).toUpperCase()
 
@@ -170,7 +180,7 @@ export function TopBar({
                             </Link>}
                             {session?.permissions.includes('branches.update') && <Link to={workspacePath('sedes')} className="user-panel-item" role="menuitem" onClick={() => setUserMenuOpen(false)}>
                                 <Building2 size={16} />
-                                <span>Mis sedes</span>
+                                <span>Mi sede</span>
                             </Link>}
                             <button type="button" className="user-panel-item mobile-theme-menu-item" role="menuitem" onClick={() => { onToggleDarkMode?.(); setUserMenuOpen(false) }}>
                                 {darkMode ? <SunMedium size={16} /> : <Moon size={16} />}

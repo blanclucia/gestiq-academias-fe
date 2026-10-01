@@ -23,6 +23,7 @@ type DataTableProps<T> = {
     getRowKey: (row: T) => string
     onAdd?: () => void
     addLabel?: string
+    addButtonVariant?: 'primary' | 'secondary'
     onExport?: () => void
     filters?: ReactNode
     renderActions?: (row: T) => ReactNode
@@ -40,6 +41,7 @@ export function DataTable<T>({
     getRowKey,
     onAdd,
     addLabel = 'Agregar',
+    addButtonVariant = 'secondary',
     onExport,
     filters,
     renderActions,
@@ -61,7 +63,7 @@ export function DataTable<T>({
 
                     <div className="data-table-actions">
                         {onExport && <span aria-hidden="true" />}
-                        {onAdd && <button type="button" className="secondary-button compact-button" onClick={onAdd}><Plus size={15} />{addLabel}</button>}
+                        {onAdd && <button type="button" className={`${addButtonVariant === 'primary' ? 'primary-button' : 'secondary-button'} compact-button`} onClick={onAdd}><Plus size={15} />{addLabel}</button>}
                     </div>
                 </div>
             )}

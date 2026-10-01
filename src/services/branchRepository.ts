@@ -101,7 +101,7 @@ export function useUpdateBranch() {
             if (changes.closingTime !== undefined) corePatch.closingTime = changes.closingTime
             if (changes.weekDays) corePatch.operatingWeekdays = weekDaysToOperating(changes.weekDays)
             if (changes.status) corePatch.status = branchStatusToApi(changes.status)
-            if (Object.keys(corePatch).length > 0) await updateBranchApi(organizationSlug, id, corePatch)
+            const updated = Object.keys(corePatch).length > 0 ? await updateBranchApi(organizationSlug, id, corePatch) : null
 
             const { managerId, managerIds, staffIds, studentIds } = changes
             if (managerId !== undefined || managerIds || staffIds || studentIds) {
@@ -112,8 +112,17 @@ export function useUpdateBranch() {
                     ...(studentIds && { studentIds }),
                 })
             }
+            return updated
         },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['branches', organizationSlug] }),
+        // Patch the cache synchronously with the real response so the header/status/switcher reflect
+        // the save the instant the toast shows — invalidateQueries alone leaves the UI on stale data
+        // until its background refetch resolves, which reads as "nothing happened" right after saving.
+        onSuccess: (updated) => {
+            if (updated) {
+                queryClient.setQueryData<ApiBranch[]>(['branches', organizationSlug], (current) => current?.map((branch) => branch.id === updated.id ? updated : branch))
+            }
+            queryClient.invalidateQueries({ queryKey: ['branches', organizationSlug] })
+        },
     })
 }
 
