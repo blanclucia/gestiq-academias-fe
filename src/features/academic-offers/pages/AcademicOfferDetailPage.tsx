@@ -7,7 +7,8 @@ import { EnrollmentForm, type EnrollmentFormValue } from '@/features/enrollments
 import { DeleteConfirmationModal, EntityFormModal } from '@/components/crud/EntityFormModal'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { type AcademicCommission, listAcademicCycles, listCourses, listEnrollmentOpenings, listStudentsInCommission, useAcademyRepositoryVersion, useCreateCommission, useCreateEnrollmentOpening, useDeleteCommission, useDeleteEnrollmentOpening, useUpdateCommission, useUpdateCourse, useUpdateEnrollmentOpening } from '@/services/academyRepository'
-import { isCommissionNameConflict } from '@/services/organization/academicOffersApi'
+import { isCommissionNameConflict, isCourseClosed } from '@/services/organization/academicOffersApi'
+import { isCourseNotActive } from '@/services/organization/enrollmentsApi'
 import { validateCommission } from '@/features/commissions'
 import { validateEnrollment } from '@/features/enrollments'
 import { validateConditions } from '@/components/forms/formValidation'
@@ -16,6 +17,7 @@ import { OfferCommissionsCard } from '../components/OfferCommissionsCard'
 import { OfferEnrollmentsCard, type OfferEnrollmentRow } from '../components/OfferEnrollmentsCard'
 import { OfferFiltersModal } from '../components/OfferFiltersModal'
 import { calculateOccupancy, getEligibleCommissions } from '@/domain/commissions/commissionRules'
+import { useAcademySettings } from '@/services/academySettingsRepository'
 import { useToast } from '@/components/ui/ToastContext'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
@@ -27,8 +29,8 @@ function formatCommissionSchedule(value: CommissionFormValue) {
 }
 
 
-function emptyCommissionForm(startDate = '2026-03-01', endDate = '2026-12-15'): CommissionFormValue {
-    return { name: '', teachers: [], capacity: 20, amount: 48000, startDate, endDate, dueDay: 10, status: 'Programada', days: [], fromTime: '18:30', toTime: '20:00' }
+function emptyCommissionForm(startDate = '2026-03-01', endDate = '2026-12-15', capacity = 20): CommissionFormValue {
+    return { name: '', teachers: [], capacity, amount: 48000, startDate, endDate, dueDay: 10, status: 'Programada', days: [], fromTime: '18:30', toTime: '20:00' }
 }
 
 export function AcademicOfferDetailPage() {
@@ -38,6 +40,8 @@ export function AcademicOfferDetailPage() {
     const navigate = useNavigate()
     const { path } = useWorkspace()
     const courses = listCourses()
+    const { settings: academySettings } = useAcademySettings()
+    const defaultCommissionCapacity = academySettings?.enrollments.defaultCapacity ?? 20
     const requestedCommission = courses.find((item) => item.id === courseId)?.commissions.find((commission) => commission.id === searchParams.get('editCommission')) ?? null
     const [activeTab, setActiveTab] = useState<'overview' | 'enrollments'>('overview')
     const [isCreateCommissionOpen, setIsCreateCommissionOpen] = useState(false)
@@ -46,7 +50,7 @@ export function AcademicOfferDetailPage() {
     const [commissionNameError, setCommissionNameError] = useState('')
     const [isCreateEnrollmentOpen, setIsCreateEnrollmentOpen] = useState(false)
     const [isEditEnrollmentOpen, setIsEditEnrollmentOpen] = useState(false)
-    const [newCommissionForm, setNewCommissionForm] = useState<CommissionFormValue>(() => emptyCommissionForm())
+    const [newCommissionForm, setNewCommissionForm] = useState<CommissionFormValue>(() => emptyCommissionForm(undefined, undefined, defaultCommissionCapacity))
     const [courseForm, setCourseForm] = useState<CourseFormValue>({ name: '', description: '', status: 'Borrador' })
     const [editingCommissionForm, setEditingCommissionForm] = useState<CommissionFormValue>(() => ({ name: requestedCommission?.name ?? '', teachers: requestedCommission?.teachers ?? (requestedCommission?.teacher ? [requestedCommission.teacher] : []), capacity: requestedCommission?.capacity ?? 20, amount: requestedCommission?.amount ?? 48000, startDate: requestedCommission?.startDate ?? '2026-03-01', endDate: requestedCommission?.endDate ?? '2026-12-15', dueDay: requestedCommission?.dueDay ?? 10, status: requestedCommission?.status ?? 'Programada', days: [], fromTime: '18:30', toTime: '20:00' }))
     const [editingCommission, setEditingCommission] = useState<CourseCommission | null>(requestedCommission)
@@ -170,7 +174,7 @@ export function AcademicOfferDetailPage() {
             commission: { name: `${commission.name} (copia)`, teacher: commission.teacher, teachers: commission.teachers, schedule: commission.schedule, capacity: commission.capacity, amount: commission.amount, startDate: commission.startDate, endDate: commission.endDate, dueDay: commission.dueDay, status: 'Programada' },
         }, {
             onSuccess: () => showToast('success', 'Comisión duplicada correctamente.'),
-            onError: () => showToast('error', 'No se pudo duplicar la comisión. Intentá nuevamente.'),
+            onError: (error) => showToast('error', isCourseClosed(error) ? 'El curso está cerrado: no admite comisiones nuevas.' : 'No se pudo duplicar la comisión. Intentá nuevamente.'),
         })
     }
 
@@ -250,7 +254,7 @@ export function AcademicOfferDetailPage() {
                 onClose={() => {
                     setIsCreateCommissionOpen(false)
                     setCommissionNameError('')
-                    setNewCommissionForm(emptyCommissionForm(academicCycle?.startDate, academicCycle?.endDate))
+                    setNewCommissionForm(emptyCommissionForm(academicCycle?.startDate, academicCycle?.endDate, defaultCommissionCapacity))
                 }}
                 onSubmit={() => {
                     const draftCommission = {
@@ -269,10 +273,10 @@ export function AcademicOfferDetailPage() {
                         onSuccess: () => {
                             setIsCreateCommissionOpen(false)
                             setCommissionNameError('')
-                            setNewCommissionForm(emptyCommissionForm(academicCycle?.startDate, academicCycle?.endDate))
+                            setNewCommissionForm(emptyCommissionForm(academicCycle?.startDate, academicCycle?.endDate, defaultCommissionCapacity))
                             showToast('success', 'Comisión creada correctamente.')
                         },
-                        onError: (error) => setCommissionNameError(isCommissionNameConflict(error) ? 'Ya existe una comisión con ese nombre dentro de esta oferta académica.' : 'No se pudo crear la comisión. Intentá nuevamente.'),
+                        onError: (error) => setCommissionNameError(isCommissionNameConflict(error) ? 'Ya existe una comisión con ese nombre dentro de esta oferta académica.' : isCourseClosed(error) ? 'El curso está cerrado: no admite comisiones nuevas.' : 'No se pudo crear la comisión. Intentá nuevamente.'),
                     })
                 }}
             >
@@ -390,7 +394,7 @@ export function AcademicOfferDetailPage() {
                             showToast('success', 'Inscripción creada correctamente.')
                             navigate(path(`oferta/${course.id}/inscripciones/${created.id}`))
                         },
-                        onError: () => showToast('error', 'No se pudo crear la inscripción. Intentá nuevamente.'),
+                        onError: (error) => showToast('error', isCourseNotActive(error) ? 'El curso debe estar Activo para lanzar una inscripción pública.' : 'No se pudo crear la inscripción. Intentá nuevamente.'),
                     })
                     setEnrollmentForm({ courseId: course.id, commissionIds: [], amount: 48000, startDate: '2026-08-26', endDate: '2026-08-30', status: 'Abierta' })
                     setIsCreateEnrollmentOpen(false)
@@ -508,7 +512,7 @@ export function AcademicOfferDetailPage() {
                             onSearchChange={setCommissionSearch}
                             onOpenFilters={() => setIsCommissionFilterOpen(true)}
                             onCreate={() => {
-                                setNewCommissionForm(emptyCommissionForm(academicCycle?.startDate, academicCycle?.endDate))
+                                setNewCommissionForm(emptyCommissionForm(academicCycle?.startDate, academicCycle?.endDate, defaultCommissionCapacity))
                                 setIsCreateCommissionOpen(true)
                             }}
                             onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)}

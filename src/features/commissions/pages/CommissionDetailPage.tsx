@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { createCommissionExam, listCommissionExams, listCourses, listStudents, updateCommissionExam, useAcademyRepositoryVersion, useAssignEnrollment, useCommissionRoster, useGenerateTuition, useUpdateCommission, type CommissionStudentStatus } from '@/services/academyRepository'
 import { useToast } from '@/components/ui/ToastContext'
+import { isCourseClosed } from '@/services/organization/academicOffersApi'
 import { CommissionAssignmentModal } from '../components/CommissionAssignmentModal'
 import { DeleteConfirmationModal, EntityFormModal, FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
 import { getSelectedBranchId } from '@/services/branchRepository'
@@ -115,17 +116,24 @@ export function CommissionDetailPage() {
     const saveStudentStatus = async () => {
         if (!statusTarget) return
         let failed = 0
+        let closedCourse = false
         for (const studentId of statusTarget.ids) {
             try {
                 await assignEnrollment.mutateAsync({ courseId: course.id, commissionId: commission.id, studentId, status: statusDraft })
                 // Only generate tuition on (re)activation — marking someone Pausado/Finalizado/Baja
                 // shouldn't create new pending cuotas for them.
                 if (statusDraft === 'Activo') await generateTuition.mutateAsync({ studentId, commissionId: commission.id })
-            } catch {
+            } catch (error) {
                 failed += 1
+                if (isCourseClosed(error)) closedCourse = true
             }
         }
-        showToast(failed === 0 ? 'success' : 'error', failed === 0 ? 'Estado actualizado correctamente.' : `No se pudo actualizar el estado de ${failed} alumno${failed === 1 ? '' : 's'}.`)
+        const message = failed === 0
+            ? 'Estado actualizado correctamente.'
+            : closedCourse
+                ? 'El curso está cerrado: no admite inscripciones activas nuevas.'
+                : `No se pudo actualizar el estado de ${failed} alumno${failed === 1 ? '' : 's'}.`
+        showToast(failed === 0 ? 'success' : 'error', message)
         setStatusTarget(null)
         setSelectedStudentIds([])
     }
@@ -253,15 +261,22 @@ export function CommissionDetailPage() {
                 onClose={() => setIsAssignmentModalOpen(false)}
                 onConfirm={async ({ studentIds }) => {
                     let failed = 0
+                    let closedCourse = false
                     for (const studentId of studentIds) {
                         try {
                             await assignEnrollment.mutateAsync({ courseId: course.id, commissionId: commission.id, studentId })
                             await generateTuition.mutateAsync({ studentId, commissionId: commission.id })
-                        } catch {
+                        } catch (error) {
                             failed += 1
+                            if (isCourseClosed(error)) closedCourse = true
                         }
                     }
-                    showToast(failed === 0 ? 'success' : 'error', failed === 0 ? 'Alumnos asignados correctamente.' : `No se pudo asignar a ${failed} alumno${failed === 1 ? '' : 's'}.`)
+                    const message = failed === 0
+                        ? 'Alumnos asignados correctamente.'
+                        : closedCourse
+                            ? 'El curso está cerrado: no admite inscripciones activas nuevas.'
+                            : `No se pudo asignar a ${failed} alumno${failed === 1 ? '' : 's'}.`
+                    showToast(failed === 0 ? 'success' : 'error', message)
                     setIsAssignmentModalOpen(false)
                 }}
             />

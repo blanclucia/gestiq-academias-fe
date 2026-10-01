@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { authClient } from '@/auth/api/authClient'
-import { publicRequest } from '@/services/http/client'
+import { ApiError, publicRequest } from '@/services/http/client'
 
 const apiOpeningSchema = z.object({
     id: z.string(),
@@ -140,4 +140,8 @@ export async function fetchPublicOffer(organizationSlug: string, slug: string, s
 }
 export async function registerPubliclyApi(organizationSlug: string, slug: string, input: ApiPublicRegistrationInput, request: Requester = defaultPublicRequest): Promise<ApiPublicRegistrationResult> {
     return apiPublicRegistrationResultSchema.parse(await request(publicOfferPath(organizationSlug, slug, '/registrations'), { method: 'POST', body: JSON.stringify(input) }))
+}
+
+export function isCourseNotActive(error: unknown): boolean {
+    return error instanceof ApiError && error.code === 'course_not_active'
 }

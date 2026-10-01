@@ -140,3 +140,6 @@ export function isCourseHasActiveCommissions(error: unknown): boolean {
 export function isCommissionHasActiveRoster(error: unknown): boolean {
     return error instanceof ApiError && error.code === 'commission_has_active_roster'
 }
+export function isCourseClosed(error: unknown): boolean {
+    return error instanceof ApiError && error.code === 'course_closed'
+}

@@ -1125,6 +1125,19 @@ html.dark .donut-chart {
   .offer-overview-links {
     grid-template-columns: 1fr;
   }
+
+  /* Tabs force-wrap the cycle selector onto its own row well before the 640px breakpoint
+     below switches the whole header to a column layout — without this, it's stranded
+     compact and right-aligned on an otherwise empty row for a wide middle range of widths. */
+  .cycle-context-compact {
+    flex: 1 1 100%;
+    align-items: stretch;
+  }
+
+  .cycle-context-compact select {
+    flex: 1 1 auto;
+    width: auto;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1161,15 +1174,11 @@ html.dark .donut-chart {
 
   .cycle-context-compact {
     align-items: stretch;
-    justify-content: stretch;
-  }
-
-  .cycle-context-compact label {
-    width: 100%;
   }
 
   .cycle-context-compact select {
-    width: 100%;
+    flex: 1 1 auto;
+    width: auto;
   }
 
   .cycle-context-compact .cycle-icon-action {
