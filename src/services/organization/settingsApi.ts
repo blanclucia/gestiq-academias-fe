@@ -12,11 +12,11 @@ const brandSchema = z.object({
 const paymentsSchema = z.object({
     defaultDueDay: z.number(), graceDays: z.number(), lateFeePercent: z.number(),
     transferAlias: z.string(), transferCbu: z.string(), accountHolder: z.string(), accountTaxId: z.string(),
-    paymentMessage: z.string(), paymentLink: z.string(), receiptPrefix: z.string(), enabledMethods: z.array(z.string()),
+    paymentMessage: z.string(), paymentLink: z.string(), enabledMethods: z.array(z.string()),
 })
 const enrollmentsSchema = z.object({
-    confirmationMode: z.enum(['manual', 'automatic']), reservationHours: z.number(), defaultCapacity: z.number(),
-    requirePayment: z.boolean(), requiredFields: z.array(z.string()), terms: z.string(),
+    confirmationMode: z.enum(['manual', 'automatic']), defaultCapacity: z.number(),
+    requirePayment: z.boolean(), requiredFields: z.array(z.string()),
 })
 const apiSettingsSchema = z.object({ general: generalSchema, brand: brandSchema, payments: paymentsSchema, enrollments: enrollmentsSchema })
 

@@ -29,16 +29,13 @@ export type AcademyPaymentSettings = {
     accountTaxId: string
     paymentMessage: string
     paymentLink: string
-    receiptPrefix: string
 }
 
 export type AcademyEnrollmentSettings = {
     confirmationMode: 'Automática' | 'Manual'
-    reservationHours: number
     defaultCapacity: number
     requirePayment: boolean
     requiredFields: string[]
-    terms: string
 }
 
 export type AcademySettings = {
@@ -75,23 +72,17 @@ export const defaultAcademySettings: AcademySettings = {
         accountTaxId: '30-71234567-8',
         paymentMessage: 'Te compartimos el enlace para abonar tu cuota. Gracias.',
         paymentLink: 'https://mpago.la/demo-academia-puentes',
-        receiptPrefix: 'AP',
     },
     enrollments: {
         confirmationMode: 'Manual',
-        reservationHours: 48,
         defaultCapacity: 20,
         requirePayment: false,
         requiredFields: ['Documento', 'Email', 'Teléfono', 'Fecha de nacimiento'],
-        terms: 'Declaro que los datos ingresados son correctos y acepto las condiciones de inscripción.',
     },
 }
 
-// Public, unauthenticated pages (enrollment/payment links shared with prospective students) read
-// academy settings without a session. The backend's settings API requires an authenticated owner
-// (academy.update) and there is no public equivalent for payments/enrollments data, only branding.
-// So this local mirror stays the source of truth for those public pages; the authenticated admin
-// flow below (useAcademySettings/useSaveAcademySettings) keeps it in sync on every save.
+// Public pages read real settings via usePublicEnrollmentSettings() now — this local mirror only
+// survives to carry logoDataUrl (no real logo upload endpoint yet, see fromApi() below).
 export function getAcademySettings(): AcademySettings {
     if (typeof window === 'undefined') return defaultAcademySettings
     try {

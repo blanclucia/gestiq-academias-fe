@@ -6,7 +6,9 @@ import { useCrudList } from '@/hooks/useCrudList'
 import type { Payment } from '@/types/domain'
 import { confirmPaymentRecord, getPaymentRemovalBlocker, listPayments, listStudents, updatePaymentRecord, useAcademyRepositoryVersion, useCreateCharge, useDeleteCharge, useUpdateCharge } from '@/services/academyRepository'
 import { chargeMethodToApi, chargeStatusToApi } from '@/services/organization/chargesMapping'
+import { getNextDueDateForDay } from '@/domain/billing/billingRules'
 import { getPaymentReferenceDate as getReferenceDate, resolveChargeCollectionStatus } from '@/domain/billing/paymentRules'
+import { useAcademySettings } from '@/services/academySettingsRepository'
 import { useToast } from '@/components/ui/ToastContext'
 import { ManualChargeModal } from '../components/ManualChargeModal'
 import { BillingSummary } from '../components/BillingSummary'
@@ -35,8 +37,10 @@ export function BillingPage() {
     const createCharge = useCreateCharge()
     const updateCharge = useUpdateCharge()
     const deleteCharge = useDeleteCharge()
+    const { settings: academySettings } = useAcademySettings()
     const [activeTab, setActiveTab] = useState<BillingTab>('resumen')
     const today = startOfDay(new Date())
+    const suggestedDueDate = getNextDueDateForDay(academySettings?.payments.defaultDueDay ?? 10, format(today, 'yyyy-MM-dd'))
     const [dateRange, setDateRange] = useState({
         from: format(startOfMonth(today), 'yyyy-MM-dd'),
         to: format(endOfMonth(today), 'yyyy-MM-dd'),
@@ -57,14 +61,15 @@ export function BillingPage() {
     const [copyFeedback, setCopyFeedback] = useState('')
     const [activeFilters, setActiveFilters] = useState({ student: '' })
     const [isManualChargeOpen, setIsManualChargeOpen] = useState(false)
-    const [manualChargeForm, setManualChargeForm] = useState({ studentId: '', category: 'Examen', detail: '', amount: '', status: 'Pendiente' as 'Pendiente' | 'Pagado', method: 'Transferencia' as Payment['method'], dueDate: format(today, 'yyyy-MM-dd'), date: format(today, 'yyyy-MM-dd'), notes: '' })
+    const [manualChargeForm, setManualChargeForm] = useState({ studentId: '', category: 'Examen', detail: '', amount: '', status: 'Pendiente' as 'Pendiente' | 'Pagado', method: 'Transferencia' as Payment['method'], dueDate: suggestedDueDate, date: format(today, 'yyyy-MM-dd'), notes: '' })
     const paymentList = listPayments()
     const studentOptions = listStudents()
     const paymentRemovalBlocker = deleteTarget ? getPaymentRemovalBlocker() : null
 
+    const graceDays = academySettings?.payments.graceDays ?? 0
     const paymentRows = useMemo(
-        () => paymentList.map((payment) => ({ ...payment, statusView: resolveChargeCollectionStatus(payment.chargeSnapshot, today) })),
-        [paymentList, today],
+        () => paymentList.map((payment) => ({ ...payment, statusView: resolveChargeCollectionStatus(payment.chargeSnapshot, today, graceDays) })),
+        [paymentList, today, graceDays],
     )
 
     const filteredByContext = useMemo(() => {
@@ -241,6 +246,10 @@ export function BillingPage() {
 
         const numericValue = Number(adjustmentForm.value || 0)
 
+        if (adjustmentForm.type === 'Recargo por mora') {
+            return Math.max(0, Math.round(originalAmount * (1 + numericValue / 100)))
+        }
+
         if (adjustmentForm.mode === 'percentage') {
             return Math.max(0, Math.round(originalAmount * (1 - numericValue / 100)))
         }
@@ -282,7 +291,7 @@ export function BillingPage() {
     }
 
     const resetManualChargeForm = () => {
-        setManualChargeForm({ studentId: '', category: 'Examen', detail: '', amount: '', status: 'Pendiente', method: 'Transferencia', dueDate: format(today, 'yyyy-MM-dd'), date: format(today, 'yyyy-MM-dd'), notes: '' })
+        setManualChargeForm({ studentId: '', category: 'Examen', detail: '', amount: '', status: 'Pendiente', method: 'Transferencia', dueDate: suggestedDueDate, date: format(today, 'yyyy-MM-dd'), notes: '' })
     }
 
     const submitManualCharge = () => {
@@ -386,6 +395,7 @@ export function BillingPage() {
                 target={adjustTarget}
                 value={adjustmentForm}
                 adjustedAmount={adjustedAmountPreview}
+                lateFeePercent={academySettings?.payments.lateFeePercent ?? 0}
                 onChange={setAdjustmentForm}
                 onClose={() => {
                     setAdjustTarget(null)
@@ -470,6 +480,7 @@ export function BillingPage() {
                     <BillingTable
                         rows={paginatedPayments}
                         today={today}
+                        graceDays={graceDays}
                         currentPage={currentPage}
                         totalPages={totalPages}
                         selectedIds={selectedIds}

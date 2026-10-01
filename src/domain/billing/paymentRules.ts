@@ -1,16 +1,19 @@
-import { format, isBefore, parseISO } from 'date-fns'
+import { addDays, format, isBefore, parseISO } from 'date-fns'
 import type { BillingDisplayStatus, ChargePaymentSnapshot, Payment } from '@/types/domain'
 
 type PaymentStatusView = Payment['status']
 type PaymentDates = Pick<Payment, 'status' | 'date' | 'dueDate'>
 
-export function resolveChargeCollectionStatus(charge: ChargePaymentSnapshot, today: Date): BillingDisplayStatus {
+// graceDays comes from the org's payment settings (Cobros › Días de tolerancia) — a charge isn't
+// "Vencido" until that many days pass after its due date, not the instant it's reached.
+export function resolveChargeCollectionStatus(charge: ChargePaymentSnapshot, today: Date, graceDays = 0): BillingDisplayStatus {
     if (charge.lifecycleStatus === 'void') return 'Anulado'
     if (charge.paymentStatus === 'rejected') return 'Rechazado'
     if (charge.paymentStatus === 'reported' || charge.paymentStatus === 'under_review') return 'En verificación'
     if (charge.paidAmount >= charge.adjustedAmount) return 'Pagado'
     if (charge.paidAmount > 0) return 'Parcial'
-    return isBefore(parseISO(charge.dueDate), today) ? 'Vencido' : 'Pendiente'
+    const overdueAfter = addDays(parseISO(charge.dueDate), graceDays)
+    return isBefore(overdueAfter, today) ? 'Vencido' : 'Pendiente'
 }
 
 export function paymentReadModelToChargeSnapshot(payment: Payment): ChargePaymentSnapshot {

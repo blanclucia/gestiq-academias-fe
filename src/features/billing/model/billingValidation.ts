@@ -1,7 +1,7 @@
 import { invalidForm, validForm, type FormValidationResult } from '@/components/forms/formValidation'
 
 type ManualChargeValue = { studentId: string; category: string; detail: string; amount: string; status: 'Pendiente' | 'Pagado'; dueDate: string; date: string }
-type AdjustmentValue = { type: 'Bonificacion total' | 'Promocion' | 'Importe manual'; mode: 'percentage' | 'fixed'; value: string; reason: string }
+type AdjustmentValue = { type: 'Bonificacion total' | 'Promocion' | 'Recargo por mora' | 'Importe manual'; mode: 'percentage' | 'fixed'; value: string; reason: string }
 
 export function validateManualCharge(value: ManualChargeValue): FormValidationResult {
     const fieldErrors: Record<string, string> = {}
