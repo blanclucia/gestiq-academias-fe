@@ -16,6 +16,12 @@ describe('payment rules', () => {
         expect(resolveChargeCollectionStatus({ lifecycleStatus: 'void', adjustedAmount: 100, paidAmount: 0, dueDate: '2026-09-08' }, today)).toBe('Anulado')
     })
 
+    it('delays "Vencido" by the configured grace period', () => {
+        const charge = { lifecycleStatus: 'open' as const, adjustedAmount: 100, paidAmount: 0, dueDate: '2026-09-08' }
+        expect(resolveChargeCollectionStatus(charge, today, 5)).toBe('Pendiente')
+        expect(resolveChargeCollectionStatus({ ...charge, dueDate: '2026-09-01' }, today, 5)).toBe('Vencido')
+    })
+
     it('keeps payment processing separate from collection state', () => {
         expect(resolveChargeCollectionStatus({ lifecycleStatus: 'open', paymentStatus: 'under_review', adjustedAmount: 100, paidAmount: 0, dueDate: '2026-09-08' }, today)).toBe('En verificación')
         expect(resolveChargeCollectionStatus({ lifecycleStatus: 'open', paymentStatus: 'rejected', adjustedAmount: 100, paidAmount: 0, dueDate: '2026-09-20' }, today)).toBe('Rechazado')

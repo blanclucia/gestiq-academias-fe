@@ -95,8 +95,7 @@ export function PublicEnrollmentPage() {
     const requiredFields = new Set(requiredFieldsFromApi(settings.enrollments.requiredFields));
     const age = form.birthDate ? calculateAge(form.birthDate) : null;
     const isMinor = age !== null && age < 18;
-    const submit = (event: React.FormEvent) => {
-        event.preventDefault();
+    const performRegistration = () => {
         if (!selectedCommission || !availability.available) {
             setFormError(availability.reason || "Elegí una comisión para continuar.");
             return;
@@ -132,6 +131,10 @@ export function PublicEnrollmentPage() {
             onError: () => setFormError("No pudimos completar la inscripción. Intentá nuevamente."),
         });
     };
+    const submit = (event: React.FormEvent) => {
+        event.preventDefault();
+        performRegistration();
+    };
 
     const goToContactStep = () => {
         const missingFields = [
@@ -158,7 +161,12 @@ export function PublicEnrollmentPage() {
             return;
         }
         setFormError("");
-        setFormStep(3);
+        // requirePayment=false: no tiene sentido pedir un método de pago que la organización no exige.
+        if (settings.enrollments.requirePayment) {
+            setFormStep(3);
+        } else {
+            performRegistration();
+        }
     };
 
     return (
@@ -289,16 +297,18 @@ export function PublicEnrollmentPage() {
                                     >
                                         2 Contacto
                                     </button>
-                                    <button
-                                        type="button"
-                                        className={
-                                            formStep === 3 ? "active" : formStep > 3 ? "complete" : ""
-                                        }
-                                        onClick={() => formStep > 3 && setFormStep(3)}
-                                        disabled={formStep <= 3}
-                                    >
-                                        3 Pago
-                                    </button>
+                                    {settings.enrollments.requirePayment && (
+                                        <button
+                                            type="button"
+                                            className={
+                                                formStep === 3 ? "active" : formStep > 3 ? "complete" : ""
+                                            }
+                                            onClick={() => formStep > 3 && setFormStep(3)}
+                                            disabled={formStep <= 3}
+                                        >
+                                            3 Pago
+                                        </button>
+                                    )}
                                 </div>
                                 {formError && <p className="form-error-message">{formError}</p>}
                                 {formStep === 1 && (
@@ -485,7 +495,7 @@ export function PublicEnrollmentPage() {
                                                 type="button"
                                                 onClick={goToContactValidationStep}
                                             >
-                                                Continuar
+                                                {settings.enrollments.requirePayment ? "Continuar" : "Confirmar inscripción"}
                                             </button>
                                         </div>
                                     </>

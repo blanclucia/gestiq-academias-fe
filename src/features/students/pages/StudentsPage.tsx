@@ -485,7 +485,7 @@ export function StudentsPage() {
                 onSubmit={() => {
                     setCreateError('')
                     if (!selectedBranchId) {
-                        showToast('error', 'Elegí una sede en la barra superior antes de crear un alumno.')
+                        setCreateError('Elegí una sede en la barra superior antes de crear un alumno.')
                         return
                     }
                     createStudent.mutate(studentForm, {

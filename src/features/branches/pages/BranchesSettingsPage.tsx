@@ -29,12 +29,12 @@ export function BranchesSettingsPage() {
     const { branchId } = useParams()
     const globallySelectedBranchId = useSelectedBranchId()
     const [activeTab, setActiveTab] = useState<(typeof tabs)[number]['id']>('personalizacion')
-    const { branches } = useBranches()
+    const { branches, isLoading: branchesLoading } = useBranches()
     const updateBranch = useUpdateBranch()
     const setBranchAdministrator = useSetBranchAdministrator()
     const setBranchStaffScope = useSetBranchStaffScope()
     // With an explicit :branchId, show exactly that sede (active or not) — you navigated there on purpose.
-    // Without one ("Mis sedes"), prefer an active sede so this agrees with the TopBar switcher, which only
+    // Without one ("Mi sede"), prefer an active sede so this agrees with the TopBar switcher, which only
     // ever offers active sedes: session.accessibleBranches always excludes inactive ones.
     const selectedBranch = branchId
         ? branches.find((branch) => branch.id === branchId) ?? branches[0]
@@ -79,7 +79,7 @@ export function BranchesSettingsPage() {
         const normalized = { ...settings, name: settings.name.trim(), email: settings.email.trim(), address: settings.address.trim(), phone: settings.phone.trim() }
         saveBranchSettings(branchKey, normalized)
         setSettings(normalized)
-        if (!selectedBranch) { showToast('success', 'Cambios guardados correctamente.'); return }
+        if (!selectedBranch) return
         updateBranch.mutate({ id: selectedBranch.id, changes: { name: normalized.name, address: normalized.address, email: normalized.email, phone: normalized.phone, status: normalized.status } }, {
             onSuccess: () => showToast('success', 'Cambios guardados correctamente.'),
             onError: () => showToast('error', 'No se pudieron guardar los datos de la sede. Intentá nuevamente.'),
@@ -121,6 +121,34 @@ export function BranchesSettingsPage() {
         })
     }
 
+    // This page configures staff/comunicaciones/automatizaciones for a sede that already exists —
+    // it was never meant to be reached with zero real sedes. Before sedes were backend-connected,
+    // `!selectedBranch` here silently fell back to a fake local-only "default" config (see
+    // saveBranchCore) that looked like it worked but never touched the API. Guiding to the real
+    // creation flow (Mi academia) instead of rendering that phantom form.
+    if (!branchesLoading && !selectedBranch) {
+        return (
+            <div className="dashboard-page">
+                <div className="page-header academy-settings-header compact">
+                    <div>
+                        <h1>Mi sede</h1>
+                        <p>Definí los datos, accesos, equipo y comunicaciones de tus sedes.</p>
+                    </div>
+                </div>
+                <section className="academy-settings-card">
+                    <div className="academy-placeholder">
+                        <div className="academy-placeholder-icon">
+                            <Building2 size={22} />
+                        </div>
+                        <h3>Todavía no creaste ninguna sede</h3>
+                        <p>Es la base de todo lo demás — alumnos, cursos, egresos. Creá la primera desde Mi academia para poder configurarla acá.</p>
+                        <Link to={path('academy')} className="primary-button">Ir a Mi academia</Link>
+                    </div>
+                </section>
+            </div>
+        )
+    }
+
     return <div className="dashboard-page academy-settings-page branch-settings-page">
         <EntityFormModal open={newTemplateOpen} title="Nueva comunicación" subtitle="Creá una plantilla reutilizable para esta sede." submitLabel="Crear comunicación" validate={() => validateConditions({ templateName: !newTemplate.name.trim() && 'Ingresá el nombre.', templateSubject: !newTemplate.subject.trim() && 'Ingresá el asunto.', templateMessage: !newTemplate.message.trim() && 'Ingresá el mensaje.' }, 'Revisá la comunicación.')} onClose={() => { setNewTemplateOpen(false); setNewTemplate(emptyTemplate) }} onSubmit={createTemplate}>
             <div className="form-stack">
@@ -133,7 +161,7 @@ export function BranchesSettingsPage() {
                 <div className="branch-channel-options"><span>Canales iniciales</span>{['Email', 'WhatsApp'].map((channel) => <label key={channel}><input type="checkbox" checked={newTemplate.channels.includes(channel)} onChange={(event) => setNewTemplate((current) => ({ ...current, channels: event.target.checked ? [...current.channels, channel] : current.channels.filter((item) => item !== channel) }))} />{channel}</label>)}</div>
             </div>
         </EntityFormModal>
-        <div className="page-header academy-settings-header compact"><div>{branchId && <div className="detail-breadcrumb"><Link to={path('academy')}><ArrowLeft size={14} /> Mi academia</Link><span>›</span><span>{selectedBranch?.name ?? 'Sede'}</span></div>}<div className="academy-title-row detail-title-row"><h1>{branchId ? selectedBranch?.name ?? 'Sede' : 'Mis sedes'}</h1><span className={`academy-status ${selectedBranch?.status === 'Activa' ? 'active' : ''}`}>{branchId ? selectedBranch?.status ?? 'Sin sede' : selectedBranch?.name ?? 'Sin sede activa'}</span></div><p>Definí los datos, accesos, equipo y comunicaciones de esta sede.</p></div></div>
+        <div className="page-header academy-settings-header compact"><div>{branchId && <div className="detail-breadcrumb"><Link to={path('academy')}><ArrowLeft size={14} /> Mi academia</Link><span>›</span><span>{selectedBranch?.name ?? 'Sede'}</span></div>}<div className="academy-title-row detail-title-row"><h1>{branchId ? selectedBranch?.name ?? 'Sede' : 'Mi sede'}</h1><span className={`academy-status ${selectedBranch?.status === 'Activa' ? 'active' : ''}`}>{branchId ? selectedBranch?.status ?? 'Sin sede' : selectedBranch?.name ?? 'Sin sede activa'}</span></div><p>Definí los datos, accesos, equipo y comunicaciones de esta sede.</p></div></div>
         <div className="academy-tabs-wrap">
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as (typeof tabs)[number]['id'])}><TabsList variant="line" aria-label="Configuración de sedes">{tabs.map((tab) => <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>)}</TabsList></Tabs>
             <div className="academy-tab-panel">

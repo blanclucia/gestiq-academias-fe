@@ -3,7 +3,7 @@ import { getPaymentDisplayDate } from '@/domain/billing/paymentRules'
 import type { Payment } from '@/types/domain'
 import { validatePaymentAdjustment } from '../model/billingValidation'
 
-export type PaymentAdjustmentType = 'Bonificacion total' | 'Promocion' | 'Importe manual'
+export type PaymentAdjustmentType = 'Bonificacion total' | 'Promocion' | 'Recargo por mora' | 'Importe manual'
 export type PaymentAdjustmentMode = 'percentage' | 'fixed'
 
 export type PaymentAdjustmentValue = {
@@ -19,12 +19,13 @@ type PaymentAdjustmentModalProps = {
     target: AdjustmentTarget | null
     value: PaymentAdjustmentValue
     adjustedAmount: number
+    lateFeePercent: number
     onChange: (value: PaymentAdjustmentValue) => void
     onClose: () => void
     onSubmit: () => void
 }
 
-export function PaymentAdjustmentModal({ target, value, adjustedAmount, onChange, onClose, onSubmit }: PaymentAdjustmentModalProps) {
+export function PaymentAdjustmentModal({ target, value, adjustedAmount, lateFeePercent, onChange, onClose, onSubmit }: PaymentAdjustmentModalProps) {
     const update = (changes: Partial<PaymentAdjustmentValue>) => onChange({ ...value, ...changes })
 
     return (
@@ -50,9 +51,17 @@ export function PaymentAdjustmentModal({ target, value, adjustedAmount, onChange
                 <FormSection title="Tipo de ajuste" description="El importe original se conserva y el ajuste impacta sólo en el monto final a cobrar.">
                     <FormGrid>
                         <FormField label="Acción">
-                            <select className="form-input" value={value.type} onChange={(event) => update({ type: event.target.value as PaymentAdjustmentType })}>
+                            <select
+                                className="form-input"
+                                value={value.type}
+                                onChange={(event) => {
+                                    const type = event.target.value as PaymentAdjustmentType
+                                    update({ type, value: type === 'Recargo por mora' && !value.value ? String(lateFeePercent) : value.value })
+                                }}
+                            >
                                 <option value="Bonificacion total">Bonificar 100%</option>
                                 <option value="Promocion">Aplicar promoción</option>
+                                <option value="Recargo por mora">Aplicar recargo por mora</option>
                                 <option value="Importe manual">Definir importe manual</option>
                             </select>
                         </FormField>
@@ -65,7 +74,13 @@ export function PaymentAdjustmentModal({ target, value, adjustedAmount, onChange
                             </FormField>
                         )}
                         {value.type !== 'Bonificacion total' && (
-                            <FormField label={value.type === 'Importe manual' ? 'Importe final' : value.mode === 'percentage' ? 'Descuento (%)' : 'Descuento ($)'}>
+                            <FormField
+                                label={
+                                    value.type === 'Importe manual' ? 'Importe final'
+                                        : value.type === 'Recargo por mora' ? `Recargo (%) · sugerido ${lateFeePercent}%`
+                                            : value.mode === 'percentage' ? 'Descuento (%)' : 'Descuento ($)'
+                                }
+                            >
                                 <input name="adjustmentValue" className="form-input" type="number" min="0" value={value.value} onChange={(event) => update({ value: event.target.value })} />
                             </FormField>
                         )}

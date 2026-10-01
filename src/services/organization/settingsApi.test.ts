@@ -4,8 +4,8 @@ import { fetchOrganizationSettings, updateOrganizationSettings } from './setting
 const apiSettings = {
     general: { commercialName: 'Academia Puentes', legalName: 'Academia Puentes SAS', taxId: '30-1', email: 'a@a.com', phone: '', website: '', address: '', timezone: 'America/Argentina/Cordoba', currency: 'ARS', status: 'active' as const },
     brand: { name: 'Academia Puentes', shortName: 'AP', logoUrl: '', primary: '#4f46e5', primaryStrong: '#3730a3', primarySoft: 'rgba(0,0,0,0.1)', primaryContrast: '#ffffff', accent: '#22c55e' },
-    payments: { defaultDueDay: 10, graceDays: 5, lateFeePercent: 0, transferAlias: '', transferCbu: '', accountHolder: '', accountTaxId: '', paymentMessage: '', paymentLink: '', receiptPrefix: 'AP', enabledMethods: ['bank_transfer'] },
-    enrollments: { confirmationMode: 'manual' as const, reservationHours: 48, defaultCapacity: 20, requirePayment: false, requiredFields: ['document'], terms: '' },
+    payments: { defaultDueDay: 10, graceDays: 5, lateFeePercent: 0, transferAlias: '', transferCbu: '', accountHolder: '', accountTaxId: '', paymentMessage: '', paymentLink: '', enabledMethods: ['bank_transfer'] },
+    enrollments: { confirmationMode: 'manual' as const, defaultCapacity: 20, requirePayment: false, requiredFields: ['document'] },
 }
 
 describe('organization settings API client', () => {

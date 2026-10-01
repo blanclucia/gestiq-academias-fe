@@ -37,7 +37,9 @@ export function AcademicOffersPage() {
     const [activeTab, setActiveTab] = useState<'groups' | 'private'>(() => searchParams.get('tab') === 'private' ? 'private' : 'groups')
     const [openMenuId, setOpenMenuId] = useState<string | null>(null)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+    const [createCourseError, setCreateCourseError] = useState('')
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+    const [editCourseError, setEditCourseError] = useState('')
     const [editingCourse, setEditingCourse] = useState<Course | null>(null)
     const [courseForm, setCourseForm] = useState<CourseFormValue>({ name: '', description: '', status: 'Borrador' })
     const [deleteTarget, setDeleteTarget] = useState<Course | null>(null)
@@ -201,16 +203,21 @@ export function AcademicOffersPage() {
                 onClose={() => setIsCreateCycleOpen(false)}
                 onSubmit={() => {
                     createCycle.mutate({ ...cycleForm, name: cycleForm.name.trim(), status: 'Borrador' }, {
-                        onSuccess: () => showToast('success', 'Ciclo lectivo creado correctamente.'),
+                        onSuccess: (created) => {
+                            activateCycle.mutate(created.id, {
+                                onSuccess: () => showToast('success', 'Ciclo lectivo creado y activado correctamente.'),
+                                onError: () => showToast('error', 'El ciclo se creó, pero no se pudo activar automáticamente. Activalo desde el selector de ciclo lectivo.'),
+                            })
+                        },
                         onError: () => showToast('error', 'No se pudo crear el ciclo lectivo. Intentá nuevamente.'),
                     })
                     setIsCreateCycleOpen(false)
                 }}
             >
                 <div className="form-grid">
-                    <label className="form-field"><span className="form-field-label">Nombre <b className="form-required-mark">*</b></span><input className="form-input" value={cycleForm.name} onChange={(event) => setCycleForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ej: Ciclo lectivo 2027" /></label>
-                    <label className="form-field"><span className="form-field-label">Fecha de inicio <b className="form-required-mark">*</b></span><input className="form-input" type="date" value={cycleForm.startDate} onChange={(event) => setCycleForm((current) => ({ ...current, startDate: event.target.value }))} /></label>
-                    <label className="form-field"><span className="form-field-label">Fecha de cierre <b className="form-required-mark">*</b></span><input className="form-input" type="date" value={cycleForm.endDate} onChange={(event) => setCycleForm((current) => ({ ...current, endDate: event.target.value }))} /></label>
+                    <label className="form-field"><span className="form-field-label"><span>Nombre <b className="form-required-mark">*</b></span></span><input className="form-input" value={cycleForm.name} onChange={(event) => setCycleForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ej: Ciclo lectivo 2027" /></label>
+                    <label className="form-field"><span className="form-field-label"><span>Fecha de inicio <b className="form-required-mark">*</b></span></span><input className="form-input" type="date" value={cycleForm.startDate} onChange={(event) => setCycleForm((current) => ({ ...current, startDate: event.target.value }))} /></label>
+                    <label className="form-field"><span className="form-field-label"><span>Fecha de cierre <b className="form-required-mark">*</b></span></span><input className="form-input" type="date" value={cycleForm.endDate} onChange={(event) => setCycleForm((current) => ({ ...current, endDate: event.target.value }))} /></label>
                 </div>
             </EntityFormModal>
 
@@ -219,21 +226,29 @@ export function AcademicOffersPage() {
                 title="Nueva oferta académica"
                 subtitle="Completa los datos principales de la oferta académica."
                 validate={() => validateConditions({ courseName: !courseForm.name.trim() && 'Ingresá el nombre de la oferta.' })}
-                onClose={() => setIsCreateModalOpen(false)}
+                onClose={() => { setIsCreateModalOpen(false); setCreateCourseError('') }}
                 onSubmit={() => {
+                    setCreateCourseError('')
                     if (!courseForm.name.trim()) { setIsCreateModalOpen(false); return }
                     if (!selectedBranchId) {
-                        showToast('error', 'Elegí una sede en la barra superior antes de crear un curso.')
+                        setCreateCourseError('Elegí una sede en la barra superior antes de crear un curso.')
+                        return
+                    }
+                    if (!activeCycleId) {
+                        setCreateCourseError(cycles.length === 0 ? 'Creá un ciclo lectivo antes de crear una oferta académica.' : 'Activá un ciclo lectivo en el selector de arriba antes de crear una oferta académica.')
                         return
                     }
                     createCourse.mutate({ form: courseForm, cycleId: activeCycleId }, {
-                        onSuccess: () => showToast('success', 'Oferta académica creada correctamente.'),
-                        onError: () => showToast('error', 'No se pudo crear la oferta académica. Intentá nuevamente.'),
+                        onSuccess: () => {
+                            setIsCreateModalOpen(false)
+                            showToast('success', 'Oferta académica creada correctamente.')
+                        },
+                        onError: () => setCreateCourseError('No se pudo crear la oferta académica. Intentá nuevamente.'),
                     })
-                    setIsCreateModalOpen(false)
                 }}
             >
                 <CourseForm value={courseForm} onValueChange={setCourseForm} />
+                {createCourseError && <p className="form-error-message" role="alert">{createCourseError}</p>}
             </EntityFormModal>
 
             <EntityFormModal
@@ -244,16 +259,23 @@ export function AcademicOffersPage() {
                 onClose={() => {
                     setIsEditModalOpen(false)
                     setEditingCourse(null)
+                    setEditCourseError('')
                 }}
                 onSubmit={() => {
-                    if (editingCourse && courseForm.name.trim()) {
-                        updateCourse.mutate({ id: editingCourse.id, changes: courseForm }, {
-                            onSuccess: () => showToast('success', 'Oferta académica actualizada correctamente.'),
-                            onError: () => showToast('error', 'No se pudo actualizar la oferta académica. Intentá nuevamente.'),
-                        })
+                    setEditCourseError('')
+                    if (!editingCourse || !courseForm.name.trim()) {
+                        setIsEditModalOpen(false)
+                        setEditingCourse(null)
+                        return
                     }
-                    setIsEditModalOpen(false)
-                    setEditingCourse(null)
+                    updateCourse.mutate({ id: editingCourse.id, changes: courseForm }, {
+                        onSuccess: () => {
+                            setIsEditModalOpen(false)
+                            setEditingCourse(null)
+                            showToast('success', 'Oferta académica actualizada correctamente.')
+                        },
+                        onError: () => setEditCourseError('No se pudo actualizar la oferta académica. Intentá nuevamente.'),
+                    })
                 }}
             >
                 <CourseForm
@@ -264,6 +286,7 @@ export function AcademicOffersPage() {
                         description: 'Oferta académica orientada a nivel inicial con foco en speaking y listening.',
                     }}
                 />
+                {editCourseError && <p className="form-error-message" role="alert">{editCourseError}</p>}
             </EntityFormModal>
 
             <DeleteConfirmationModal
@@ -338,12 +361,15 @@ export function AcademicOffersPage() {
                             </TabsList>
                         </Tabs>
                         <div className="cycle-context-compact">
-                            <label>
-                                <select aria-label="Ciclo lectivo" value={activeCycleId} onChange={(event) => activateCycle.mutate(event.target.value, { onError: () => showToast('error', 'No se pudo cambiar el ciclo lectivo activo.') })}>
+                            <span className="cycle-context-label">Ciclo lectivo</span>
+                            <div className="cycle-context-row">
+                                <select aria-label="Ciclo lectivo" value={activeCycleId} disabled={cycles.length === 0} onChange={(event) => activateCycle.mutate(event.target.value, { onError: () => showToast('error', 'No se pudo cambiar el ciclo lectivo activo.') })}>
+                                    {cycles.length === 0 && <option value="">Creá un ciclo lectivo</option>}
+                                    {cycles.length > 0 && !activeCycleId && <option value="">Seleccioná un ciclo lectivo</option>}
                                     {cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.name}</option>)}
                                 </select>
-                            </label>
-                            <button type="button" className="secondary-button cycle-icon-action" aria-label="Crear nuevo ciclo lectivo" data-tooltip="Crear y configurar un nuevo ciclo lectivo" onClick={() => setIsCreateCycleOpen(true)}><CalendarPlus size={16} /></button>
+                                <button type="button" className="secondary-button cycle-icon-action" aria-label="Crear nuevo ciclo lectivo" data-tooltip="Crear y configurar un nuevo ciclo lectivo" onClick={() => setIsCreateCycleOpen(true)}><CalendarPlus size={16} /></button>
+                            </div>
                         </div>
                     </div>
                 )}

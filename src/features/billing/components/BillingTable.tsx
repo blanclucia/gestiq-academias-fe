@@ -21,6 +21,7 @@ export type BillingPaymentRecord = Payment & {
 type BillingTableProps = {
     rows: BillingPaymentRecord[]
     today: Date
+    graceDays: number
     currentPage: number
     totalPages: number
     selectedIds: string[]
@@ -83,14 +84,14 @@ export function BillingTable(props: BillingTableProps) {
                     key: 'amount', header: 'Monto', align: 'right', accessor: (payment) => <div style={{ display: 'grid', gap: 2, justifyItems: 'end' }}><strong>{`$${payment.amount.toLocaleString('es-AR')}`}</strong>{payment.adjustment && payment.originalAmount !== payment.amount ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>Original $ {payment.originalAmount.toLocaleString('es-AR')} · {payment.adjustment.type}</span> : null}</div>,
                 },
                 {
-                    key: 'reminder', header: 'Recordatorio', accessor: (payment) => <span>{getPaymentReminderLabel(payment, resolveChargeCollectionStatus(payment.chargeSnapshot, props.today), props.today)}{payment.lastReminderAt ? ` · Último ${getPaymentDisplayDate(payment.lastReminderAt)}` : ''}</span>,
+                    key: 'reminder', header: 'Recordatorio', accessor: (payment) => <span>{getPaymentReminderLabel(payment, resolveChargeCollectionStatus(payment.chargeSnapshot, props.today, props.graceDays), props.today)}{payment.lastReminderAt ? ` · Último ${getPaymentDisplayDate(payment.lastReminderAt)}` : ''}</span>,
                 },
                 {
-                    key: 'status', header: 'Estado', align: 'center', accessor: (payment) => { const status = resolveChargeCollectionStatus(payment.chargeSnapshot, props.today); return <StatusBadge label={status} tone={statusToneMap[status]} /> },
+                    key: 'status', header: 'Estado', align: 'center', accessor: (payment) => { const status = resolveChargeCollectionStatus(payment.chargeSnapshot, props.today, props.graceDays); return <StatusBadge label={status} tone={statusToneMap[status]} /> },
                 },
             ]}
             renderActions={(payment) => {
-                const status = resolveChargeCollectionStatus(payment.chargeSnapshot, props.today)
+                const status = resolveChargeCollectionStatus(payment.chargeSnapshot, props.today, props.graceDays)
                 const collectable = ['Pendiente', 'En verificación', 'Vencido', 'Rechazado'].includes(status)
                 return <RowActionMenu ariaLabel={`Acciones para ${payment.student}`} active={props.openMenuId === payment.id} onToggle={() => props.onToggleMenu(payment.id)} actions={[
                     { label: 'Editar', icon: <PencilLine size={15} />, onClick: () => props.onEdit(payment) },
