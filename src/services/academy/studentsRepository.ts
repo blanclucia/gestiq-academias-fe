@@ -2,9 +2,11 @@ import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/auth/AuthContext'
 import { getSelectedBranchId } from '@/services/branchRepository'
-import { createStudentApi, deleteStudentApi, fetchStudents, updateStudentApi, type ApiStudent, type ApiStudentInput, type ApiStudentPatch } from '@/services/organization/studentsApi'
+import { createStudentApi, deleteStudentApi, fetchStudentEnrollments, fetchStudents, updateStudentApi, type ApiStudent, type ApiStudentInput, type ApiStudentPatch } from '@/services/organization/studentsApi'
 import { studentStatusFromApi, studentStatusToApi } from '@/services/organization/studentsMapping'
+import { enrollmentStatusFromApi } from '@/services/organization/academicOffersMapping'
 import type { Student } from '@/types/domain'
+import type { CommissionStudentStatus } from './academyTypes'
 import { readAcademyState, updateAcademyState } from './academyState'
 
 function fromApiStudent(student: ApiStudent): Student {
@@ -40,21 +42,12 @@ function sameMirror(current: Student[], next: Student[]): boolean {
 // commissions, exams, academic offers) read it outside React, without awaiting anything. It reads
 // a local mirror of the real backend list (kept warm by useStudents()/<StudentsSync>) instead of
 // the old local-only students — real backend is now the source of truth, this is just a cache.
-// A public self-enrollment used to synthesize a "ghost" student here from a locally-stored
-// registration — no longer needed: Inscripciones is real now, so that student is already a real row
-// in state.students by the time anyone reads this (see the enrollments module).
+// student.courses is always [] here: which commissions a student is in is now resolved from the
+// real roster (useCommissionRoster per commission, useStudentEnrollments for a student's full
+// history) — not merged in locally anymore, since the local "assignments" mechanism that used to
+// fill it never touched the real backend and is gone.
 export function listStudents(): Student[] {
-    const state = readAcademyState()
-    return state.students.map((student) => {
-        const courses = new Map(student.courses.map((course) => [`${course.name}|${course.group}|${course.modality ?? 'Grupo'}`, course]))
-        state.assignments.filter((assignment) => assignment.studentId === student.id).forEach((assignment) => courses.set(`${assignment.courseName}|${assignment.commissionName}|Grupo`, { name: assignment.courseName, group: assignment.commissionName, modality: 'Grupo' as const }))
-        return { ...student, courses: Array.from(courses.values()) }
-    })
-}
-
-export function listStudentsInCommission(courseName: string, commissionName: string, commissionId?: string) {
-    const assignments = readAcademyState().assignments
-    return listStudents().filter((student) => assignments.some((assignment) => assignment.studentId === student.id && (assignment.commissionId === commissionId || (!assignment.commissionId && assignment.courseName === courseName && assignment.commissionName === commissionName))) || student.courses.some((course) => course.name === courseName && course.group === commissionName))
+    return readAcademyState().students
 }
 
 export function useStudents(options: { enabled?: boolean } = {}) {
@@ -130,4 +123,31 @@ export function useDeleteStudent() {
         },
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['students', organizationSlug] }),
     })
+}
+
+export type StudentEnrollmentHistoryRow = { id: string; courseId: string; courseName: string; commissionId: string; commissionName: string; startDate: string; endDate: string; status: CommissionStudentStatus; enrolledAt: string }
+
+// The student's full enrollment history across every commission/course/cycle — unlike
+// listStudents()'s "vigente"-scoped data elsewhere, this is intentionally unfiltered (no espejo:
+// fetched on demand, same criterion as useCommissionRoster).
+export function useStudentEnrollments(studentId: string | undefined) {
+    const { session } = useAuth()
+    const organizationSlug = session?.organization.slug
+    const query = useQuery({
+        queryKey: ['student-enrollments', organizationSlug, studentId],
+        queryFn: ({ signal }) => fetchStudentEnrollments(organizationSlug!, studentId!, signal),
+        enabled: Boolean(organizationSlug && studentId),
+    })
+    const history: StudentEnrollmentHistoryRow[] = (query.data ?? []).map((item) => ({
+        id: item.commissionId,
+        courseId: item.courseId,
+        courseName: item.courseName,
+        commissionId: item.commissionId,
+        commissionName: item.commissionName,
+        startDate: item.startDate,
+        endDate: item.endDate,
+        status: enrollmentStatusFromApi(item.status),
+        enrolledAt: item.enrolledAt,
+    })).sort((a, b) => b.startDate.localeCompare(a.startDate))
+    return { history, isLoading: query.isLoading, isError: query.isError }
 }

@@ -7,14 +7,9 @@ import { confirmationModeFromApi, confirmationModeToApi, orgStatusFromApi, orgSt
 
 export type AcademyGeneralSettings = {
     commercialName: string
-    legalName: string
-    taxId: string
     email: string
     phone: string
-    website: string
     address: string
-    timezone: string
-    currency: string
     status: 'Activa' | 'Inactiva'
 }
 
@@ -50,14 +45,9 @@ const storageKey = 'gestiq-academy-settings-v1'
 export const defaultAcademySettings: AcademySettings = {
     general: {
         commercialName: defaultAcademyBrand.name,
-        legalName: 'Academia Puentes SAS',
-        taxId: '30-71234567-8',
         email: 'hola@academiapuentes.com',
         phone: '+54 351 555-0198',
-        website: 'https://academiapuentes.com',
         address: 'Av. San Martín 1240, Córdoba',
-        timezone: 'America/Argentina/Cordoba',
-        currency: 'ARS',
         status: 'Activa',
     },
     brand: defaultAcademyBrand,

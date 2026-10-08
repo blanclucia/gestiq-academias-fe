@@ -1,5 +1,6 @@
 import { EntityFormModal, FormField } from '@/components/crud/EntityFormModal'
 import { invalidForm, validForm } from '@/components/forms/formValidation'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import type { AgendaEvent, AgendaEventType } from '@/services/agendaRepository'
 
 export type AgendaEventFormValue = {
@@ -45,7 +46,7 @@ export function AgendaEventModal({ open, editingEvent, value, onChange, onClose,
         <EntityFormModal open={open} title={editingEvent ? 'Editar evento' : 'Nuevo evento'} subtitle="Agregá una fecha visible para toda la academia." submitLabel={editingEvent ? 'Guardar cambios' : 'Guardar evento'} validate={() => validateAgendaEvent(value)} onClose={onClose} onSubmit={onSubmit}>
             <div className="form-grid">
                 <FormField label="Título" required><input name="title" className="form-input" value={value.title} onChange={(event) => update({ title: event.target.value })} placeholder="Ej. Reunión de equipo" /></FormField>
-                <FormField label="Tipo" required><select className="form-input" value={value.type} onChange={(event) => update({ type: event.target.value as AgendaEventType })}>{eventTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></FormField>
+                <FormField label="Tipo" required><SearchableSelect name="type" value={value.type} onChange={(type) => update({ type: type as AgendaEventType })} options={eventTypes} /></FormField>
                 <div className="agenda-date-range">
                     <FormField label="Desde" required><input name="date" className="form-input" type="date" value={value.date} onChange={(event) => update({ date: event.target.value, endDate: value.endDate < event.target.value ? event.target.value : value.endDate })} /></FormField>
                     <FormField label="Hasta" required><input name="endDate" className="form-input" type="date" min={value.date} value={value.endDate} onChange={(event) => update({ endDate: event.target.value })} /></FormField>
@@ -56,7 +57,7 @@ export function AgendaEventModal({ open, editingEvent, value, onChange, onClose,
                     <FormField label="Hora de fin" required><input name="endTime" className="form-input" type="time" min={value.date === value.endDate ? value.startTime : undefined} value={value.endTime} onChange={(event) => update({ endTime: event.target.value })} /></FormField>
                 </div>}
                 {!editingEvent && <>
-                    <FormField label="Repetir"><select className="form-input" value={value.recurrence} onChange={(event) => { const recurrence = event.target.value as AgendaEventFormValue['recurrence']; update({ recurrence, repeatUntil: recurrence === 'weekly' && value.repeatUntil < value.date ? value.date : value.repeatUntil }) }}><option value="none">No repetir</option><option value="weekly">Cada semana</option></select></FormField>
+                    <FormField label="Repetir"><SearchableSelect value={value.recurrence} onChange={(recurrenceValue) => { const recurrence = recurrenceValue as AgendaEventFormValue['recurrence']; update({ recurrence, repeatUntil: recurrence === 'weekly' && value.repeatUntil < value.date ? value.date : value.repeatUntil }) }} options={[{ value: 'none', label: 'No repetir' }, { value: 'weekly', label: 'Cada semana' }]} /></FormField>
                     {value.recurrence === 'weekly' && <>
                         <FormField label="Días"><div className="agenda-repeat-days" data-field="repeatDays">{repeatDays.map((day) => <button type="button" className={value.repeatDays.includes(day.value) ? 'active' : ''} key={day.value} onClick={() => toggleRepeatDay(day.value)}>{day.label}</button>)}</div></FormField>
                         <FormField label="Repetir hasta" required><input name="repeatUntil" className="form-input" type="date" min={value.date} value={value.repeatUntil} onChange={(event) => update({ repeatUntil: event.target.value })} /></FormField>

@@ -3,7 +3,9 @@ export type BranchSettings = {
     email: string
     address: string
     phone: string
-    schedule: string
+    weekDays: string[]
+    openingTime: string
+    closingTime: string
     timezone: string
     status: 'Activa' | 'Inactiva'
 }
@@ -20,8 +22,10 @@ export const defaultBranchSettings: BranchSettings = {
     email: 'sanjose@academiapuentes.com',
     address: 'Av. San Martín 1240, Córdoba',
     phone: '+54 351 555-0198',
-    schedule: 'Lunes a viernes, de 08:00 a 21:00',
-    timezone: 'America/Argentina/Cordoba',
+    weekDays: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'],
+    openingTime: '08:00',
+    closingTime: '21:00',
+    timezone: 'America/Argentina/Buenos_Aires',
     status: 'Activa',
 }
 

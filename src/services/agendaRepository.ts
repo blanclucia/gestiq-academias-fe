@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { listCourses, listEnrollmentOpenings, listPrivateLessons, listStaff, listStudents } from '@/services/academyRepository'
+import { getActiveAcademicCycleId, listCourses, listEnrollmentOpenings, listPrivateLessons, listStaff, listStudents } from '@/services/academyRepository'
 import { createRepositoryEvents } from '@/services/shared/repositoryEvents'
 import { readStoredValue, writeStoredValue } from '@/services/shared/storage'
 import { getWeeklyAgendaDates, shiftAgendaDate } from '@/domain/agenda/agendaRules'
@@ -76,7 +76,10 @@ function parseSchedule(schedule: string) {
 }
 
 function derivedClassEvents(year: number): AgendaEvent[] {
-    const courses = listCourses()
+    // Same scoping as Ofertas académicas: only the active ciclo lectivo's courses show up here —
+    // a course from a past/inactive cycle shouldn't keep generating class chips on the calendar.
+    const activeCycleId = getActiveAcademicCycleId()
+    const courses = listCourses().filter((course) => course.cycleId === activeCycleId)
     const commissionEvents = courses.flatMap((course) => course.commissions.flatMap((commission) => {
         const schedule = parseSchedule(commission.schedule)
         return getWeeklyAgendaDates(commission.startDate, commission.endDate, schedule.weekdays, year).map((date) => ({
@@ -112,8 +115,12 @@ function derivedClassEvents(year: number): AgendaEvent[] {
 }
 
 function derivedEnrollmentEvents(year: number): AgendaEvent[] {
-    return listEnrollmentOpenings().filter((opening) => opening.startDate.startsWith(`${year}-`)).flatMap((opening) => {
-        const course = listCourses().find((item) => item.id === opening.courseId)
+    // Same scoping as derivedClassEvents above: an opening for a course outside the active ciclo
+    // lectivo shouldn't keep showing "Inscripciones abiertas" on the calendar.
+    const activeCycleId = getActiveAcademicCycleId()
+    const coursesById = new Map(listCourses().filter((course) => course.cycleId === activeCycleId).map((course) => [course.id, course]))
+    return listEnrollmentOpenings().filter((opening) => opening.startDate.startsWith(`${year}-`) && coursesById.has(opening.courseId)).flatMap((opening) => {
+        const course = coursesById.get(opening.courseId)
         return [{ id: `ENROLLMENT-OPEN-${opening.id}`, title: `Inscripciones abiertas · ${course?.name ?? 'Oferta académica'}`, type: 'inscripcion' as const, scope: 'general' as const, date: opening.startDate, endDate: opening.endDate, allDay: true, source: 'system' as const, createdAt: `${year}-01-01` }]
     })
 }

@@ -4,12 +4,14 @@ import { Link, useParams } from 'react-router-dom'
 import { StaffPage } from '@/features/staff'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EntityFormModal, FormField, FormGrid } from '@/components/crud/EntityFormModal'
-import { setSelectedBranchId, useBranches, useSelectedBranchId, useSetBranchAdministrator, useSetBranchStaffScope, useUpdateBranch } from '@/services/branchRepository'
+import { setSelectedBranchId, useBranchRoster, useBranchRosterInvalidation, useBranches, useSelectedBranchId, useSetBranchAdministrator, useSetBranchStaffScope, useUpdateBranch } from '@/services/branchRepository'
 import { listStaff } from '@/services/academyRepository'
 import { getBranchSettings, listBranchAutomations, saveBranchAutomations, saveBranchSettings, type BranchAutomation, type BranchSettings } from '@/services/branchConfigurationRepository'
 import { defaultCommunicationTemplates as defaultTemplates, listCommunicationTemplates, saveCommunicationTemplates, type CommunicationTemplate } from '@/services/communicationTemplateRepository'
 import { validateConditions } from '@/components/forms/formValidation'
 import { SettingsField as Field, SettingsToggleOption as ToggleOption } from '@/components/forms/SettingsControls'
+import { WeekDaysCheckboxGroup } from '@/components/forms/WeekDaysCheckboxGroup'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { useToast } from '@/components/ui/ToastContext'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
@@ -33,6 +35,7 @@ export function BranchesSettingsPage() {
     const updateBranch = useUpdateBranch()
     const setBranchAdministrator = useSetBranchAdministrator()
     const setBranchStaffScope = useSetBranchStaffScope()
+    const invalidateBranchRoster = useBranchRosterInvalidation()
     // With an explicit :branchId, show exactly that sede (active or not) — you navigated there on purpose.
     // Without one ("Mi sede"), prefer an active sede so this agrees with the TopBar switcher, which only
     // ever offers active sedes: session.accessibleBranches always excludes inactive ones.
@@ -42,7 +45,10 @@ export function BranchesSettingsPage() {
         ?? branches.find((branch) => branch.status === 'Activa')
         ?? branches[0]
     const branchKey = selectedBranch?.id ?? 'default'
-    const [settings, setSettings] = useState<BranchSettings>(() => getBranchSettings(branchKey, { name: selectedBranch?.name, address: selectedBranch?.address, email: selectedBranch?.email, phone: selectedBranch?.phone, status: selectedBranch?.status }))
+    const { roster } = useBranchRoster(selectedBranch?.id)
+    const realAdministratorIds = listStaff().filter((member) => member.userId && roster.administratorIds.includes(member.userId)).map((member) => member.id)
+    const realStaffIds = listStaff().filter((member) => member.userId && roster.teacherIds.includes(member.userId)).map((member) => member.id)
+    const [settings, setSettings] = useState<BranchSettings>(() => getBranchSettings(branchKey, { name: selectedBranch?.name, address: selectedBranch?.address, email: selectedBranch?.email, phone: selectedBranch?.phone, weekDays: selectedBranch?.weekDays, openingTime: selectedBranch?.openingTime, closingTime: selectedBranch?.closingTime, timezone: selectedBranch?.timezone, status: selectedBranch?.status }))
     const [templates, setTemplates] = useState<CommunicationTemplate[]>(() => listCommunicationTemplates(branchKey))
     const [automations, setAutomations] = useState<BranchAutomation[]>(() => listBranchAutomations(branchKey))
     const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(defaultTemplates[0].id)
@@ -50,14 +56,20 @@ export function BranchesSettingsPage() {
     const [newTemplate, setNewTemplate] = useState(emptyTemplate)
     const { showToast } = useToast()
 
+    // `useBranches()` returns a fresh array/object every render, so depending on the raw `weekDays`
+    // array below would re-fire the effect (and reset the draft) on every render instead of only
+    // when the branch context actually changes — joining to a string gives a stable primitive.
+    const branchWeekDaysKey = selectedBranch?.weekDays.join('|')
+
     /* The route changes the complete editing context, so all branch-scoped drafts reset together. */
     /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
-        setSettings(getBranchSettings(branchKey, { name: selectedBranch?.name, address: selectedBranch?.address, email: selectedBranch?.email, phone: selectedBranch?.phone, status: selectedBranch?.status }))
+        setSettings(getBranchSettings(branchKey, { name: selectedBranch?.name, address: selectedBranch?.address, email: selectedBranch?.email, phone: selectedBranch?.phone, weekDays: selectedBranch?.weekDays, openingTime: selectedBranch?.openingTime, closingTime: selectedBranch?.closingTime, timezone: selectedBranch?.timezone, status: selectedBranch?.status }))
         setTemplates(listCommunicationTemplates(branchKey))
         setAutomations(listBranchAutomations(branchKey))
         setExpandedTemplateId(defaultTemplates[0]?.id ?? null)
-    }, [branchKey, selectedBranch?.address, selectedBranch?.email, selectedBranch?.name, selectedBranch?.phone, selectedBranch?.status])
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- branchWeekDaysKey stands in for selectedBranch?.weekDays, see comment above
+    }, [branchKey, selectedBranch?.address, selectedBranch?.email, selectedBranch?.name, selectedBranch?.phone, branchWeekDaysKey, selectedBranch?.openingTime, selectedBranch?.closingTime, selectedBranch?.timezone, selectedBranch?.status])
     /* eslint-enable react-hooks/set-state-in-effect */
 
     const updateSettings = (values: Partial<BranchSettings>) => setSettings((current) => ({ ...current, ...values }))
@@ -76,11 +88,13 @@ export function BranchesSettingsPage() {
     const saveBranchCore = () => {
         if (!settings.name.trim() || !settings.address.trim()) { showToast('error', 'Completá el nombre y la dirección de la sede.'); return }
         if (!settings.email.includes('@')) { showToast('error', 'Ingresá un correo electrónico válido.'); return }
+        if (settings.weekDays.length === 0) { showToast('error', 'Elegí al menos un día de atención.'); return }
+        if (settings.openingTime >= settings.closingTime) { showToast('error', 'La hora de apertura debe ser anterior a la de cierre.'); return }
         const normalized = { ...settings, name: settings.name.trim(), email: settings.email.trim(), address: settings.address.trim(), phone: settings.phone.trim() }
         saveBranchSettings(branchKey, normalized)
         setSettings(normalized)
         if (!selectedBranch) return
-        updateBranch.mutate({ id: selectedBranch.id, changes: { name: normalized.name, address: normalized.address, email: normalized.email, phone: normalized.phone, status: normalized.status } }, {
+        updateBranch.mutate({ id: selectedBranch.id, changes: { name: normalized.name, address: normalized.address, email: normalized.email, phone: normalized.phone, weekDays: normalized.weekDays, openingTime: normalized.openingTime, closingTime: normalized.closingTime, timezone: normalized.timezone, status: normalized.status } }, {
             onSuccess: () => showToast('success', 'Cambios guardados correctamente.'),
             onError: () => showToast('error', 'No se pudieron guardar los datos de la sede. Intentá nuevamente.'),
         })
@@ -102,8 +116,7 @@ export function BranchesSettingsPage() {
         if (!member?.userId) { showToast('error', 'Completá el DNI de esta persona (editándola) antes de asignarla como administradora.'); return }
         setBranchAdministrator.mutate({ branchId: selectedBranch.id, userId: member.userId, enabled }, {
             onSuccess: () => {
-                const managerIds = enabled ? Array.from(new Set([...selectedBranch.managerIds, staffId])) : selectedBranch.managerIds.filter((id) => id !== staffId)
-                updateBranch.mutate({ id: selectedBranch.id, changes: { managerIds, managerId: managerIds[0] ?? '', staffIds: Array.from(new Set([...selectedBranch.staffIds, staffId])) } })
+                invalidateBranchRoster(selectedBranch.id)
                 setSelectedBranchId(selectedBranch.id)
                 showToast('success', enabled ? 'Administrador asignado correctamente.' : 'Administrador revocado correctamente.')
             },
@@ -113,10 +126,10 @@ export function BranchesSettingsPage() {
 
     const onStaffCreated = (staffId: string) => {
         if (!selectedBranch) { showToast('error', 'No se pudo identificar la sede actual. Recargá la página e intentá de nuevo.'); return }
-        updateBranch.mutate({ id: selectedBranch.id, changes: { staffIds: Array.from(new Set([...selectedBranch.staffIds, staffId])) } })
         const member = listStaff().find((teacher) => teacher.id === staffId)
         if (!member?.userId) { showToast('success', 'Persona agregada al staff. Completá su DNI para habilitar el acceso real a esta sede.'); return }
         setBranchStaffScope.mutate({ branchId: selectedBranch.id, userId: member.userId, enabled: true }, {
+            onSuccess: () => invalidateBranchRoster(selectedBranch.id),
             onError: () => showToast('error', 'La persona quedó en el staff, pero no se pudo habilitar su acceso a esta sede. Reintentá desde la fila.'),
         })
     }
@@ -153,10 +166,10 @@ export function BranchesSettingsPage() {
         <EntityFormModal open={newTemplateOpen} title="Nueva comunicación" subtitle="Creá una plantilla reutilizable para esta sede." submitLabel="Crear comunicación" validate={() => validateConditions({ templateName: !newTemplate.name.trim() && 'Ingresá el nombre.', templateSubject: !newTemplate.subject.trim() && 'Ingresá el asunto.', templateMessage: !newTemplate.message.trim() && 'Ingresá el mensaje.' }, 'Revisá la comunicación.')} onClose={() => { setNewTemplateOpen(false); setNewTemplate(emptyTemplate) }} onSubmit={createTemplate}>
             <div className="form-stack">
                 <FormGrid>
-                    <FormField label="Nombre"><input className="form-input" value={newTemplate.name} onChange={(event) => setNewTemplate((current) => ({ ...current, name: event.target.value }))} placeholder="Ej. Aviso de inscripción" /></FormField>
+                    <FormField label="Nombre"><input name="templateName" className="form-input" value={newTemplate.name} onChange={(event) => setNewTemplate((current) => ({ ...current, name: event.target.value }))} placeholder="Ej. Aviso de inscripción" /></FormField>
                     <FormField label="Descripción"><input className="form-input" value={newTemplate.description} onChange={(event) => setNewTemplate((current) => ({ ...current, description: event.target.value }))} placeholder="Para qué se usa esta comunicación" /></FormField>
-                    <FormField label="Asunto"><input className="form-input" value={newTemplate.subject} onChange={(event) => setNewTemplate((current) => ({ ...current, subject: event.target.value }))} /></FormField>
-                    <FormField label="Mensaje"><textarea className="form-textarea" value={newTemplate.message} onChange={(event) => setNewTemplate((current) => ({ ...current, message: event.target.value }))} /></FormField>
+                    <FormField label="Asunto"><input name="templateSubject" className="form-input" value={newTemplate.subject} onChange={(event) => setNewTemplate((current) => ({ ...current, subject: event.target.value }))} /></FormField>
+                    <FormField label="Mensaje"><textarea name="templateMessage" className="form-textarea" value={newTemplate.message} onChange={(event) => setNewTemplate((current) => ({ ...current, message: event.target.value }))} /></FormField>
                 </FormGrid>
                 <div className="branch-channel-options"><span>Canales iniciales</span>{['Email', 'WhatsApp'].map((channel) => <label key={channel}><input type="checkbox" checked={newTemplate.channels.includes(channel)} onChange={(event) => setNewTemplate((current) => ({ ...current, channels: event.target.checked ? [...current.channels, channel] : current.channels.filter((item) => item !== channel) }))} />{channel}</label>)}</div>
             </div>
@@ -172,12 +185,19 @@ export function BranchesSettingsPage() {
                         <Field label="Correo electrónico" required><input className="form-input" type="email" value={settings.email} onChange={(event) => updateSettings({ email: event.target.value })} /></Field>
                         <Field label="Dirección" required><input className="form-input" value={settings.address} onChange={(event) => updateSettings({ address: event.target.value })} /></Field>
                         <Field label="Teléfono"><input className="form-input" type="tel" value={settings.phone} onChange={(event) => updateSettings({ phone: event.target.value })} /></Field>
-                        <Field label="Horario de atención"><input className="form-input" value={settings.schedule} onChange={(event) => updateSettings({ schedule: event.target.value })} /></Field>
-                        <Field label="Zona horaria"><select className="form-input" value={settings.timezone} onChange={(event) => updateSettings({ timezone: event.target.value })}><option value="America/Argentina/Cordoba">Argentina · Córdoba</option><option value="America/Argentina/Buenos_Aires">Argentina · Buenos Aires</option><option value="America/Montevideo">Uruguay · Montevideo</option></select></Field>
-                        <Field label="Estado"><select className="form-input" value={settings.status} onChange={(event) => updateSettings({ status: event.target.value as 'Activa' | 'Inactiva' })}><option>Activa</option><option>Inactiva</option></select></Field>
+                        <Field label="Estado"><SearchableSelect value={settings.status} onChange={(status) => updateSettings({ status: status as 'Activa' | 'Inactiva' })} options={[{ value: 'Activa', label: 'Activa' }, { value: 'Inactiva', label: 'Inactiva' }]} /></Field>
                     </div>
                 </section>}
-                {activeTab === 'staff' && <StaffPage compact contentInset title="Staff de la sede" staffIds={selectedBranch?.staffIds ?? []} administratorIds={selectedBranch?.managerIds ?? []} onStaffCreated={onStaffCreated} onToggleAdministrator={toggleAdministrator} />}
+                {activeTab === 'personalizacion' && <section className="academy-settings-card">
+                    <div className="academy-section-heading"><Clock3 size={20} /><div><h2>Horario de atención</h2><p>Define cuándo se considera disponible esta sede.</p></div></div>
+                    <div className="form-grid academy-settings-grid">
+                        <Field label="Días de atención" full><WeekDaysCheckboxGroup value={settings.weekDays} onChange={(weekDays) => updateSettings({ weekDays })} /></Field>
+                        <Field label="Hora de apertura"><input className="form-input" type="time" value={settings.openingTime} onChange={(event) => updateSettings({ openingTime: event.target.value })} /></Field>
+                        <Field label="Hora de cierre"><input className="form-input" type="time" value={settings.closingTime} onChange={(event) => updateSettings({ closingTime: event.target.value })} /></Field>
+                        <Field label="Zona horaria"><SearchableSelect value={settings.timezone} onChange={(timezone) => updateSettings({ timezone })} options={[{ value: 'America/Argentina/Buenos_Aires', label: 'Argentina' }, { value: 'America/Montevideo', label: 'Uruguay' }]} /></Field>
+                    </div>
+                </section>}
+                {activeTab === 'staff' && <StaffPage compact contentInset title="Staff de la sede" staffIds={realStaffIds} administratorIds={realAdministratorIds} onStaffCreated={onStaffCreated} onToggleAdministrator={toggleAdministrator} />}
                 {activeTab === 'comunicaciones' && <section className="academy-settings-card">
                     <div className="academy-section-heading branch-section-heading"><div className="branch-section-heading-copy"><Mail size={20} /><div><h2>Plantillas de comunicación</h2><p>Guardá mensajes predeterminados para comunicarte con alumnos y responsables.</p></div></div><button type="button" className="secondary-button branch-add-button" onClick={() => setNewTemplateOpen(true)}><Plus size={16} />Nueva comunicación</button></div>
                     <div className="branch-template-list">{templates.map((template) => {

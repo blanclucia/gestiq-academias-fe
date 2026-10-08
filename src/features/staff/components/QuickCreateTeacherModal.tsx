@@ -70,16 +70,16 @@ export function QuickCreateTeacherModal({ open, onClose, onCreated }: QuickCreat
                 <FormSection title="Datos del profesor">
                     <FormGrid>
                         <FormField label="Nombre" required>
-                            <input className="form-input" type="text" value={form.firstName} onChange={(event) => setForm((current) => ({ ...current, firstName: event.target.value }))} />
+                            <input name="teacherFirstName" className="form-input" type="text" value={form.firstName} onChange={(event) => setForm((current) => ({ ...current, firstName: event.target.value }))} />
                         </FormField>
                         <FormField label="Apellido" required>
-                            <input className="form-input" type="text" value={form.lastName} onChange={(event) => setForm((current) => ({ ...current, lastName: event.target.value }))} />
+                            <input name="teacherLastName" className="form-input" type="text" value={form.lastName} onChange={(event) => setForm((current) => ({ ...current, lastName: event.target.value }))} />
                         </FormField>
                         <FormField label="Email" required hint="Se va a crear un usuario del sistema para esta persona con estos datos — completalo con cuidado.">
-                            <input className="form-input" type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
+                            <input name="teacherEmail" className="form-input" type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
                         </FormField>
                         <FormField label="DNI" required hint="Sin puntos ni espacios. No queda asignado a ninguna sede todavía — eso se hace después desde Sedes → Staff.">
-                            <input className="form-input" type="text" inputMode="numeric" value={form.dni} onChange={(event) => setForm((current) => ({ ...current, dni: event.target.value.replace(/\D/g, '').slice(0, 8) }))} />
+                            <input name="teacherDni" className="form-input" type="text" inputMode="numeric" value={form.dni} onChange={(event) => setForm((current) => ({ ...current, dni: event.target.value.replace(/\D/g, '').slice(0, 8) }))} />
                         </FormField>
                         <FormField label="Especialidad o área">
                             <input className="form-input" type="text" value={form.specialty} onChange={(event) => setForm((current) => ({ ...current, specialty: event.target.value }))} placeholder="Ej. Inglés, Administración" />

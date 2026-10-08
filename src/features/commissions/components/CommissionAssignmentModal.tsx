@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { EntityFormModal, FormField, FormSection } from '@/components/crud/EntityFormModal'
 import { validateConditions } from '@/components/forms/formValidation'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 
 export type AssignmentStudent = {
     id: string
@@ -11,6 +12,7 @@ export type AssignmentStudent = {
 
 export type AssignmentCommission = {
     id: string
+    courseId: string
     courseName: string
     commissionName: string
     studentsCount: number
@@ -102,12 +104,18 @@ export function CommissionAssignmentModal({
                             <label className="search-input-wrap" style={{ flex: '1 1 240px' }}>
                                 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nombre o legajo" />
                             </label>
-                            <select className="form-input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)} style={{ width: 150 }}>
-                                <option value="Todos">Todos los estados</option>
-                                <option value="Activo">Activos</option>
-                                <option value="Pendiente">Pendientes</option>
-                                <option value="Inactivo">Inactivos</option>
-                            </select>
+                            <div style={{ width: 150 }}>
+                                <SearchableSelect
+                                    value={statusFilter}
+                                    onChange={(status) => setStatusFilter(status as typeof statusFilter)}
+                                    options={[
+                                        { value: 'Todos', label: 'Todos los estados' },
+                                        { value: 'Activo', label: 'Activos' },
+                                        { value: 'Pendiente', label: 'Pendientes' },
+                                        { value: 'Inactivo', label: 'Inactivos' },
+                                    ]}
+                                />
+                            </div>
                         </div>
 
                         <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, fontSize: 13, fontWeight: 700 }}>
@@ -143,13 +151,15 @@ export function CommissionAssignmentModal({
                         {allowStudentSelection && <button type="button" className="ghost-button" onClick={() => setStep('select')} style={{ justifyContent: 'flex-start' }}>← Volver a la selección</button>}
                         <FormSection title="Comisión de destino">
                             <FormField label="Curso y comisión">
-                                <select className="form-input" value={commissionId} onChange={(event) => setCommissionId(event.target.value)}>
-                                    {commissions.map((item) => (
-                                        <option key={item.id} value={item.id} disabled={item.status === 'Cerrada'}>
-                                            {item.courseName} · {item.commissionName} ({item.studentsCount}/{item.capacity})
-                                        </option>
-                                    ))}
-                                </select>
+                                <SearchableSelect
+                                    value={commissionId}
+                                    onChange={setCommissionId}
+                                    options={commissions.map((item) => ({
+                                        value: item.id,
+                                        label: `${item.courseName} · ${item.commissionName} (${item.studentsCount}/${item.capacity})`,
+                                        disabled: item.status === 'Cerrada',
+                                    }))}
+                                />
                             </FormField>
 
                             {commission && (

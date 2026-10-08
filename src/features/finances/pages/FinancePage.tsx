@@ -1,13 +1,17 @@
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, CheckCircle2, CreditCard, PencilLine, Plus, Search, Trash2, WalletCards } from 'lucide-react'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { DeleteConfirmationModal, EntityFormModal, FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
+import { FilterModal } from '@/components/crud/FilterModal'
+import { FilterChips } from '@/components/crud/FilterChips'
+import { splitFilterValue } from '@/components/crud/filterValues'
 import { KpiCard } from '@/components/layout/KpiCard'
 import { DataTable } from '@/components/ui/DataTable'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { listPayments, useAcademyRepositoryVersion } from '@/services/academyRepository'
+import { listPayments, listStudents, useAcademyRepositoryVersion } from '@/services/academyRepository'
 import { getExpenseDisplayStatus, listExpenses, useCreateExpense, useDeleteExpense, useFinanceRepositoryVersion, useUpdateExpense, type Expense, type ExpenseCategory, type ExpenseInput } from '@/services/financeRepository'
 import type { PaymentMethod } from '@/types/domain'
 import { useBranches, useSelectedBranchId } from '@/services/branchRepository'
@@ -52,12 +56,20 @@ export function FinancePage() {
     const [paymentForm, setPaymentForm] = useState<{ paidDate: string; method: PaymentMethod }>({ paidDate: today, method: 'Transferencia' })
     const [search, setSearch] = useState('')
     const [dateRange, setDateRange] = useState(() => ({ from: `${today.slice(0, 7)}-01`, to: new Date(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0).toISOString().slice(0, 10) }))
-    const [filters, setFilters] = useState({ status: '', category: '', recurrence: '' })
-    const [filterDraft, setFilterDraft] = useState(filters)
+    const [filters, setFilters] = useState<Record<string, string>>({ status: '', category: '', recurrence: '' })
     const [isFiltersOpen, setIsFiltersOpen] = useState(false)
+    const expenseFilterFields = [
+        { key: 'status', label: 'Estado', options: ['Pendiente', 'Vencido', 'Pagado'] },
+        { key: 'category', label: 'Categoría', options: categories },
+        { key: 'recurrence', label: 'Frecuencia', options: ['Único', 'Mensual'] },
+    ]
     const [openMenuId, setOpenMenuId] = useState<string | null>(null)
     const expenses = listExpenses().filter((expense) => expense.branchId === selectedBranchId)
-    const payments = selectedBranchId === 'BR-1001' ? listPayments() : []
+    // A payment has no branchId of its own — it's scoped to a sede through its student, same join
+    // AdminDashboardPage already uses. (The old `selectedBranchId === 'BR-1001'` check was a stub
+    // from before sede ids were real UUIDs; it never matched a real sede, so income always read $0.)
+    const studentIdsInBranch = new Set(listStudents().filter((student) => student.branchId === selectedBranchId).map((student) => student.id))
+    const payments = listPayments().filter((payment) => payment.studentId !== undefined && studentIdsInBranch.has(payment.studentId))
 
     const isInDateRange = (date?: string) => Boolean(date)
         && (!dateRange.from || date! >= dateRange.from)
@@ -71,14 +83,16 @@ export function FinancePage() {
     const reminders = expenses.filter((expense) => expense.status !== 'Pagado' && expense.dueDate && expense.dueDate <= addDays(today, 14)).slice(0, 5)
     const filteredExpenses = expenses.filter((expense) => {
         const status = getExpenseDisplayStatus(expense, today)
+        const statuses = splitFilterValue(filters.status)
+        const selectedCategories = splitFilterValue(filters.category)
+        const recurrences = splitFilterValue(filters.recurrence)
         return (!expense.dueDate || !dateRange.from || expense.dueDate >= dateRange.from)
             && (!expense.dueDate || !dateRange.to || expense.dueDate <= dateRange.to)
-            && (!filters.status || status === filters.status)
-            && (!filters.category || expense.category === filters.category)
-            && (!filters.recurrence || expense.recurrence === filters.recurrence)
+            && (statuses.length === 0 || statuses.includes(status))
+            && (selectedCategories.length === 0 || selectedCategories.includes(expense.category))
+            && (recurrences.length === 0 || recurrences.includes(expense.recurrence))
             && `${expense.concept} ${expense.beneficiary}`.toLocaleLowerCase('es-AR').includes(search.toLocaleLowerCase('es-AR'))
     })
-    const activeFilterCount = Object.values(filters).filter(Boolean).length
 
     const openCreate = () => { setEditingExpense(null); setExpenseForm(emptyExpense(selectedBranchId)); setIsExpenseOpen(true) }
     const openEdit = (expense: Expense) => { setEditingExpense(expense); setEditScope(expense.seriesId ? 'future' : 'single'); setExpenseForm({ ...expense, repeatUntil: '' }); setIsExpenseOpen(true) }
@@ -101,16 +115,16 @@ export function FinancePage() {
         }}>
             <div className="form-stack"><FormSection title="Datos del egreso"><FormGrid>
                 <FormField label="Concepto" required><input className="form-input" value={expenseForm.concept} onChange={(event) => setExpenseForm((current) => ({ ...current, concept: event.target.value }))} placeholder="Ej: Alquiler de la sede" /></FormField>
-                <FormField label="Categoría" required><select className="form-input" value={expenseForm.category} onChange={(event) => setExpenseForm((current) => ({ ...current, category: event.target.value as ExpenseCategory }))}>{categories.map((item) => <option key={item}>{item}</option>)}</select></FormField>
+                <FormField label="Categoría" required><SearchableSelect value={expenseForm.category} onChange={(category) => setExpenseForm((current) => ({ ...current, category: category as ExpenseCategory }))} options={categories.map((item) => ({ value: item, label: item }))} /></FormField>
                 <FormField label="Proveedor o beneficiario" required><input className="form-input" value={expenseForm.beneficiary} onChange={(event) => setExpenseForm((current) => ({ ...current, beneficiary: event.target.value }))} /></FormField>
                 <FormField label="Importe" required><input className="form-input" type="number" min={0} value={expenseForm.amount || ''} onChange={(event) => setExpenseForm((current) => ({ ...current, amount: Number(event.target.value) }))} /></FormField>
                 {expenseForm.status !== 'Pagado' && <FormField label={expenseForm.recurrence === 'Mensual' ? 'Primer vencimiento' : 'Vencimiento (opcional)'}><input className="form-input" type="date" value={expenseForm.dueDate} onChange={(event) => setExpenseForm((current) => ({ ...current, dueDate: event.target.value }))} /></FormField>}
             </FormGrid></FormSection>
-            {editingExpense?.seriesId && <FormSection title="Alcance del cambio" description="Los vencimientos que ya fueron pagados nunca se modificarán."><FormGrid><FormField label="Aplicar cambios a"><select className="form-input" value={editScope} onChange={(event) => setEditScope(event.target.value as typeof editScope)}><option value="future">Este y los siguientes</option><option value="single">Solo este vencimiento</option><option value="series">Toda la serie pendiente</option></select></FormField></FormGrid></FormSection>}
+            {editingExpense?.seriesId && <FormSection title="Alcance del cambio" description="Los vencimientos que ya fueron pagados nunca se modificarán."><FormGrid><FormField label="Aplicar cambios a"><SearchableSelect value={editScope} onChange={(scope) => setEditScope(scope as typeof editScope)} options={[{ value: 'future', label: 'Este y los siguientes' }, { value: 'single', label: 'Solo este vencimiento' }, { value: 'series', label: 'Toda la serie pendiente' }]} /></FormField></FormGrid></FormSection>}
             {!editingExpense && <FormSection title="Calendarización"><FormGrid>
-                <FormField label="Frecuencia"><select className="form-input" value={expenseForm.recurrence} onChange={(event) => setExpenseForm((current) => ({ ...current, recurrence: event.target.value as ExpenseInput['recurrence'] }))}><option value="Único">Pago único</option><option value="Mensual">Todos los meses</option></select></FormField>
-                {expenseForm.recurrence === 'Único' && <FormField label="Estado"><select className="form-input" value={expenseForm.status} onChange={(event) => setExpenseForm((current) => ({ ...current, status: event.target.value as ExpenseInput['status'], dueDate: event.target.value === 'Pagado' ? '' : current.dueDate, paidDate: event.target.value === 'Pagado' ? (current.paidDate || localDate()) : current.paidDate }))}><option value="Pendiente">Pendiente</option><option value="Pagado">Pagado</option></select></FormField>}
-                {expenseForm.recurrence === 'Único' && expenseForm.status === 'Pagado' && <><FormField label="Fecha de pago"><input className="form-input" type="date" value={expenseForm.paidDate ?? ''} onChange={(event) => setExpenseForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio de pago"><select className="form-input" value={expenseForm.method ?? 'Transferencia'} onChange={(event) => setExpenseForm((current) => ({ ...current, method: event.target.value as PaymentMethod }))}><option>Transferencia</option><option>Tarjeta</option><option>Efectivo</option></select></FormField></>}
+                <FormField label="Frecuencia"><SearchableSelect value={expenseForm.recurrence} onChange={(recurrence) => setExpenseForm((current) => ({ ...current, recurrence: recurrence as ExpenseInput['recurrence'] }))} options={[{ value: 'Único', label: 'Pago único' }, { value: 'Mensual', label: 'Todos los meses' }]} /></FormField>
+                {expenseForm.recurrence === 'Único' && <FormField label="Estado"><SearchableSelect value={expenseForm.status} onChange={(status) => setExpenseForm((current) => ({ ...current, status: status as ExpenseInput['status'], dueDate: status === 'Pagado' ? '' : current.dueDate, paidDate: status === 'Pagado' ? (current.paidDate || localDate()) : current.paidDate }))} options={[{ value: 'Pendiente', label: 'Pendiente' }, { value: 'Pagado', label: 'Pagado' }]} /></FormField>}
+                {expenseForm.recurrence === 'Único' && expenseForm.status === 'Pagado' && <><FormField label="Fecha de pago"><input className="form-input" type="date" value={expenseForm.paidDate ?? ''} onChange={(event) => setExpenseForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio de pago"><SearchableSelect value={expenseForm.method ?? 'Transferencia'} onChange={(method) => setExpenseForm((current) => ({ ...current, method: method as PaymentMethod }))} options={[{ value: 'Transferencia', label: 'Transferencia' }, { value: 'Tarjeta', label: 'Tarjeta' }, { value: 'Efectivo', label: 'Efectivo' }]} /></FormField></>}
                 {expenseForm.recurrence === 'Mensual' && <FormField label="Generar vencimientos hasta"><div className="finance-date-with-help"><input className="form-input" type="date" min={expenseForm.dueDate} value={expenseForm.repeatUntil} onChange={(event) => setExpenseForm((current) => ({ ...current, repeatUntil: event.target.value }))} /><small>Opcional · por defecto 12 meses</small></div></FormField>}
             </FormGrid></FormSection>}</div>
         </EntityFormModal>
@@ -122,14 +136,14 @@ export function FinancePage() {
                 })
             }
             setPayTarget(null)
-        }}><FormGrid><FormField label="Fecha de pago"><input className="form-input" type="date" value={paymentForm.paidDate} onChange={(event) => setPaymentForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio"><select className="form-input" value={paymentForm.method} onChange={(event) => setPaymentForm((current) => ({ ...current, method: event.target.value as PaymentMethod }))}><option>Transferencia</option><option>Tarjeta</option><option>Efectivo</option></select></FormField></FormGrid></EntityFormModal>
+        }}><FormGrid><FormField label="Fecha de pago"><input className="form-input" type="date" value={paymentForm.paidDate} onChange={(event) => setPaymentForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio"><SearchableSelect value={paymentForm.method} onChange={(method) => setPaymentForm((current) => ({ ...current, method: method as PaymentMethod }))} options={[{ value: 'Transferencia', label: 'Transferencia' }, { value: 'Tarjeta', label: 'Tarjeta' }, { value: 'Efectivo', label: 'Efectivo' }]} /></FormField></FormGrid></EntityFormModal>
         <DeleteConfirmationModal open={Boolean(deleteTarget)} title="Eliminar egreso" description={`Se eliminará solamente el vencimiento de “${deleteTarget?.concept ?? ''}”.`} onClose={() => setDeleteTarget(null)} onConfirm={() => {
             if (deleteTarget) {
                 deleteExpense.mutate(deleteTarget.id, { onError: () => showToast('error', 'No se pudo eliminar el egreso. Intentá nuevamente.') })
             }
             setDeleteTarget(null)
         }} />
-        <EntityFormModal open={isFiltersOpen} title="Filtrar egresos" subtitle="Combiná los criterios para acotar los vencimientos." submitLabel="Aplicar filtros" cancelLabel="Cancelar" onClose={() => setIsFiltersOpen(false)} onSubmit={() => { setFilters(filterDraft); setIsFiltersOpen(false) }}><FormGrid><FormField label="Estado"><select className="form-input" value={filterDraft.status} onChange={(event) => setFilterDraft((current) => ({ ...current, status: event.target.value }))}><option value="">Todos</option><option>Pendiente</option><option>Vencido</option><option>Pagado</option></select></FormField><FormField label="Categoría"><select className="form-input" value={filterDraft.category} onChange={(event) => setFilterDraft((current) => ({ ...current, category: event.target.value }))}><option value="">Todas</option>{categories.map((item) => <option key={item}>{item}</option>)}</select></FormField><FormField label="Frecuencia"><select className="form-input" value={filterDraft.recurrence} onChange={(event) => setFilterDraft((current) => ({ ...current, recurrence: event.target.value }))}><option value="">Todas</option><option value="Único">Pago único</option><option value="Mensual">Mensual</option></select></FormField></FormGrid></EntityFormModal>
+        <FilterModal open={isFiltersOpen} title="Filtrar egresos" fields={expenseFilterFields} values={filters} onChange={setFilters} onClose={() => setIsFiltersOpen(false)} />
 
         <div className="page-header finance-header"><div><h1>Finanzas</h1><p>Ingresos, egresos y compromisos de {selectedBranch?.name ?? 'la sede'}.</p></div></div>
         <div className="finance-page-tabs"><Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as FinanceTab)}><TabsList variant="line" aria-label="Secciones de finanzas"><TabsTrigger value="summary">Resumen</TabsTrigger><TabsTrigger value="expenses">Egresos</TabsTrigger></TabsList></Tabs><button type="button" className="primary-button compact-button context-primary-action" onClick={openCreate}><Plus size={16} /> Nuevo egreso</button></div>
@@ -144,7 +158,8 @@ export function FinancePage() {
                 <div className="student-table-toolbar">
                     <div className="student-table-toolbar-left">
                         <label className="search-input-wrap" style={{ flex: '0 0 420px', width: 420, maxWidth: '46%', minWidth: 260 }}><Search aria-hidden="true" size={16} strokeWidth={2.2} className="search-input-icon" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar concepto o proveedor" /></label>
-                        <button type="button" className="secondary-button compact-button" onClick={() => { setFilterDraft(filters); setIsFiltersOpen(true) }}>Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</button>
+                        <button type="button" className="secondary-button compact-button" onClick={() => setIsFiltersOpen(true)}>Filtros</button>
+                        <FilterChips fields={expenseFilterFields} values={filters} onChange={setFilters} />
                     </div>
                     <div className="student-table-toolbar-center"><DateRangeControl value={dateRange} onChange={setDateRange} ariaLabel="Rango de vencimientos" /></div>
                     <div className="student-table-toolbar-right" />
@@ -158,7 +173,7 @@ export function FinancePage() {
                         { key: 'dueDate', header: 'Vencimiento', accessor: (expense) => <strong>{formatDate(expense.dueDate)}</strong> },
                         { key: 'recurrence', header: 'Frecuencia', accessor: (expense) => expense.recurrence === 'Mensual' ? 'Mensual' : 'Pago único' },
                         { key: 'amount', header: 'Importe', accessor: (expense) => <strong>{currency.format(expense.amount)}</strong>, align: 'right' },
-                        { key: 'status', header: 'Estado', accessor: (expense) => { const status = getExpenseDisplayStatus(expense, today); return <StatusBadge label={status} tone={status === 'Pagado' ? 'success' : status === 'Vencido' ? 'warning' : 'neutral'} /> }, align: 'center' },
+                        { key: 'status', header: 'Estado', accessor: (expense) => { const status = getExpenseDisplayStatus(expense, today); return <StatusBadge label={status} tone={status === 'Pagado' ? 'success' : status === 'Vencido' ? 'warning' : status === 'Pendiente' ? 'warning' : 'neutral'} /> }, align: 'center' },
                     ]}
                     renderActions={(expense) => {
                         const status = getExpenseDisplayStatus(expense, today)

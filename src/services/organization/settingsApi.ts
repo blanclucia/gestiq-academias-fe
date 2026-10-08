@@ -2,8 +2,7 @@ import { z } from 'zod'
 import { authClient } from '@/auth/api/authClient'
 
 const generalSchema = z.object({
-    commercialName: z.string(), legalName: z.string(), taxId: z.string(), email: z.string(), phone: z.string(),
-    website: z.string(), address: z.string(), timezone: z.string(), currency: z.string(), status: z.enum(['active', 'inactive']),
+    commercialName: z.string(), email: z.string(), phone: z.string(), address: z.string(), status: z.enum(['active', 'inactive']),
 })
 const brandSchema = z.object({
     name: z.string(), shortName: z.string(), logoUrl: z.string(),

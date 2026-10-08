@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchPublicCharge, payPublicChargeApi, reportPublicChargeTransferApi } from '@/services/organization/chargesApi'
 import { usePublicEnrollmentSettings } from '@/services/organization/publicSettingsApi'
 import { paymentMethodsFromApi } from '@/services/organization/settingsMapping'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 
 type PublicPaymentMethod = 'Mercado Pago' | 'Transferencia'
 
@@ -56,10 +57,14 @@ export function PublicPaymentPage() {
             <div className="public-enrollment-summary"><span>Total a pagar</span><strong>${charge.amount.toLocaleString('es-AR')}</strong></div>
             {availableMethods.length > 0 ? <>
                 <label className="public-enrollment-field">Medio de pago
-                    <select className="form-input" value={method} onChange={(event) => setMethod(event.target.value as PublicPaymentMethod)}>
-                        {availableMethods.includes('Mercado Pago') && <option value="Mercado Pago">Mercado Pago</option>}
-                        {availableMethods.includes('Transferencia') && <option value="Transferencia">Transferencia bancaria</option>}
-                    </select>
+                    <SearchableSelect
+                        value={method}
+                        onChange={(nextMethod) => setMethod(nextMethod as PublicPaymentMethod)}
+                        options={[
+                            ...(availableMethods.includes('Mercado Pago') ? [{ value: 'Mercado Pago', label: 'Mercado Pago' }] : []),
+                            ...(availableMethods.includes('Transferencia') ? [{ value: 'Transferencia', label: 'Transferencia bancaria' }] : []),
+                        ]}
+                    />
                 </label>
                 {method === 'Transferencia' && <div className="transfer-details">
                     <div className="transfer-details-heading"><Landmark size={18} /><div><strong>Datos para transferir</strong><span>{settings.payments.paymentMessage}</span></div></div>

@@ -194,6 +194,19 @@ select.form-input {
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
 }
 
+/* Applied to the specific field(s) a failed validation points at — a red border next to the field
+   itself is much harder to miss than relying only on the summary banner at the bottom of the modal,
+   or on focus/scroll landing correctly. */
+.form-input.field-invalid,
+.form-textarea.field-invalid {
+    border-color: var(--red);
+}
+
+.form-input.field-invalid:focus,
+.form-textarea.field-invalid:focus {
+    box-shadow: 0 0 0 3px var(--red-soft);
+}
+
 .form-textarea {
     resize: vertical;
     min-height: 120px;

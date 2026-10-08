@@ -173,7 +173,14 @@ export function useConfirmRegistration() {
             if (!organizationSlug) throw new Error('No hay organización activa.')
             return confirmRegistrationApi(organizationSlug, id)
         },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['enrollment-registrations', organizationSlug] }),
+        // Confirming puts the student on the real commission roster backend-side, so the
+        // course/commission student counts shown elsewhere (Ofertas académicas, Comisión) go stale
+        // unless their queries are invalidated too — not just this opening's registration list.
+        onSuccess: (result) => {
+            queryClient.invalidateQueries({ queryKey: ['enrollment-registrations', organizationSlug] })
+            queryClient.invalidateQueries({ queryKey: ['courses', organizationSlug] })
+            queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === 'commission-roster' && query.queryKey[3] === result.commissionId })
+        },
     })
 }
 

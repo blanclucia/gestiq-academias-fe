@@ -2,7 +2,7 @@ import { AlertTriangle, CalendarClock, CreditCard } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ChartCard } from '@/components/layout/ChartCard'
 import { KpiCard } from '@/components/layout/KpiCard'
-import { getActiveAcademicCycleId, listAcademicCycles, listCourses, listPayments, listStaff, listStudents, listStudentsInCommission, useAcademyRepositoryVersion } from '@/services/academyRepository'
+import { getActiveAcademicCycleId, listAcademicCycles, listCourses, listPayments, listStaff, listStudents, useAcademyRepositoryVersion } from '@/services/academyRepository'
 import { getExpenseDisplayStatus, listExpenses, useFinanceRepositoryVersion } from '@/services/financeRepository'
 import { listUpcomingAgendaEvents, useAgendaRepositoryVersion } from '@/services/agendaRepository'
 import { calculateOccupancy } from '@/domain/commissions/commissionRules'
@@ -77,7 +77,7 @@ export function AdminDashboardPage() {
                 <ChartCard title="Alumnos por comisión" subtitle="Asignaciones actuales" className="large-panel">
                     <div className="progress-list dashboard-progress-list">
                         {data.commissions.map((commission) => {
-                            const enrolled = listStudentsInCommission(commission.courseName, commission.name, commission.id).length
+                            const enrolled = commission.studentsCount
                             const occupancy = calculateOccupancy(enrolled, commission.capacity)
 
                             return <div className="progress-row" key={commission.id}>

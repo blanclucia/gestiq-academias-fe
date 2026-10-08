@@ -20,6 +20,18 @@ const apiStudentSchema = z.object({
     status: z.enum(['active', 'pending', 'inactive']),
 })
 const apiStudentListSchema = z.object({ items: z.array(apiStudentSchema) })
+const apiStudentEnrollmentSchema = z.object({
+    courseId: z.string(),
+    courseName: z.string(),
+    commissionId: z.string(),
+    commissionName: z.string(),
+    startDate: z.string(),
+    endDate: z.string(),
+    status: z.enum(['active', 'paused', 'finished', 'dropped']),
+    enrolledAt: z.string(),
+})
+const apiStudentEnrollmentListSchema = z.object({ items: z.array(apiStudentEnrollmentSchema) })
+export type ApiStudentEnrollment = z.infer<typeof apiStudentEnrollmentSchema>
 
 export type ApiStudent = z.infer<typeof apiStudentSchema>
 export type ApiStudentInput = {
@@ -60,4 +72,9 @@ export async function deleteStudentApi(organizationSlug: string, studentId: stri
 
 export function isStudentDocumentConflict(error: unknown): boolean {
     return error instanceof ApiError && error.code === 'student_document_conflict'
+}
+
+export async function fetchStudentEnrollments(organizationSlug: string, studentId: string, signal?: AbortSignal, request: Requester = defaultRequest): Promise<ApiStudentEnrollment[]> {
+    const result = apiStudentEnrollmentListSchema.parse(await request(studentsPath(organizationSlug, `/${studentId}/enrollments`), { signal }))
+    return result.items
 }

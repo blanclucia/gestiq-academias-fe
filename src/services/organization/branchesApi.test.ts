@@ -3,7 +3,7 @@ import { assignBranchAdministratorApi, assignBranchStaffApi, createBranchApi, fe
 
 const apiBranch = {
     id: 'b1', name: 'Sede Centro', email: 'centro@example.com', phone: '+54 351 000-0000', address: 'Calle Falsa 123',
-    openingTime: '08:00', closingTime: '21:00', operatingWeekdays: [1, 2, 3, 4, 5], status: 'active' as const,
+    timezone: 'America/Argentina/Cordoba', openingTime: '08:00', closingTime: '21:00', operatingWeekdays: [1, 2, 3, 4, 5], status: 'active' as const,
 }
 
 describe('branches API client', () => {
@@ -15,7 +15,7 @@ describe('branches API client', () => {
     })
     it('creates a branch with the given payload', async () => {
         const request = vi.fn().mockResolvedValue(apiBranch)
-        const input = { displayCode: 'CENTRO_1', name: 'Sede Centro', email: 'centro@example.com', phone: '', address: '', openingTime: '08:00', closingTime: '21:00', operatingWeekdays: [1, 2, 3, 4, 5], status: 'active' as const }
+        const input = { displayCode: 'CENTRO_1', name: 'Sede Centro', email: 'centro@example.com', phone: '', address: '', timezone: 'America/Argentina/Cordoba', openingTime: '08:00', closingTime: '21:00', operatingWeekdays: [1, 2, 3, 4, 5], status: 'active' as const }
         const created = await createBranchApi('academy-demo', input, request)
         expect(request).toHaveBeenCalledWith('/organizations/academy-demo/branches', { method: 'POST', body: JSON.stringify(input) })
         expect(created).toEqual(apiBranch)

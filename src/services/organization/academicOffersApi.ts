@@ -143,3 +143,19 @@ export function isCommissionHasActiveRoster(error: unknown): boolean {
 export function isCourseClosed(error: unknown): boolean {
     return error instanceof ApiError && error.code === 'course_closed'
 }
+export function isCommissionClosed(error: unknown): boolean {
+    return error instanceof ApiError && error.code === 'commission_closed'
+}
+export function isCommissionNoCapacity(error: unknown): boolean {
+    return error instanceof ApiError && error.code === 'commission_no_capacity'
+}
+
+// Single source of truth for how an enrollment-assignment failure reads to the admin — every
+// screen that assigns a student to a commission (Comisiones, Alumnos, importación CSV) should
+// show the same wording instead of each one re-deriving its own phrasing from the error code.
+export function describeEnrollmentFailure(error: unknown): string | undefined {
+    if (isCourseClosed(error)) return 'El curso está cerrado: no admite inscripciones activas nuevas.'
+    if (isCommissionClosed(error)) return 'La comisión está cerrada: no admite inscripciones activas nuevas.'
+    if (isCommissionNoCapacity(error)) return 'La comisión ya alcanzó su cupo máximo.'
+    return undefined
+}

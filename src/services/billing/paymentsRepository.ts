@@ -1,13 +1,11 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/auth/AuthContext'
-import { getCommissionMonthlyDueDates, getInstallmentMonthLabel } from '@/domain/billing/billingRules'
 import { getLocalDateString } from '@/domain/shared/dateRules'
 import type { ChargePaymentSnapshot, Payment } from '@/types/domain'
 import { paymentReadModelToChargeSnapshot } from '@/domain/billing/paymentRules'
 import { readAcademyState, updateAcademyState } from '@/services/academy/academyState'
 import type { PaymentUpdate, RealCharge } from '@/services/academy/academyTypes'
-import { listCourses } from '@/services/academy/coursesRepository'
 import { listStudents } from '@/services/academy/studentsRepository'
 import { createChargeApi, deleteChargeApi, fetchCharges, generateTuitionApi, updateChargeApi, type ApiCharge, type ApiChargeInput, type ApiChargePatch } from '@/services/organization/chargesApi'
 import { chargeMethodFromApi, chargeStatusFromApiWithPartial } from '@/services/organization/chargesMapping'
@@ -61,17 +59,10 @@ export function listPayments(): PaymentRecord[] {
         method: charge.method, date: charge.date, dueDate: charge.dueDate, amount: charge.amount, originalAmount: charge.amount,
         status: charge.status, isReal: true,
     }))
-    const assignmentPayments = state.assignments.flatMap((assignment): LegacyPaymentRecord[] => {
-        const match = listCourses().flatMap((course) => course.commissions.map((commission) => ({ course, commission }))).find(({ course, commission }) => assignment.commissionId ? commission.id === assignment.commissionId : course.name === assignment.courseName && commission.name === assignment.commissionName)
-        const amount = match?.commission.amount ?? assignment.amount
-        const student = studentNames.get(assignment.studentId)
-        if (!student || !amount || !match) return []
-        return getCommissionMonthlyDueDates(match.commission).map((dueDate) => ({ id: `PAY-ASSIGN-${assignment.studentId}-${match.commission.id}-${dueDate.slice(0, 7)}`, student, studentId: assignment.studentId, concept: `Cuota ${getInstallmentMonthLabel(dueDate)} · ${match.course.name} · ${match.commission.name}`, method: 'Transferencia', date: '-', dueDate, amount, originalAmount: amount, status: 'Pendiente' }))
-    })
     // Exam-fee installments (examinationsRepository.ts) still write directly into state.manualCharges
     // — that module remains 100% mock, unrelated to the real "Nuevo cobro" flow in BillingPage.
     const examManualCharges: LegacyPaymentRecord[] = state.manualCharges.map((charge) => ({ id: charge.id, student: charge.student || 'Sin alumno asociado', concept: `${charge.category}${charge.detail ? ` · ${charge.detail}` : ''}`, method: charge.method, date: charge.date, dueDate: charge.dueDate, amount: charge.amount, originalAmount: charge.amount, status: charge.status }))
-    return [...realCharges, ...assignmentPayments, ...examManualCharges]
+    return [...realCharges, ...examManualCharges]
         .map((payment) => state.paymentUpdates[payment.id] ? { ...payment, ...state.paymentUpdates[payment.id] } : payment)
         .filter((payment) => !state.paymentUpdates[payment.id]?.deleted)
         .map((payment) => ({ ...payment, chargeSnapshot: paymentReadModelToChargeSnapshot(payment) }))

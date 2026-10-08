@@ -3,6 +3,7 @@ import { FormField, FormGrid, FormSection } from '@/components/crud/EntityFormMo
 import { WeekDaysCheckboxGroup } from '@/components/forms/WeekDaysCheckboxGroup'
 import { TimeRangeField } from '@/components/forms/TimeRangeField'
 import { QuickCreateTeacherModal } from '@/features/staff'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { getActiveAcademicCycleId, listCourses, listStaff, useAcademyRepositoryVersion } from '@/services/academyRepository'
 import { useEffect, useRef, useState } from 'react'
 
@@ -129,19 +130,13 @@ export function CommissionForm({
             <FormSection title="Datos de la comisión">
                 <FormGrid>
                     <FormField label="Oferta académica base" required>
-                        <select
-                            className="form-input"
+                        <SearchableSelect
                             value={initialValues?.course ?? selectedCourse}
-                            onChange={(event) => setSelectedCourse(event.target.value)}
+                            onChange={setSelectedCourse}
                             disabled={Boolean(initialValues?.course)}
-                        >
-                            {courseOptions.length === 0 && <option value="">No hay ofertas disponibles</option>}
-                            {courseOptions.map((course) => (
-                                <option key={course} value={course}>
-                                    {course}
-                                </option>
-                            ))}
-                        </select>
+                            placeholder={courseOptions.length === 0 ? 'No hay ofertas disponibles' : 'Buscar oferta académica'}
+                            options={courseOptions.map((course) => ({ value: course, label: course }))}
+                        />
                     </FormField>
 
                     <FormField label="Nombre de la comisión" required>
@@ -191,11 +186,7 @@ export function CommissionForm({
             <FormSection title="Estado" description="Controla el ciclo de la comisión.">
                 <FormGrid>
                     <FormField label="Estado inicial">
-                        <select className="form-input" value={formValue.status} onChange={(event) => update({ status: event.target.value as CommissionFormValue['status'] })}>
-                            <option value="Programada">Programada</option>
-                            <option value="Activa">Activa</option>
-                            <option value="Cerrada">Cerrada</option>
-                        </select>
+                        <SearchableSelect value={formValue.status} onChange={(status) => update({ status: status as CommissionFormValue['status'] })} options={[{ value: 'Programada', label: 'Programada' }, { value: 'Activa', label: 'Activa' }, { value: 'Cerrada', label: 'Cerrada' }]} />
                     </FormField>
                 </FormGrid>
             </FormSection>

@@ -14,6 +14,8 @@ import { StatusBadge, type StatusBadgeTone } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { type AcademicCourse, getActiveAcademicCycleId, getCourseRemovalBlockers, listAcademicCycles, listCourses, listPrivateLessons, listStaff, listStudents, useAcademyRepositoryVersion, useActivateCycle, useCreateCourse, useCreateCycle, useCreatePrivateLesson, useDeleteCourse, useUpdateCourse, useUpdatePrivateLesson } from '@/services/academyRepository'
 import { PrivateLessonsTable, type PrivateStudentRow } from '../components/PrivateLessonsTable'
+import { splitFilterValue } from '@/components/crud/filterValues'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { useToast } from '@/components/ui/ToastContext'
 import { useSelectedBranchId } from '@/services/branchRepository'
 import { useWorkspace } from '@/workspace/useWorkspace'
@@ -59,11 +61,14 @@ export function AcademicOffersPage() {
     const courseItems = listCourses().filter((course) => course.cycleId === activeCycleId && course.branchId === selectedBranchId)
     const [courseFilters, setCourseFilters] = useState({ course: '', teacher: '', status: '' })
     const [privateFilters, setPrivateFilters] = useState({ teacher: '', plan: '', status: '' })
-    const filteredCourseItems = courseItems.filter((course) =>
-        (!courseFilters.course || course.name === courseFilters.course)
-        && (!courseFilters.teacher || course.commissions.some((commission) => commission.teachers.includes(courseFilters.teacher)))
-        && (!courseFilters.status || course.status === courseFilters.status),
-    )
+    const filteredCourseItems = courseItems.filter((course) => {
+        const courses = splitFilterValue(courseFilters.course)
+        const teachers = splitFilterValue(courseFilters.teacher)
+        const statuses = splitFilterValue(courseFilters.status)
+        return (courses.length === 0 || courses.includes(course.name))
+            && (teachers.length === 0 || course.commissions.some((commission) => commission.teachers.some((teacher) => teachers.includes(teacher))))
+            && (statuses.length === 0 || statuses.includes(course.status))
+    })
     const removalBlockers = deleteTarget ? getCourseRemovalBlockers(deleteTarget.id) : []
     const [isPrivateModalOpen, setIsPrivateModalOpen] = useState(opensPrivateLesson)
     const [editingPrivateLessonId, setEditingPrivateLessonId] = useState<string | null>(null)
@@ -106,11 +111,14 @@ export function AcademicOffersPage() {
             status: lesson.status,
         }]
     })
-    const filteredPrivateStudentsItems = privateStudentsItems.filter((item) =>
-        (!privateFilters.teacher || item.teacher === privateFilters.teacher)
-        && (!privateFilters.plan || item.plan === privateFilters.plan)
-        && (!privateFilters.status || item.status === privateFilters.status),
-    )
+    const filteredPrivateStudentsItems = privateStudentsItems.filter((item) => {
+        const teachers = splitFilterValue(privateFilters.teacher)
+        const plans = splitFilterValue(privateFilters.plan)
+        const statuses = splitFilterValue(privateFilters.status)
+        return (teachers.length === 0 || teachers.includes(item.teacher))
+            && (plans.length === 0 || plans.includes(item.plan))
+            && (statuses.length === 0 || statuses.includes(item.status))
+    })
 
     const {
         search,
@@ -215,9 +223,9 @@ export function AcademicOffersPage() {
                 }}
             >
                 <div className="form-grid">
-                    <label className="form-field"><span className="form-field-label"><span>Nombre <b className="form-required-mark">*</b></span></span><input className="form-input" value={cycleForm.name} onChange={(event) => setCycleForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ej: Ciclo lectivo 2027" /></label>
-                    <label className="form-field"><span className="form-field-label"><span>Fecha de inicio <b className="form-required-mark">*</b></span></span><input className="form-input" type="date" value={cycleForm.startDate} onChange={(event) => setCycleForm((current) => ({ ...current, startDate: event.target.value }))} /></label>
-                    <label className="form-field"><span className="form-field-label"><span>Fecha de cierre <b className="form-required-mark">*</b></span></span><input className="form-input" type="date" value={cycleForm.endDate} onChange={(event) => setCycleForm((current) => ({ ...current, endDate: event.target.value }))} /></label>
+                    <label className="form-field"><span className="form-field-label"><span>Nombre <b className="form-required-mark">*</b></span></span><input name="cycleName" className="form-input" value={cycleForm.name} onChange={(event) => setCycleForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ej: Ciclo lectivo 2027" /></label>
+                    <label className="form-field"><span className="form-field-label"><span>Fecha de inicio <b className="form-required-mark">*</b></span></span><input name="cycleStartDate" className="form-input" type="date" value={cycleForm.startDate} onChange={(event) => setCycleForm((current) => ({ ...current, startDate: event.target.value }))} /></label>
+                    <label className="form-field"><span className="form-field-label"><span>Fecha de cierre <b className="form-required-mark">*</b></span></span><input name="cycleEndDate" className="form-input" type="date" value={cycleForm.endDate} onChange={(event) => setCycleForm((current) => ({ ...current, endDate: event.target.value }))} /></label>
                 </div>
             </EntityFormModal>
 
@@ -363,11 +371,14 @@ export function AcademicOffersPage() {
                         <div className="cycle-context-compact">
                             <span className="cycle-context-label">Ciclo lectivo</span>
                             <div className="cycle-context-row">
-                                <select aria-label="Ciclo lectivo" value={activeCycleId} disabled={cycles.length === 0} onChange={(event) => activateCycle.mutate(event.target.value, { onError: () => showToast('error', 'No se pudo cambiar el ciclo lectivo activo.') })}>
-                                    {cycles.length === 0 && <option value="">Creá un ciclo lectivo</option>}
-                                    {cycles.length > 0 && !activeCycleId && <option value="">Seleccioná un ciclo lectivo</option>}
-                                    {cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.name}</option>)}
-                                </select>
+                                <SearchableSelect
+                                    aria-label="Ciclo lectivo"
+                                    value={activeCycleId}
+                                    disabled={cycles.length === 0}
+                                    placeholder={cycles.length === 0 ? 'Creá un ciclo lectivo' : 'Seleccioná un ciclo lectivo'}
+                                    options={cycles.map((cycle) => ({ value: cycle.id, label: cycle.name }))}
+                                    onChange={(cycleId) => activateCycle.mutate(cycleId, { onError: () => showToast('error', 'No se pudo cambiar el ciclo lectivo activo.') })}
+                                />
                                 <button type="button" className="secondary-button cycle-icon-action" aria-label="Crear nuevo ciclo lectivo" data-tooltip="Crear y configurar un nuevo ciclo lectivo" onClick={() => setIsCreateCycleOpen(true)}><CalendarPlus size={16} /></button>
                             </div>
                         </div>

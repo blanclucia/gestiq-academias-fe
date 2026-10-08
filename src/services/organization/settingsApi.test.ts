@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { fetchOrganizationSettings, updateOrganizationSettings } from './settingsApi'
 
 const apiSettings = {
-    general: { commercialName: 'Academia Puentes', legalName: 'Academia Puentes SAS', taxId: '30-1', email: 'a@a.com', phone: '', website: '', address: '', timezone: 'America/Argentina/Cordoba', currency: 'ARS', status: 'active' as const },
+    general: { commercialName: 'Academia Puentes', email: 'a@a.com', phone: '', address: '', status: 'active' as const },
     brand: { name: 'Academia Puentes', shortName: 'AP', logoUrl: '', primary: '#4f46e5', primaryStrong: '#3730a3', primarySoft: 'rgba(0,0,0,0.1)', primaryContrast: '#ffffff', accent: '#22c55e' },
     payments: { defaultDueDay: 10, graceDays: 5, lateFeePercent: 0, transferAlias: '', transferCbu: '', accountHolder: '', accountTaxId: '', paymentMessage: '', paymentLink: '', enabledMethods: ['bank_transfer'] },
     enrollments: { confirmationMode: 'manual' as const, defaultCapacity: 20, requirePayment: false, requiredFields: ['document'] },

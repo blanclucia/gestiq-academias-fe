@@ -7,12 +7,19 @@ const apiBranchSchema = z.object({
     email: z.string(),
     phone: z.string(),
     address: z.string(),
+    timezone: z.string(),
     openingTime: z.string(),
     closingTime: z.string(),
     operatingWeekdays: z.array(z.number()),
     status: z.enum(['active', 'inactive']),
 })
 const apiBranchListSchema = z.object({ items: z.array(apiBranchSchema) })
+const apiBranchRosterSchema = z.object({
+    administratorIds: z.array(z.string()),
+    teacherIds: z.array(z.string()),
+    studentIds: z.array(z.string()),
+})
+export type ApiBranchRoster = z.infer<typeof apiBranchRosterSchema>
 
 export type ApiBranch = z.infer<typeof apiBranchSchema>
 export type ApiBranchInput = {
@@ -21,6 +28,7 @@ export type ApiBranchInput = {
     email: string
     phone: string
     address: string
+    timezone: string
     openingTime: string
     closingTime: string
     operatingWeekdays: number[]
@@ -61,4 +69,8 @@ export async function assignBranchStaffApi(organizationSlug: string, branchId: s
 
 export async function revokeBranchStaffApi(organizationSlug: string, branchId: string, userId: string, request: Requester = defaultRequest): Promise<void> {
     await request(branchesPath(organizationSlug, `/${branchId}/staff/${userId}`), { method: 'DELETE' })
+}
+
+export async function fetchBranchRoster(organizationSlug: string, branchId: string, signal?: AbortSignal, request: Requester = defaultRequest): Promise<ApiBranchRoster> {
+    return apiBranchRosterSchema.parse(await request(branchesPath(organizationSlug, `/${branchId}/roster`), { signal }))
 }

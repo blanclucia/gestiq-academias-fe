@@ -19,6 +19,7 @@ import { PaymentAdjustmentModal, type PaymentAdjustmentValue } from '../componen
 import { PaymentCollectionModal } from '../components/PaymentCollectionModal'
 import { PaymentEditModal } from '../components/PaymentEditModal'
 import { PaymentLinkModal } from '../components/PaymentLinkModal'
+import { splitFilterValue } from '@/components/crud/filterValues'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
 const defaultAdjustmentForm: PaymentAdjustmentValue = {
@@ -38,6 +39,9 @@ export function BillingPage() {
     const updateCharge = useUpdateCharge()
     const deleteCharge = useDeleteCharge()
     const { settings: academySettings } = useAcademySettings()
+    const enabledPaymentMethods = paymentMethods.filter((method) => academySettings?.payments.enabledMethods.includes(method))
+    // Never leave staff unable to register any payment at all if the org hasn't enabled any method yet.
+    const availablePaymentMethods = enabledPaymentMethods.length > 0 ? enabledPaymentMethods : paymentMethods
     const [activeTab, setActiveTab] = useState<BillingTab>('resumen')
     const today = startOfDay(new Date())
     const suggestedDueDate = getNextDueDateForDay(academySettings?.payments.defaultDueDay ?? 10, format(today, 'yyyy-MM-dd'))
@@ -92,8 +96,9 @@ export function BillingPage() {
                 return false
             }
 
+            const selectedStudents = splitFilterValue(activeFilters.student)
             const matchesStudent =
-                activeFilters.student === '' || payment.student === activeFilters.student
+                selectedStudents.length === 0 || selectedStudents.includes(payment.student)
 
             if (!matchesStudent) {
                 return false
@@ -155,7 +160,11 @@ export function BillingPage() {
     }, [dateRange.from, dateRange.to, today])
 
     const monthMetrics = useMemo(() => {
+        // Exam-fee installments (examinationsRepository.ts, still 100% mock) are rendered as table
+        // rows like any other charge, but they have no backing row in the backend — they shouldn't
+        // inflate the rolled-up KPI totals here the way a real charge does.
         const monthPayments = paymentRows.filter((payment) => {
+            if (!payment.isReal) return false
             const referenceDate = parseISO(getReferenceDate(payment, payment.statusView))
             return isWithinInterval(referenceDate, { start: summaryInterval.start, end: summaryInterval.end })
         })
@@ -337,6 +346,7 @@ export function BillingPage() {
                 open={isManualChargeOpen}
                 value={manualChargeForm}
                 students={studentOptions}
+                paymentMethods={availablePaymentMethods}
                 onChange={setManualChargeForm}
                 onClose={() => {
                     setIsManualChargeOpen(false)
@@ -356,7 +366,7 @@ export function BillingPage() {
                 onCopy={copyPaymentLink}
             />
 
-            <PaymentCollectionModal target={collectTarget} value={collectForm} onChange={setCollectForm} onClose={() => setCollectTarget(null)} onSubmit={submitCollection} />
+            <PaymentCollectionModal target={collectTarget} value={collectForm} paymentMethods={availablePaymentMethods} onChange={setCollectForm} onClose={() => setCollectTarget(null)} onSubmit={submitCollection} />
             <PaymentEditModal
                 open={isEditModalOpen}
                 target={editingPayment}

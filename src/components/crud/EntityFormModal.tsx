@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { FormValidationResult } from '@/components/forms/formValidation'
 
 type EntityFormModalProps = {
@@ -26,6 +26,7 @@ export function EntityFormModal({
     children,
 }: EntityFormModalProps) {
     const [submitError, setSubmitError] = useState('')
+    const contentRef = useRef<HTMLDivElement>(null)
     /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         if (!open) setSubmitError('')
@@ -59,7 +60,7 @@ export function EntityFormModal({
                     </button>
                 </div>
 
-                <div className="entity-modal-content">{children}</div>
+                <div className="entity-modal-content" ref={contentRef}>{children}</div>
 
                 <div className="entity-modal-footer">
                     {submitError && <p className="entity-modal-validation-error" role="alert">{submitError}</p>}
@@ -69,10 +70,18 @@ export function EntityFormModal({
                         </button>
                         <button type="button" className="primary-button" onClick={() => {
                             const result = validate?.()
+                            const namedFields = Array.from(contentRef.current?.querySelectorAll<HTMLElement>('[name]') ?? [])
+                            // Clear any marks from a previous failed attempt before applying this one.
+                            namedFields.forEach((field) => field.classList.remove('field-invalid'))
                             if (result?.valid === false) {
                                 setSubmitError(result.message ?? 'Revisá los campos obligatorios.')
-                                const firstInvalidField = result?.fieldErrors && Object.keys(result.fieldErrors)[0]
-                                if (firstInvalidField) Array.from(document.querySelectorAll<HTMLElement>('[name]')).find((field) => field.getAttribute('name') === firstInvalidField)?.focus()
+                                const invalidKeys = result.fieldErrors ? Object.keys(result.fieldErrors) : []
+                                // Mark every invalid field, not just the first — a red border is a much
+                                // harder thing to miss than a focus ring that can land below the fold or
+                                // get silently lost to a re-render, and the user may have more than one
+                                // field to fix at once.
+                                invalidKeys.forEach((key) => namedFields.find((field) => field.getAttribute('name') === key)?.classList.add('field-invalid'))
+                                namedFields.find((field) => field.getAttribute('name') === invalidKeys[0])?.focus()
                                 return
                             }
                             setSubmitError('')
@@ -137,20 +146,22 @@ export function DeleteConfirmationModal({
                 </div>
 
                 <div className="entity-modal-footer">
-                    <button type="button" className="secondary-button" onClick={onClose}>
-                        {cancelLabel}
-                    </button>
-                    <button
-                        type="button"
-                        className="primary-button"
-                        onClick={onConfirm}
-                        style={{
-                            background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                            borderColor: '#ef4444',
-                        }}
-                    >
-                        {confirmLabel}
-                    </button>
+                    <div className="entity-modal-actions">
+                        <button type="button" className="secondary-button" onClick={onClose}>
+                            {cancelLabel}
+                        </button>
+                        <button
+                            type="button"
+                            className="primary-button"
+                            onClick={onConfirm}
+                            style={{
+                                background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                                borderColor: '#ef4444',
+                            }}
+                        >
+                            {confirmLabel}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

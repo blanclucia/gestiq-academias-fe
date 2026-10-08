@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/auth/AuthContext'
 import { readOrganizationStorageItem, writeOrganizationStorageItem } from '@/workspace/organizationScope'
-import { assignBranchAdministratorApi, assignBranchStaffApi, createBranchApi, fetchBranches, revokeBranchAdministratorApi, revokeBranchStaffApi, updateBranchApi, type ApiBranch, type ApiBranchPatch } from '@/services/organization/branchesApi'
+import { assignBranchAdministratorApi, assignBranchStaffApi, createBranchApi, fetchBranchRoster, fetchBranches, revokeBranchAdministratorApi, revokeBranchStaffApi, updateBranchApi, type ApiBranch, type ApiBranchPatch } from '@/services/organization/branchesApi'
 import { administersBranches, grantMemberRoleApi, revokeMemberRoleApi } from '@/services/organization/membersApi'
 import { branchStatusFromApi, branchStatusToApi, generateDisplayCode, operatingToWeekDays, weekDaysToOperating } from '@/services/organization/branchesMapping'
 import { getBranchRoster, setBranchRoster, type BranchRoster } from '@/services/organization/branchRoster'
@@ -20,11 +20,12 @@ export type AcademyBranch = {
     weekDays: string[]
     openingTime: string
     closingTime: string
+    timezone: string
     studentsCount: number
     status: 'Activa' | 'Inactiva'
 }
 
-type BranchCoreFields = Pick<AcademyBranch, 'name' | 'address' | 'email' | 'phone' | 'weekDays' | 'openingTime' | 'closingTime' | 'status'>
+type BranchCoreFields = Pick<AcademyBranch, 'name' | 'address' | 'email' | 'phone' | 'weekDays' | 'openingTime' | 'closingTime' | 'timezone' | 'status'>
 
 const selectedBranchKey = 'gestiq-selected-branch-v1'
 const selectionListeners = new Set<() => void>()
@@ -38,6 +39,7 @@ function withRoster(branch: ApiBranch): AcademyBranch {
         phone: branch.phone,
         openingTime: branch.openingTime,
         closingTime: branch.closingTime,
+        timezone: branch.timezone,
         weekDays: operatingToWeekDays(branch.operatingWeekdays),
         status: branchStatusFromApi(branch.status),
         ...getBranchRoster(branch.id),
@@ -70,6 +72,7 @@ export function useCreateBranch() {
                 address: input.address,
                 openingTime: input.openingTime,
                 closingTime: input.closingTime,
+                timezone: input.timezone,
                 operatingWeekdays: weekDaysToOperating(input.weekDays),
                 status: branchStatusToApi(input.status),
             })
@@ -99,6 +102,7 @@ export function useUpdateBranch() {
             if (changes.phone !== undefined) corePatch.phone = changes.phone
             if (changes.openingTime !== undefined) corePatch.openingTime = changes.openingTime
             if (changes.closingTime !== undefined) corePatch.closingTime = changes.closingTime
+            if (changes.timezone !== undefined) corePatch.timezone = changes.timezone
             if (changes.weekDays) corePatch.operatingWeekdays = weekDaysToOperating(changes.weekDays)
             if (changes.status) corePatch.status = branchStatusToApi(changes.status)
             const updated = Object.keys(corePatch).length > 0 ? await updateBranchApi(organizationSlug, id, corePatch) : null
@@ -167,6 +171,26 @@ export function useSetBranchStaffScope() {
             await revokeBranchStaffApi(organizationSlug, branchId, userId)
         },
     })
+}
+
+// The real assignment (administrators/staff scopes) and the real roster read-back, unlike
+// AcademyBranch.managerIds/staffIds/studentIds below (a local-only stub never synced to the backend).
+export function useBranchRoster(branchId: string | undefined) {
+    const { session } = useAuth()
+    const organizationSlug = session?.organization.slug
+    const query = useQuery({
+        queryKey: ['branch-roster', organizationSlug, branchId],
+        queryFn: ({ signal }) => fetchBranchRoster(organizationSlug!, branchId!, signal),
+        enabled: Boolean(organizationSlug) && Boolean(branchId),
+    })
+    return { roster: query.data ?? { administratorIds: [], teacherIds: [], studentIds: [] }, isLoading: query.isLoading, isError: query.isError }
+}
+
+export function useBranchRosterInvalidation() {
+    const { session } = useAuth()
+    const organizationSlug = session?.organization.slug
+    const queryClient = useQueryClient()
+    return (branchId: string) => queryClient.invalidateQueries({ queryKey: ['branch-roster', organizationSlug, branchId] })
 }
 
 // Roster filtering by role stays client-side: staff/student membership per branch has no backend equivalent yet.
