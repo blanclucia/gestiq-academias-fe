@@ -1,6 +1,9 @@
 import { Plus, Search, X } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { ActionButtonGroup, type ActionButtonItem } from '@/components/ui/ActionButtonGroup'
+import { MultiSearchableSelect } from '@/components/ui/MultiSearchableSelect'
+import { FilterChips } from './FilterChips'
+import { joinFilterValue, splitFilterValue } from './filterValues'
 
 export type TableFilterField = {
     key: string
@@ -67,9 +70,17 @@ export function CrudListPage({
     hideToolbar = false,
 }: CrudListPageProps) {
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false)
-    const [filterValues, setFilterValues] = useState<Record<string, string>>(() =>
-        Object.fromEntries(filterFields.map((field) => [field.key, ''])),
-    )
+    const emptyFilters = () => Object.fromEntries(filterFields.map((field) => [field.key, '']))
+    // appliedFilters is what the table (and the chips next to "Filtros") actually reflects.
+    // filterValues is the modal's own draft, only committed to appliedFilters on "Aplicar" — kept
+    // apart so ticking options inside the still-open modal doesn't change the chips behind it.
+    const [appliedFilters, setAppliedFilters] = useState<Record<string, string>>(emptyFilters)
+    const [filterValues, setFilterValues] = useState<Record<string, string>>(emptyFilters)
+    /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+    useEffect(() => {
+        if (isFilterModalOpen) setFilterValues(appliedFilters)
+    }, [isFilterModalOpen])
+    /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
     const normalizedToolbar: ToolbarConfig = {
         ...toolbar,
@@ -96,6 +107,11 @@ export function CrudListPage({
         }
 
         onFilters?.()
+    }
+
+    const applyFilterValues = (next: Record<string, string>) => {
+        setAppliedFilters(next)
+        onApplyFilters?.(next)
     }
 
     if (normalizedToolbar.filters) {
@@ -151,6 +167,8 @@ export function CrudListPage({
                             </label>
 
                             {leftActions.length > 0 && <ActionButtonGroup actions={leftActions} compact />}
+
+                            <FilterChips fields={filterFields} values={appliedFilters} onChange={applyFilterValues} />
                         </div>
 
                         {toolbarCenterContent && (
@@ -206,25 +224,20 @@ export function CrudListPage({
                                             <label key={field.key} className="form-field">
                                                 <span className="form-field-label">{field.label}</span>
                                                 {fieldOptions && fieldOptions.length > 0 ? (
-                                                    <select
-                                                        className="form-input"
-                                                        value={filterValues[field.key] ?? ''}
-                                                        onChange={(event) =>
+                                                    <MultiSearchableSelect
+                                                        values={splitFilterValue(filterValues[field.key])}
+                                                        onChange={(values) =>
                                                             setFilterValues((current) => ({
                                                                 ...current,
-                                                                [field.key]: event.target.value,
+                                                                [field.key]: joinFilterValue(values),
                                                             }))
                                                         }
-                                                    >
-                                                        <option value="">Todas</option>
-                                                        {Array.from(new Set(fieldOptions)).map((option) => (
-                                                            <option key={`${field.key}-${option}`} value={option}>
-                                                                {option}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                        placeholder={`Buscar ${field.label.toLowerCase()}…`}
+                                                        options={Array.from(new Set(fieldOptions)).map((option) => ({ value: option, label: option }))}
+                                                    />
                                                 ) : (
                                                     <input
+                                                        className="form-input"
                                                         type="text"
                                                         value={filterValues[field.key] ?? ''}
                                                         placeholder={field.placeholder ?? `Filtrar por ${field.label.toLowerCase()}`}
@@ -244,25 +257,28 @@ export function CrudListPage({
                         </div>
 
                         <div className="entity-modal-footer">
-                            <button
-                                type="button"
-                                className="secondary-button"
-                                onClick={() => {
-                                    setFilterValues(Object.fromEntries(filterFields.map((field) => [field.key, ''])))
-                                }}
-                            >
-                                Limpiar
-                            </button>
-                            <button
-                                type="button"
-                                className="primary-button"
-                                onClick={() => {
-                                    onApplyFilters?.(filterValues)
-                                    setIsFilterModalOpen(false)
-                                }}
-                            >
-                                Aplicar
-                            </button>
+                            <div className="entity-modal-actions">
+                                <button
+                                    type="button"
+                                    className="secondary-button"
+                                    onClick={() => {
+                                        setFilterValues(Object.fromEntries(filterFields.map((field) => [field.key, ''])))
+                                    }}
+                                >
+                                    Limpiar
+                                </button>
+                                <button
+                                    type="button"
+                                    className="primary-button"
+                                    onClick={() => {
+                                        setAppliedFilters(filterValues)
+                                        onApplyFilters?.(filterValues)
+                                        setIsFilterModalOpen(false)
+                                    }}
+                                >
+                                    Aplicar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

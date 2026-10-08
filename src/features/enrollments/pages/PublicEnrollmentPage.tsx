@@ -14,7 +14,7 @@ import {
     useRegisterPublicly,
 } from "@/services/academyRepository";
 import { usePublicEnrollmentSettings } from "@/services/organization/publicSettingsApi";
-import { requiredFieldsFromApi } from "@/services/organization/settingsMapping";
+import { paymentMethodsFromApi, requiredFieldsFromApi } from "@/services/organization/settingsMapping";
 import type { ApiPublicRegistrationResult } from "@/services/organization/enrollmentsApi";
 import { calculateAge } from "@/domain/students/studentRules";
 
@@ -93,6 +93,11 @@ export function PublicEnrollmentPage() {
         }
     };
     const requiredFields = new Set(requiredFieldsFromApi(settings.enrollments.requiredFields));
+    const enabledMethods = paymentMethodsFromApi(settings.payments.enabledMethods);
+    const canUseMercadoPago = enabledMethods.includes("Mercado Pago");
+    const canUseTransferencia = enabledMethods.includes("Transferencia");
+    const canUseEfectivo = enabledMethods.includes("Efectivo");
+    const hasAnyPaymentMethod = canUseMercadoPago || canUseTransferencia || canUseEfectivo;
     const age = form.birthDate ? calculateAge(form.birthDate) : null;
     const isMinor = age !== null && age < 18;
     const performRegistration = () => {
@@ -506,69 +511,79 @@ export function PublicEnrollmentPage() {
                                             <strong>Elegí el método de pago</strong>
                                             <span>Seleccioná cómo querés abonar la inscripción.</span>
                                         </div>
-                                        <div className="payment-method-options">
-                                            <button
-                                                className={
-                                                    paymentOption === "mercadopago"
-                                                        ? "payment-method-option selected"
-                                                        : "payment-method-option"
-                                                }
-                                                type="button"
-                                                onClick={() => {
-                                                    setPaymentOption("mercadopago");
-                                                    setFormError("");
-                                                }}
-                                            >
-                                                <strong>Mercado Pago</strong>
-                                                <small>Pagá online con tu tarjeta o saldo.</small>
-                                                {paymentOption === "mercadopago" && (
-                                                    <span className="payment-method-inline-details">
-                                                        <strong>Link de pago</strong>
-                                                        <a href={settings.payments.paymentLink} target="_blank" rel="noreferrer">{settings.payments.paymentLink}</a>
-                                                    </span>
+                                        {hasAnyPaymentMethod ? (
+                                            <div className="payment-method-options">
+                                                {canUseMercadoPago && (
+                                                    <button
+                                                        className={
+                                                            paymentOption === "mercadopago"
+                                                                ? "payment-method-option selected"
+                                                                : "payment-method-option"
+                                                        }
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setPaymentOption("mercadopago");
+                                                            setFormError("");
+                                                        }}
+                                                    >
+                                                        <strong>Mercado Pago</strong>
+                                                        <small>Pagá online con tu tarjeta o saldo.</small>
+                                                        {paymentOption === "mercadopago" && (
+                                                            <span className="payment-method-inline-details">
+                                                                <strong>Link de pago</strong>
+                                                                <a href={settings.payments.paymentLink} target="_blank" rel="noreferrer">{settings.payments.paymentLink}</a>
+                                                            </span>
+                                                        )}
+                                                    </button>
                                                 )}
-                                            </button>
-                                            <button
-                                                className={
-                                                    paymentOption === "transferencia"
-                                                        ? "payment-method-option selected"
-                                                        : "payment-method-option"
-                                                }
-                                                type="button"
-                                                onClick={() => {
-                                                    setPaymentOption("transferencia");
-                                                    setFormError("");
-                                                }}
-                                            >
-                                                <strong>Transferencia bancaria</strong>
-                                                <small>
-                                                    Usá los datos de la academia para transferir.
-                                                </small>
-                                                {paymentOption === "transferencia" && (
-                                                    <span className="payment-method-inline-details">
-                                                        <strong>Datos para transferir</strong>
-                                                        <span>Alias: {settings.payments.transferAlias || "Sin configurar"}</span>
-                                                        <span>CBU / CVU: {settings.payments.transferCbu || "Sin configurar"}</span>
-                                                        <span>Titular: {settings.payments.accountHolder} · CUIT {settings.payments.accountTaxId}</span>
-                                                    </span>
+                                                {canUseTransferencia && (
+                                                    <button
+                                                        className={
+                                                            paymentOption === "transferencia"
+                                                                ? "payment-method-option selected"
+                                                                : "payment-method-option"
+                                                        }
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setPaymentOption("transferencia");
+                                                            setFormError("");
+                                                        }}
+                                                    >
+                                                        <strong>Transferencia bancaria</strong>
+                                                        <small>
+                                                            Usá los datos de la academia para transferir.
+                                                        </small>
+                                                        {paymentOption === "transferencia" && (
+                                                            <span className="payment-method-inline-details">
+                                                                <strong>Datos para transferir</strong>
+                                                                <span>Alias: {settings.payments.transferAlias || "Sin configurar"}</span>
+                                                                <span>CBU / CVU: {settings.payments.transferCbu || "Sin configurar"}</span>
+                                                                <span>Titular: {settings.payments.accountHolder} · CUIT {settings.payments.accountTaxId}</span>
+                                                            </span>
+                                                        )}
+                                                    </button>
                                                 )}
-                                            </button>
-                                            <button
-                                                className={paymentOption === "efectivo" ? "payment-method-option selected" : "payment-method-option"}
-                                                type="button"
-                                                onClick={() => { setPaymentOption("efectivo"); setFormError("") }}
-                                            >
-                                                <strong>Efectivo en sede</strong>
-                                                <small>Aboná personalmente en la academia.</small>
-                                                {paymentOption === "efectivo" && (
-                                                    <span className="payment-method-inline-details">
-                                                        <strong>Dirección de la sede</strong>
-                                                        <span>{settings.general.address || "Dirección no configurada"}</span>
-                                                        <span>Indicá el nombre del alumno y presentá su DNI.</span>
-                                                    </span>
+                                                {canUseEfectivo && (
+                                                    <button
+                                                        className={paymentOption === "efectivo" ? "payment-method-option selected" : "payment-method-option"}
+                                                        type="button"
+                                                        onClick={() => { setPaymentOption("efectivo"); setFormError("") }}
+                                                    >
+                                                        <strong>Efectivo en sede</strong>
+                                                        <small>Aboná personalmente en la academia.</small>
+                                                        {paymentOption === "efectivo" && (
+                                                            <span className="payment-method-inline-details">
+                                                                <strong>Dirección de la sede</strong>
+                                                                <span>{settings.general.address || "Dirección no configurada"}</span>
+                                                                <span>Indicá el nombre del alumno y presentá su DNI.</span>
+                                                            </span>
+                                                        )}
+                                                    </button>
                                                 )}
-                                            </button>
-                                        </div>
+                                            </div>
+                                        ) : (
+                                            <p className="form-error-message">No hay medios de pago habilitados. Contactá a la academia para coordinar el pago.</p>
+                                        )}
                                         <div className="public-enrollment-step-actions">
                                             <button
                                                 className="secondary-button"

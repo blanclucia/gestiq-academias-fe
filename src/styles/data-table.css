@@ -105,6 +105,7 @@
 .student-table-toolbar-right {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
     min-width: 0;
 }
@@ -259,6 +260,46 @@
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.active-filters-inline {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.filter-chip:hover {
+    border-color: var(--primary);
+}
+
+.filter-chip-clear {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 5px 4px;
+}
+
+.filter-chip-clear:hover {
+    color: var(--text);
 }
 
 .data-table-footer {
@@ -497,6 +538,11 @@
 .status-badge.neutral {
     color: var(--muted);
     background: rgba(148, 163, 184, 0.12);
+}
+
+.status-badge.danger {
+    color: var(--red);
+    background: var(--red-soft);
 }
 
 .table-actions-cell {

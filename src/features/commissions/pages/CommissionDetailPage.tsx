@@ -3,8 +3,9 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { createCommissionExam, listCommissionExams, listCourses, listStudents, updateCommissionExam, useAcademyRepositoryVersion, useAssignEnrollment, useCommissionRoster, useGenerateTuition, useUpdateCommission, type CommissionStudentStatus } from '@/services/academyRepository'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { useToast } from '@/components/ui/ToastContext'
-import { isCourseClosed } from '@/services/organization/academicOffersApi'
+import { describeEnrollmentFailure } from '@/services/organization/academicOffersApi'
 import { CommissionAssignmentModal } from '../components/CommissionAssignmentModal'
 import { DeleteConfirmationModal, EntityFormModal, FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
 import { getSelectedBranchId } from '@/services/branchRepository'
@@ -73,13 +74,28 @@ export function CommissionDetailPage() {
 
     const allStudents = listStudents()
     const rosterIds = new Set(commissionStudents.map((student) => student.id))
-    const assignmentStudents = allStudents.map((student) =>
-        rosterIds.has(student.id) && !student.courses.some((item) => item.name === course.name && item.group === commission.name)
-            ? { ...student, courses: [...student.courses, { name: course.name, group: commission.name, modality: 'Grupo' as const }] }
-            : student,
-    )
+    // Mirrors the backend guards on AssignEnrollment (closed course/commission, full capacity) so
+    // the admin sees why the action is unavailable instead of clicking through to a toast error.
+    const activeRosterCount = commissionStudents.filter((student) => student.status === 'Activo').length
+    const assignDisabledReason = course.status !== 'Activo'
+        ? 'El curso debe estar Activo para asignar alumnos nuevos.'
+        : commission.status === 'Cerrada'
+            ? 'La comisión está cerrada: no admite alumnos nuevos.'
+            : commission.capacity > 0 && activeRosterCount >= commission.capacity
+                ? 'La comisión ya alcanzó su cupo máximo.'
+                : undefined
+    // For THIS commission, the real roster is the only source of truth — strip any stale entry a
+    // student might carry from the legacy local assignment mechanism before deciding whether to
+    // re-add it, instead of only ever adding on top of whatever was already there.
+    const assignmentStudents = allStudents.map((student) => {
+        const matchesThisCommission = (item: { name: string; group: string }) => item.name === course.name && item.group === commission.name
+        const otherCourses = student.courses.filter((item) => !matchesThisCommission(item))
+        const courses = rosterIds.has(student.id) ? [...otherCourses, { name: course.name, group: commission.name, modality: 'Grupo' as const }] : otherCourses
+        return { ...student, courses }
+    })
     const assignmentCommission = {
         id: commission.id,
+        courseId: course.id,
         courseName: course.name,
         commissionName: commission.name,
         studentsCount: commissionStudents.length,
@@ -116,7 +132,7 @@ export function CommissionDetailPage() {
     const saveStudentStatus = async () => {
         if (!statusTarget) return
         let failed = 0
-        let closedCourse = false
+        let failureReason: string | undefined
         for (const studentId of statusTarget.ids) {
             try {
                 await assignEnrollment.mutateAsync({ courseId: course.id, commissionId: commission.id, studentId, status: statusDraft })
@@ -125,14 +141,12 @@ export function CommissionDetailPage() {
                 if (statusDraft === 'Activo') await generateTuition.mutateAsync({ studentId, commissionId: commission.id })
             } catch (error) {
                 failed += 1
-                if (isCourseClosed(error)) closedCourse = true
+                failureReason ??= describeEnrollmentFailure(error)
             }
         }
         const message = failed === 0
             ? 'Estado actualizado correctamente.'
-            : closedCourse
-                ? 'El curso está cerrado: no admite inscripciones activas nuevas.'
-                : `No se pudo actualizar el estado de ${failed} alumno${failed === 1 ? '' : 's'}.`
+            : failureReason ?? `No se pudo actualizar el estado de ${failed} alumno${failed === 1 ? '' : 's'}.`
         showToast(failed === 0 ? 'success' : 'error', message)
         setStatusTarget(null)
         setSelectedStudentIds([])
@@ -178,12 +192,16 @@ export function CommissionDetailPage() {
                 onSubmit={saveStudentStatus}
             >
                 <FormField label="Estado">
-                    <select className="form-input" value={statusDraft} onChange={(event) => setStatusDraft(event.target.value as CommissionStudentStatus)}>
-                        <option value="Activo">Activo</option>
-                        <option value="Pausado">Pausado</option>
-                        <option value="Finalizado">Finalizado</option>
-                        <option value="Baja">Baja</option>
-                    </select>
+                    <SearchableSelect
+                        value={statusDraft}
+                        onChange={(status) => setStatusDraft(status as CommissionStudentStatus)}
+                        options={[
+                            { value: 'Activo', label: 'Activo' },
+                            { value: 'Pausado', label: 'Pausado' },
+                            { value: 'Finalizado', label: 'Finalizado' },
+                            { value: 'Baja', label: 'Baja' },
+                        ]}
+                    />
                 </FormField>
             </EntityFormModal>
 
@@ -227,14 +245,15 @@ export function CommissionDetailPage() {
                     <FormSection title="Canal y plantilla">
                         <div className="bulk-channel-options"><button type="button" className={communicationForm.channel === 'Email' ? 'selected' : ''} onClick={() => setCommunicationForm((current) => ({ ...current, channel: 'Email' }))}><Mail size={18} />Email</button><button type="button" className={communicationForm.channel === 'WhatsApp' ? 'selected' : ''} onClick={() => setCommunicationForm((current) => ({ ...current, channel: 'WhatsApp' }))}><MessageCircle size={18} />WhatsApp</button></div>
                         <FormField label="Usar comunicación configurada">
-                            <select className="form-input" value="custom" onChange={(event) => { const template = communicationTemplates.find((item) => item.id === event.target.value); if (template) setCommunicationForm((current) => ({ ...current, subject: template.subject, message: template.message })) }}>
-                                <option value="custom">Escribir un mensaje</option>
-                                {communicationTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
-                            </select>
+                            <SearchableSelect
+                                value="custom"
+                                onChange={(templateId) => { const template = communicationTemplates.find((item) => item.id === templateId); if (template) setCommunicationForm((current) => ({ ...current, subject: template.subject, message: template.message })) }}
+                                options={[{ value: 'custom', label: 'Escribir un mensaje' }, ...communicationTemplates.map((template) => ({ value: template.id, label: template.name }))]}
+                            />
                         </FormField>
                     </FormSection>
                     <FormSection title="Mensaje">
-                        <FormGrid>{communicationForm.channel === 'Email' && <FormField label="Asunto"><input className="form-input" value={communicationForm.subject} onChange={(event) => setCommunicationForm((current) => ({ ...current, subject: event.target.value }))} /></FormField>}<FormField label="Mensaje" full><textarea className="form-textarea" rows={6} value={communicationForm.message} onChange={(event) => setCommunicationForm((current) => ({ ...current, message: event.target.value }))} placeholder="Escribí el mensaje para los alumnos seleccionados" /></FormField></FormGrid>
+                        <FormGrid>{communicationForm.channel === 'Email' && <FormField label="Asunto"><input name="communicationSubject" className="form-input" value={communicationForm.subject} onChange={(event) => setCommunicationForm((current) => ({ ...current, subject: event.target.value }))} /></FormField>}<FormField label="Mensaje" full><textarea name="communicationMessage" className="form-textarea" rows={6} value={communicationForm.message} onChange={(event) => setCommunicationForm((current) => ({ ...current, message: event.target.value }))} placeholder="Escribí el mensaje para los alumnos seleccionados" /></FormField></FormGrid>
                     </FormSection>
                     <p className="bulk-template-note">{communicationRecipients.length} destinatarios tienen datos disponibles para este canal.</p>
                 </div>}
@@ -248,7 +267,7 @@ export function CommissionDetailPage() {
                 onClose={() => { setIsCertificateOpen(false); setCertificateGenerated(false); setSelectedStudentIds([]) }}
                 onSubmit={() => certificateGenerated ? setIsCertificateOpen(false) : setCertificateGenerated(true)}
             >
-                {certificateGenerated ? <div className="bulk-communication-success"><Award size={28} /><strong>Certificados listos</strong><p>En esta versión de demostración se preparó la generación de certificados de {certificateType.toLowerCase()}.</p></div> : <FormSection title="Tipo de certificado"><FormField label="Certificado"><select className="form-input" value={certificateType} onChange={(event) => setCertificateType(event.target.value)}><option>Certificado de aprobación</option><option>Certificado de asistencia</option><option>Constancia de alumno regular</option></select></FormField></FormSection>}
+                {certificateGenerated ? <div className="bulk-communication-success"><Award size={28} /><strong>Certificados listos</strong><p>En esta versión de demostración se preparó la generación de certificados de {certificateType.toLowerCase()}.</p></div> : <FormSection title="Tipo de certificado"><FormField label="Certificado"><SearchableSelect value={certificateType} onChange={setCertificateType} options={[{ value: 'Certificado de aprobación', label: 'Certificado de aprobación' }, { value: 'Certificado de asistencia', label: 'Certificado de asistencia' }, { value: 'Constancia de alumno regular', label: 'Constancia de alumno regular' }]} /></FormField></FormSection>}
             </EntityFormModal>
 
             <CommissionAssignmentModal
@@ -261,21 +280,19 @@ export function CommissionDetailPage() {
                 onClose={() => setIsAssignmentModalOpen(false)}
                 onConfirm={async ({ studentIds }) => {
                     let failed = 0
-                    let closedCourse = false
+                    let failureReason: string | undefined
                     for (const studentId of studentIds) {
                         try {
                             await assignEnrollment.mutateAsync({ courseId: course.id, commissionId: commission.id, studentId })
                             await generateTuition.mutateAsync({ studentId, commissionId: commission.id })
                         } catch (error) {
                             failed += 1
-                            if (isCourseClosed(error)) closedCourse = true
+                            failureReason ??= describeEnrollmentFailure(error)
                         }
                     }
                     const message = failed === 0
                         ? 'Alumnos asignados correctamente.'
-                        : closedCourse
-                            ? 'El curso está cerrado: no admite inscripciones activas nuevas.'
-                            : `No se pudo asignar a ${failed} alumno${failed === 1 ? '' : 's'}.`
+                        : failureReason ?? `No se pudo asignar a ${failed} alumno${failed === 1 ? '' : 's'}.`
                     showToast(failed === 0 ? 'success' : 'error', message)
                     setIsAssignmentModalOpen(false)
                 }}
@@ -338,6 +355,7 @@ export function CommissionDetailPage() {
                         onSelectionChange={setSelectedStudentIds}
                         onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)}
                         onAssign={() => setIsAssignmentModalOpen(true)}
+                        assignDisabledReason={assignDisabledReason}
                         onView={(student) => navigate(path(`alumnos/${student.id}`))}
                         onCommunicate={openCommunication}
                         onCertificate={openCertificate}

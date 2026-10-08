@@ -42,9 +42,9 @@ type BillingTableProps = {
 
 const statusToneMap: Record<Payment['status'], StatusBadgeTone> = {
     Pagado: 'success',
-    Pendiente: 'neutral',
+    Pendiente: 'warning',
     'En verificación': 'warning',
-    Rechazado: 'neutral',
+    Rechazado: 'danger',
     Vencido: 'warning',
     Parcial: 'warning',
     Anulado: 'neutral',

@@ -5,8 +5,10 @@ import { CommissionForm, type CommissionFormValue } from '@/features/commissions
 import { CourseForm, type CourseFormValue } from '../components/CourseForm'
 import { EnrollmentForm, type EnrollmentFormValue } from '@/features/enrollments'
 import { DeleteConfirmationModal, EntityFormModal } from '@/components/crud/EntityFormModal'
+import { FilterChips } from '@/components/crud/FilterChips'
+import { splitFilterValue } from '@/components/crud/filterValues'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { type AcademicCommission, listAcademicCycles, listCourses, listEnrollmentOpenings, listStudentsInCommission, useAcademyRepositoryVersion, useCreateCommission, useCreateEnrollmentOpening, useDeleteCommission, useDeleteEnrollmentOpening, useUpdateCommission, useUpdateCourse, useUpdateEnrollmentOpening } from '@/services/academyRepository'
+import { type AcademicCommission, getActiveAcademicCycleId, listAcademicCycles, listCourses, listEnrollmentOpenings, useAcademyRepositoryVersion, useCreateCommission, useCreateEnrollmentOpening, useDeleteCommission, useDeleteEnrollmentOpening, useUpdateCommission, useUpdateCourse, useUpdateEnrollmentOpening } from '@/services/academyRepository'
 import { isCommissionNameConflict, isCourseClosed } from '@/services/organization/academicOffersApi'
 import { isCourseNotActive } from '@/services/organization/enrollmentsApi'
 import { validateCommission } from '@/features/commissions'
@@ -15,7 +17,7 @@ import { validateConditions } from '@/components/forms/formValidation'
 import { OfferSummaryCard } from '../components/OfferSummaryCard'
 import { OfferCommissionsCard } from '../components/OfferCommissionsCard'
 import { OfferEnrollmentsCard, type OfferEnrollmentRow } from '../components/OfferEnrollmentsCard'
-import { OfferFiltersModal } from '../components/OfferFiltersModal'
+import { FilterModal } from '@/components/crud/FilterModal'
 import { calculateOccupancy, getEligibleCommissions } from '@/domain/commissions/commissionRules'
 import { useAcademySettings } from '@/services/academySettingsRepository'
 import { useToast } from '@/components/ui/ToastContext'
@@ -26,6 +28,14 @@ type CourseCommission = AcademicCommission
 function formatCommissionSchedule(value: CommissionFormValue) {
     const days = value.days.map((day) => day.slice(0, 3)).join(' / ')
     return days ? `${days} · ${value.fromTime} - ${value.toTime}` : `Horario a definir · ${value.fromTime} - ${value.toTime}`
+}
+
+function defaultEnrollmentWindow() {
+    const start = new Date()
+    const end = new Date()
+    end.setDate(end.getDate() + 30)
+    const toISODate = (date: Date) => date.toISOString().slice(0, 10)
+    return { startDate: toISODate(start), endDate: toISODate(end) }
 }
 
 
@@ -57,7 +67,7 @@ export function AcademicOfferDetailPage() {
     const [viewCommission, setViewCommission] = useState<CourseCommission | null>(null)
     const [deleteCommissionTarget, setDeleteCommissionTarget] = useState<CourseCommission | null>(null)
     const [editingEnrollment, setEditingEnrollment] = useState<OfferEnrollmentRow | null>(null)
-    const [enrollmentForm, setEnrollmentForm] = useState<EnrollmentFormValue>({ courseId: courseId ?? '', commissionIds: [], amount: 48000, startDate: '2026-08-26', endDate: '2026-08-30', status: 'Abierta' })
+    const [enrollmentForm, setEnrollmentForm] = useState<EnrollmentFormValue>({ courseId: courseId ?? '', commissionIds: [], amount: 48000, ...defaultEnrollmentWindow(), status: 'Abierta' })
     const [viewEnrollment, setViewEnrollment] = useState<OfferEnrollmentRow | null>(null)
     const [deleteEnrollmentTarget, setDeleteEnrollmentTarget] = useState<OfferEnrollmentRow | null>(null)
     const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -99,7 +109,7 @@ export function AcademicOfferDetailPage() {
             }
         })
     const allEnrollmentRows = persistedEnrollmentRows
-    const assignedStudents = course.commissions.reduce((total, commission) => total + listStudentsInCommission(course.name, commission.name, commission.id).length, 0)
+    const assignedStudents = course.commissions.reduce((total, commission) => total + commission.studentsCount, 0)
     const totalCapacity = course.commissions.reduce((total, commission) => total + commission.capacity, 0)
     const occupancyPercentage = calculateOccupancy(assignedStudents, totalCapacity)
     const activeCommissions = course.commissions.filter((commission) => commission.status === 'Activa').length
@@ -125,19 +135,19 @@ export function AcademicOfferDetailPage() {
         ].some((value) => value.toLowerCase().includes(commissionSearch.toLowerCase()))
 
         const matchesFilters = commissionFilterFields.every((field) => {
-            const selectedValue = commissionFilters[field.key]
-            if (!selectedValue) {
+            const selectedValues = splitFilterValue(commissionFilters[field.key])
+            if (selectedValues.length === 0) {
                 return true
             }
 
-            const fieldValue = {
+            // "teacher" has one value per commission (possibly several) — the rest are scalars.
+            const fieldValues: string[] = field.key === 'teacher' ? commission.teachers : [{
                 commission: commission.name,
-                teacher: commission.teachers.join(', '),
                 schedule: commission.schedule,
                 status: commission.status,
-            }[field.key]
+            }[field.key] ?? '']
 
-            return fieldValue === selectedValue
+            return fieldValues.some((value) => selectedValues.includes(value))
         })
 
         return matchesSearch && matchesFilters
@@ -153,16 +163,14 @@ export function AcademicOfferDetailPage() {
         ].some((value) => value.toLowerCase().includes(enrollmentSearch.toLowerCase()))
 
         const matchesFilters = enrollmentFilterFields.every((field) => {
-            const selectedValue = enrollmentFilters[field.key]
-            if (!selectedValue) {
+            const selectedValues = splitFilterValue(enrollmentFilters[field.key])
+            if (selectedValues.length === 0) {
                 return true
             }
 
-            const fieldValue = {
-                status: enrollment.status,
-            }[field.key]
+            const fieldValue = { status: enrollment.status }[field.key] ?? ''
 
-            return fieldValue === selectedValue
+            return selectedValues.includes(fieldValue)
         })
 
         return matchesSearch && matchesFilters
@@ -396,7 +404,7 @@ export function AcademicOfferDetailPage() {
                         },
                         onError: (error) => showToast('error', isCourseNotActive(error) ? 'El curso debe estar Activo para lanzar una inscripción pública.' : 'No se pudo crear la inscripción. Intentá nuevamente.'),
                     })
-                    setEnrollmentForm({ courseId: course.id, commissionIds: [], amount: 48000, startDate: '2026-08-26', endDate: '2026-08-30', status: 'Abierta' })
+                    setEnrollmentForm({ courseId: course.id, commissionIds: [], amount: 48000, ...defaultEnrollmentWindow(), status: 'Abierta' })
                     setIsCreateEnrollmentOpen(false)
                 }}
             >
@@ -476,9 +484,9 @@ export function AcademicOfferDetailPage() {
                 }}
             />
 
-            <OfferFiltersModal open={isCommissionFilterOpen} title="Filtros de comisiones" fields={commissionFilterFields} values={commissionFilters} onChange={setCommissionFilters} onClose={() => setIsCommissionFilterOpen(false)} />
+            <FilterModal open={isCommissionFilterOpen} title="Filtros de comisiones" fields={commissionFilterFields} values={commissionFilters} onChange={setCommissionFilters} onClose={() => setIsCommissionFilterOpen(false)} />
 
-            <OfferFiltersModal open={isEnrollmentFilterOpen} title="Filtros de inscripciones" fields={enrollmentFilterFields} values={enrollmentFilters} onChange={setEnrollmentFilters} onClose={() => setIsEnrollmentFilterOpen(false)} />
+            <FilterModal open={isEnrollmentFilterOpen} title="Filtros de inscripciones" fields={enrollmentFilterFields} values={enrollmentFilters} onChange={setEnrollmentFilters} onClose={() => setIsEnrollmentFilterOpen(false)} />
 
             <div className="academy-tabs-wrap">
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'enrollments')}>
@@ -511,6 +519,7 @@ export function AcademicOfferDetailPage() {
                             openMenuId={openMenuId}
                             onSearchChange={setCommissionSearch}
                             onOpenFilters={() => setIsCommissionFilterOpen(true)}
+                            filterChips={<FilterChips fields={commissionFilterFields} values={commissionFilters} onChange={setCommissionFilters} />}
                             onCreate={() => {
                                 setNewCommissionForm(emptyCommissionForm(academicCycle?.startDate, academicCycle?.endDate, defaultCommissionCapacity))
                                 setIsCreateCommissionOpen(true)
@@ -529,11 +538,16 @@ export function AcademicOfferDetailPage() {
                             rows={filteredEnrollments}
                             search={enrollmentSearch}
                             openMenuId={openMenuId}
+                            createDisabledReason={course.status !== 'Activo'
+                                ? 'El curso debe estar Activo para lanzar una inscripción pública.'
+                                : course.cycleId !== getActiveAcademicCycleId()
+                                    ? 'El ciclo lectivo de este curso ya no es el activo.'
+                                    : undefined}
                             onSearchChange={setEnrollmentSearch}
                             onOpenFilters={() => setIsEnrollmentFilterOpen(true)}
+                            filterChips={<FilterChips fields={enrollmentFilterFields} values={enrollmentFilters} onChange={setEnrollmentFilters} />}
                             onCreate={() => {
-                                const startDate = '2026-08-26'
-                                const endDate = '2026-08-30'
+                                const { startDate, endDate } = defaultEnrollmentWindow()
                                 const commissionIds = getEligibleCommissions(course.commissions, startDate, endDate).map((commission) => commission.id)
                                 setEnrollmentForm({ courseId: course.id, commissionIds, amount: course.commissions[0]?.amount ?? 48000, startDate, endDate, status: 'Abierta' })
                                 setIsCreateEnrollmentOpen(true)

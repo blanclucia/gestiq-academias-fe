@@ -1,6 +1,7 @@
 import { ArrowLeft, CalendarDays, CheckCircle2, CreditCard, ExternalLink, StickyNote, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -161,8 +162,8 @@ export function EnrollmentDetailPage() {
                         <FormGrid>
                             <FormField label="Alumno"><input className="form-input" value={collectTarget?.name ?? ''} readOnly /></FormField>
                             <FormField label="Importe"><input className="form-input" value={`$${(collectTarget?.chargeAmount ?? enrollment.amount).toLocaleString('es-AR')}`} readOnly /></FormField>
-                            <FormField label="Fecha de cobro"><input className="form-input" type="date" value={collectForm.date} onChange={(event) => setCollectForm((current) => ({ ...current, date: event.target.value }))} /></FormField>
-                            <FormField label="Medio de pago"><select className="form-input" value={collectForm.method} onChange={(event) => setCollectForm((current) => ({ ...current, method: event.target.value as Payment['method'] }))}><option value="Transferencia">Transferencia</option><option value="Tarjeta">Tarjeta</option><option value="Efectivo">Efectivo</option></select></FormField>
+                            <FormField label="Fecha de cobro"><input name="collectionDate" className="form-input" type="date" value={collectForm.date} onChange={(event) => setCollectForm((current) => ({ ...current, date: event.target.value }))} /></FormField>
+                            <FormField label="Medio de pago"><SearchableSelect value={collectForm.method} onChange={(method) => setCollectForm((current) => ({ ...current, method: method as Payment['method'] }))} options={[{ value: 'Transferencia', label: 'Transferencia' }, { value: 'Tarjeta', label: 'Tarjeta' }, { value: 'Efectivo', label: 'Efectivo' }]} /></FormField>
                         </FormGrid>
                     </FormSection>
                 </div>

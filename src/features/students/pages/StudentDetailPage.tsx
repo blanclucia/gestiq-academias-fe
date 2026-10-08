@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DataTable } from '@/components/ui/DataTable'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { listStudentCommissionHistory, listStudents, useAcademyRepositoryVersion } from '@/services/academyRepository'
+import { listStudents, useAcademyRepositoryVersion, useStudentEnrollments } from '@/services/academyRepository'
 import { calculateAge } from '@/domain/students/studentRules'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
@@ -22,7 +22,8 @@ export function StudentDetailPage() {
     const [activeTab, setActiveTab] = useState<'overview' | 'courses'>('overview')
 
     const student = listStudents().find((item) => item.id === studentId)
-    const commissionHistory = student ? listStudentCommissionHistory(student.id) : []
+    const { history: commissionHistory } = useStudentEnrollments(student?.id)
+    const activeCoursesCount = commissionHistory.filter((entry) => entry.status === 'Activo').length
     const studentAge = student?.birthDate ? calculateAge(student.birthDate) : null
     const isMinor = studentAge !== null && studentAge < 18
 
@@ -55,7 +56,7 @@ export function StudentDetailPage() {
                             Alumnos
                         </Link>
                         <span>›</span>
-                        <span>{student.id}</span>
+                        <span>DNI {student.document}</span>
                     </div>
                     <h1 className="detail-page-title">{student.fullName}</h1>
                 </div>
@@ -81,7 +82,7 @@ export function StudentDetailPage() {
                                     <GraduationCap size={14} />
                                     Cursos activos
                                 </div>
-                                <div className="detail-metric-value detail-metric-value-large">{student.courses.length}</div>
+                                <div className="detail-metric-value detail-metric-value-large">{activeCoursesCount}</div>
                             </div>
 
                             <div className="detail-metric-card">
@@ -154,7 +155,7 @@ export function StudentDetailPage() {
                                 { key: 'commission', header: 'Comisión', accessor: (entry) => entry.commissionName },
                                 { key: 'period', header: 'Vigencia', accessor: (entry) => `${entry.startDate} al ${entry.endDate}` },
                                 { key: 'enrolledAt', header: 'Alta', accessor: (entry) => entry.enrolledAt },
-                                { key: 'status', header: 'Estado', accessor: (entry) => <StatusBadge label={entry.status} tone={entry.status === 'Activo' ? 'success' : entry.status === 'Pausado' ? 'warning' : 'neutral'} />, align: 'center' },
+                                { key: 'status', header: 'Estado', accessor: (entry) => <StatusBadge label={entry.status} tone={entry.status === 'Activo' ? 'success' : entry.status === 'Pausado' ? 'warning' : entry.status === 'Baja' ? 'danger' : 'neutral'} />, align: 'center' },
                             ]}
                         />
                     </div>

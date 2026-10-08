@@ -6,17 +6,19 @@ import { useAcademyBrand } from '@/theme/AcademyBrandContext'
 import { useAppBrand } from '@/theme/AppBrandContext'
 import { defaultAcademyBrand } from '@/theme/brandTheme'
 import { useAcademySettings, useSaveAcademySettings, type AcademySettings } from '@/services/academySettingsRepository'
-import { setSelectedBranchId, useBranches, useCreateBranch, useUpdateBranch } from '@/services/branchRepository'
+import { setSelectedBranchId, useBranchRoster, useBranches, useCreateBranch, useUpdateBranch } from '@/services/branchRepository'
 import { copyBranchConfiguration } from '@/services/branchConfigurationRepository'
 import { listExpenses, useFinanceRepositoryVersion } from '@/services/financeRepository'
-import { listCourses, useAcademyRepositoryVersion } from '@/services/academyRepository'
+import { getActiveAcademicCycleId, listCourses, listStaff, listStudents, useAcademyRepositoryVersion } from '@/services/academyRepository'
 import { DataTable } from '@/components/ui/DataTable'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { useNavigate } from 'react-router-dom'
 import { formatCurrencyARS } from '@/domain/shared/formattingRules'
 import { validateConditions } from '@/components/forms/formValidation'
 import { SettingsField as Field, SettingsToggleOption as ToggleOption } from '@/components/forms/SettingsControls'
+import { WeekDaysCheckboxGroup } from '@/components/forms/WeekDaysCheckboxGroup'
 import { useToast } from '@/components/ui/ToastContext'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
@@ -46,6 +48,12 @@ function withPrimaryColor(settings: AcademySettings, primary: string): AcademySe
     return { ...settings, brand: { ...settings.brand, primary, primaryStrong: strong, primarySoft: soft } }
 }
 
+function BranchTeachersCount({ branchId }: { branchId: string }) {
+    const { roster } = useBranchRoster(branchId)
+    const count = listStaff().filter((member) => member.userId && roster.teacherIds.includes(member.userId)).length
+    return <>{count}</>
+}
+
 export function AcademySettingsPage() {
     useFinanceRepositoryVersion()
     useAcademyRepositoryVersion()
@@ -67,7 +75,8 @@ export function AcademySettingsPage() {
     const createBranch = useCreateBranch()
     const updateBranch = useUpdateBranch()
     const [isCreateBranchOpen, setIsCreateBranchOpen] = useState(false)
-    const [branchForm, setBranchForm] = useState({ name: '', address: '', email: '', phone: '', copyFromBranchId: '' })
+    const emptyBranchForm = { name: '', address: '', email: '', phone: '', weekDays: newBranchWeekDays, openingTime: '08:00', closingTime: '21:00', timezone: 'America/Argentina/Buenos_Aires', copyFromBranchId: '' }
+    const [branchForm, setBranchForm] = useState(emptyBranchForm)
     const [openBranchMenuId, setOpenBranchMenuId] = useState<string | null>(null)
 
     if (!settings) return <div className="dashboard-page academy-settings-page"><p>{isSettingsLoading ? 'Cargando configuración…' : 'No se pudo cargar la configuración.'}</p></div>
@@ -81,11 +90,11 @@ export function AcademySettingsPage() {
     }
 
     const createNewBranch = () => {
-        createBranch.mutate({ name: branchForm.name.trim(), address: branchForm.address.trim(), email: branchForm.email.trim(), phone: branchForm.phone.trim(), weekDays: newBranchWeekDays, openingTime: '08:00', closingTime: '21:00', status: 'Activa' }, {
+        createBranch.mutate({ name: branchForm.name.trim(), address: branchForm.address.trim(), email: branchForm.email.trim(), phone: branchForm.phone.trim(), weekDays: branchForm.weekDays, openingTime: branchForm.openingTime, closingTime: branchForm.closingTime, timezone: branchForm.timezone, status: 'Activa' }, {
             onSuccess: (branch) => {
                 if (branchForm.copyFromBranchId) copyBranchConfiguration(branchForm.copyFromBranchId, branch.id)
                 setIsCreateBranchOpen(false)
-                setBranchForm({ name: '', address: '', email: '', phone: '', copyFromBranchId: '' })
+                setBranchForm(emptyBranchForm)
                 setSelectedBranchId(branch.id)
                 navigate(path(`sedes/${branch.id}`))
             },
@@ -95,8 +104,13 @@ export function AcademySettingsPage() {
 
     const expenses = listExpenses()
     const monthKey = new Date().toISOString().slice(0, 7)
-    const courses = listCourses().filter((course) => course.status === 'Activo')
+    // Same scoping as Ofertas académicas/Dashboard: only the active ciclo lectivo counts here too,
+    // otherwise a course from a past cycle nobody closed keeps inflating this KPI forever.
+    const courses = listCourses().filter((course) => course.status === 'Activo' && course.cycleId === getActiveAcademicCycleId())
     const activeCommissions = courses.flatMap((course) => course.commissions).filter((commission) => commission.status === 'Activa')
+    const students = listStudents()
+    const activeTeachers = listStaff().filter((member) => member.role === 'Docente' && member.status === 'Activo')
+    const branchCommissionsCount = (branchId: string) => courses.filter((course) => course.branchId === branchId).flatMap((course) => course.commissions).filter((commission) => commission.status === 'Activa').length
     const currency = { format: formatCurrencyARS }
     // Payments and commissions aren't attributed to a branch in the data model yet, so per-branch
     // income/commissions can't be computed — show 0 uniformly instead of faking data for one branch.
@@ -154,8 +168,8 @@ export function AcademySettingsPage() {
     }
 
     return <div className="dashboard-page academy-settings-page">
-        <EntityFormModal open={isCreateBranchOpen} title="Nueva sede" subtitle="Ingresá sus datos básicos. Después podrás configurar el staff y sus roles." submitLabel="Crear sede" validate={() => validateConditions({ branchName: !branchForm.name.trim() && 'Ingresá el nombre.', branchAddress: !branchForm.address.trim() && 'Ingresá la dirección.', branchEmail: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(branchForm.email) && 'Ingresá un email válido.' }, 'Revisá los datos de la sede.')} onClose={() => setIsCreateBranchOpen(false)} onSubmit={createNewBranch}>
-            <div className="form-stack"><FormSection title="Datos de la sede"><FormGrid><FormField label="Nombre"><input className="form-input" value={branchForm.name} onChange={(event) => setBranchForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ej. Sede Centro" /></FormField><FormField label="Dirección"><input className="form-input" value={branchForm.address} onChange={(event) => setBranchForm((current) => ({ ...current, address: event.target.value }))} /></FormField><FormField label="Email"><input className="form-input" type="email" value={branchForm.email} onChange={(event) => setBranchForm((current) => ({ ...current, email: event.target.value }))} /></FormField><FormField label="Teléfono"><input className="form-input" value={branchForm.phone} onChange={(event) => setBranchForm((current) => ({ ...current, phone: event.target.value }))} /></FormField></FormGrid></FormSection><FormSection title="Configuración inicial"><FormField label="Copiar comunicaciones y automatizaciones"><select className="form-input" value={branchForm.copyFromBranchId} onChange={(event) => setBranchForm((current) => ({ ...current, copyFromBranchId: event.target.value }))}><option value="">Comenzar desde cero</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>Copiar desde {branch.name}</option>)}</select></FormField></FormSection></div>
+        <EntityFormModal open={isCreateBranchOpen} title="Nueva sede" subtitle="Ingresá sus datos básicos. Después podrás configurar el staff y sus roles." submitLabel="Crear sede" validate={() => validateConditions({ branchName: !branchForm.name.trim() && 'Ingresá el nombre.', branchAddress: !branchForm.address.trim() && 'Ingresá la dirección.', branchEmail: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(branchForm.email) && 'Ingresá un email válido.', branchWeekDays: branchForm.weekDays.length === 0 && 'Elegí al menos un día de atención.', branchHours: branchForm.openingTime >= branchForm.closingTime && 'La hora de apertura debe ser anterior a la de cierre.' }, 'Revisá los datos de la sede.')} onClose={() => setIsCreateBranchOpen(false)} onSubmit={createNewBranch}>
+            <div className="form-stack"><FormSection title="Datos de la sede"><FormGrid><FormField label="Nombre"><input name="branchName" className="form-input" value={branchForm.name} onChange={(event) => setBranchForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ej. Sede Centro" /></FormField><FormField label="Dirección"><input name="branchAddress" className="form-input" value={branchForm.address} onChange={(event) => setBranchForm((current) => ({ ...current, address: event.target.value }))} /></FormField><FormField label="Email"><input name="branchEmail" className="form-input" type="email" value={branchForm.email} onChange={(event) => setBranchForm((current) => ({ ...current, email: event.target.value }))} /></FormField><FormField label="Teléfono"><input className="form-input" value={branchForm.phone} onChange={(event) => setBranchForm((current) => ({ ...current, phone: event.target.value }))} /></FormField></FormGrid></FormSection><FormSection title="Horario de atención"><FormField label="Días de atención"><WeekDaysCheckboxGroup value={branchForm.weekDays} onChange={(weekDays) => setBranchForm((current) => ({ ...current, weekDays }))} /></FormField><FormGrid><FormField label="Hora de apertura"><input name="branchHours" className="form-input" type="time" value={branchForm.openingTime} onChange={(event) => setBranchForm((current) => ({ ...current, openingTime: event.target.value }))} /></FormField><FormField label="Hora de cierre"><input className="form-input" type="time" value={branchForm.closingTime} onChange={(event) => setBranchForm((current) => ({ ...current, closingTime: event.target.value }))} /></FormField><FormField label="Zona horaria"><SearchableSelect value={branchForm.timezone} onChange={(timezone) => setBranchForm((current) => ({ ...current, timezone }))} options={[{ value: 'America/Argentina/Buenos_Aires', label: 'Argentina' }, { value: 'America/Montevideo', label: 'Uruguay' }]} /></FormField></FormGrid></FormSection><FormSection title="Configuración inicial"><FormField label="Copiar comunicaciones y automatizaciones"><SearchableSelect value={branchForm.copyFromBranchId} onChange={(copyFromBranchId) => setBranchForm((current) => ({ ...current, copyFromBranchId }))} placeholder="Comenzar desde cero" options={branches.map((branch) => ({ value: branch.id, label: `Copiar desde ${branch.name}` }))} /></FormField></FormSection></div>
         </EntityFormModal>
 
         <div className="page-header academy-settings-header">
@@ -164,13 +178,13 @@ export function AcademySettingsPage() {
         <div className="academy-tabs-wrap">
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as (typeof tabs)[number]['id'])}><TabsList variant="line" aria-label="Configuración de la academia">{tabs.map((tab) => <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>)}</TabsList></Tabs>
             <div className="academy-tab-panel">
-                {activeTab === 'resumen' && <div className="academy-overview-content"><div className="academy-overview-grid"><section className="academy-overview-card"><span className="academy-overview-icon"><Building2 size={20} /></span><small>Sedes activas</small><strong>{branches.filter((branch) => branch.status === 'Activa').length}</strong><p>de {branches.length} sedes registradas</p></section><section className="academy-overview-card"><span className="academy-overview-icon"><GraduationCap size={20} /></span><small>Alumnos</small><strong>{branches.reduce((total, branch) => total + branch.studentsCount, 0)}</strong><p>en toda la academia</p></section><section className="academy-overview-card"><span className="academy-overview-icon"><Users size={20} /></span><small>Profesores</small><strong>{new Set(branches.flatMap((branch) => branch.staffIds)).size}</strong><p>asignados a sedes</p></section><section className="academy-overview-card"><span className="academy-overview-icon"><CalendarDays size={20} /></span><small>Comisiones vigentes</small><strong>{activeCommissions.length}</strong><p>{courses.length} ofertas activas</p></section></div>
+                {activeTab === 'resumen' && <div className="academy-overview-content"><div className="academy-overview-grid"><section className="academy-overview-card"><span className="academy-overview-icon"><Building2 size={20} /></span><small>Sedes activas</small><strong>{branches.filter((branch) => branch.status === 'Activa').length}</strong><p>de {branches.length} sedes registradas</p></section><section className="academy-overview-card"><span className="academy-overview-icon"><GraduationCap size={20} /></span><small>Alumnos</small><strong>{students.length}</strong><p>en toda la academia</p></section><section className="academy-overview-card"><span className="academy-overview-icon"><Users size={20} /></span><small>Docentes</small><strong>{activeTeachers.length}</strong><p>activos en la academia</p></section><section className="academy-overview-card"><span className="academy-overview-icon"><CalendarDays size={20} /></span><small>Comisiones vigentes</small><strong>{activeCommissions.length}</strong><p>{courses.length} ofertas activas</p></section></div>
                     <div className="academy-overview-layout"><div className="data-table-card academy-branches-overview"><DataTable title="Estado de las sedes" subtitle="Resumen académico y financiero del mes por sede." onAdd={() => setIsCreateBranchOpen(true)} addLabel="Nueva sede" addButtonVariant="primary" rows={branches} getRowKey={(branch) => branch.id} onRowClick={(branch) => { setSelectedBranchId(branch.id); navigate(path(`sedes/${branch.id}`)) }} columns={[
                         { key: 'branch', header: 'Sede', accessor: (branch) => <strong>{branch.name}</strong> },
                         { key: 'status', header: 'Estado', accessor: (branch) => <StatusBadge label={branch.status} tone={branch.status === 'Activa' ? 'success' : 'neutral'} />, align: 'center' },
-                        { key: 'students', header: 'Alumnos', accessor: (branch) => branch.studentsCount, align: 'center' },
-                        { key: 'teachers', header: 'Profesores', accessor: (branch) => branch.staffIds.length, align: 'center' },
-                        { key: 'commissions', header: 'Comisiones', accessor: () => 0, align: 'center' },
+                        { key: 'students', header: 'Alumnos', accessor: (branch) => students.filter((student) => student.branchId === branch.id).length, align: 'center' },
+                        { key: 'teachers', header: 'Profesores', accessor: (branch) => <BranchTeachersCount branchId={branch.id} />, align: 'center' },
+                        { key: 'commissions', header: 'Comisiones', accessor: (branch) => branchCommissionsCount(branch.id), align: 'center' },
                         { key: 'income', header: 'Ingresos', accessor: () => <strong>{currency.format(branchIncome())}</strong>, align: 'right' },
                         { key: 'expenses', header: 'Egresos', accessor: (branch) => currency.format(branchExpenses(branch.id)), align: 'right' },
                         { key: 'balance', header: 'Balance', accessor: (branch) => <strong className={branchIncome() - branchExpenses(branch.id) < 0 ? 'academy-balance-negative' : 'academy-balance-positive'}>{currency.format(branchIncome() - branchExpenses(branch.id))}</strong>, align: 'right' },
@@ -185,15 +199,10 @@ export function AcademySettingsPage() {
                     <div className="academy-section-heading"><FileCheck2 size={20} /><div><h2>Información general</h2><p>Datos institucionales visibles en la plataforma y documentos.</p></div></div>
                     <div className="form-grid academy-settings-grid">
                         <Field label="Nombre comercial" required><input className="form-input" value={settings.general.commercialName} onChange={(event) => update('general', { commercialName: event.target.value })} /></Field>
-                        <Field label="Razón social"><input className="form-input" value={settings.general.legalName} onChange={(event) => update('general', { legalName: event.target.value })} /></Field>
-                        <Field label="CUIT"><input className="form-input" value={settings.general.taxId} onChange={(event) => update('general', { taxId: event.target.value })} /></Field>
-                        <Field label="Estado"><select className="form-input" value={settings.general.status} onChange={(event) => update('general', { status: event.target.value as 'Activa' | 'Inactiva' })}><option>Activa</option><option>Inactiva</option></select></Field>
+                        <Field label="Estado"><SearchableSelect value={settings.general.status} onChange={(status) => update('general', { status: status as 'Activa' | 'Inactiva' })} options={[{ value: 'Activa', label: 'Activa' }, { value: 'Inactiva', label: 'Inactiva' }]} /></Field>
                         <Field label="Email institucional" required><input className="form-input" type="email" value={settings.general.email} onChange={(event) => update('general', { email: event.target.value })} /></Field>
                         <Field label="Teléfono"><input className="form-input" type="tel" value={settings.general.phone} onChange={(event) => update('general', { phone: event.target.value })} /></Field>
-                        <Field label="Sitio web"><input className="form-input" type="url" value={settings.general.website} onChange={(event) => update('general', { website: event.target.value })} /></Field>
                         <Field label="Dirección principal"><input className="form-input" value={settings.general.address} onChange={(event) => update('general', { address: event.target.value })} /></Field>
-                        <Field label="Zona horaria"><select className="form-input" value={settings.general.timezone} onChange={(event) => update('general', { timezone: event.target.value })}><option value="America/Argentina/Cordoba">Argentina · Córdoba</option><option value="America/Argentina/Buenos_Aires">Argentina · Buenos Aires</option><option value="America/Montevideo">Uruguay · Montevideo</option></select></Field>
-                        <Field label="Moneda"><select className="form-input" value={settings.general.currency} onChange={(event) => update('general', { currency: event.target.value })}><option value="ARS">Peso argentino (ARS)</option><option value="USD">Dólar estadounidense (USD)</option><option value="UYU">Peso uruguayo (UYU)</option></select></Field>
                     </div>
                 </section>}
                 {activeTab === 'general' && <div className="academy-brand-layout">
@@ -227,7 +236,7 @@ export function AcademySettingsPage() {
                 {activeTab === 'inscripciones' && <section className="academy-settings-card">
                     <div className="academy-section-heading"><Check size={20} /><div><h2>Configuración de inscripciones</h2><p>Reglas aplicadas al crear nuevas aperturas de inscripción.</p></div></div>
                     <div className="form-grid academy-settings-grid">
-                        <Field label="Confirmación"><select className="form-input" value={settings.enrollments.confirmationMode} onChange={(event) => update('enrollments', { confirmationMode: event.target.value as 'Automática' | 'Manual' })}><option>Manual</option><option>Automática</option></select></Field>
+                        <Field label="Confirmación"><SearchableSelect value={settings.enrollments.confirmationMode} onChange={(confirmationMode) => update('enrollments', { confirmationMode: confirmationMode as 'Automática' | 'Manual' })} options={[{ value: 'Manual', label: 'Manual' }, { value: 'Automática', label: 'Automática' }]} /></Field>
                         <Field label="Cupo predeterminado" hint="Se usa al crear una comisión nueva"><input className="form-input" type="number" min={1} value={settings.enrollments.defaultCapacity} onChange={(event) => update('enrollments', { defaultCapacity: Number(event.target.value) })} /></Field>
                     </div>
                     <div className="academy-options-section"><ToggleOption label="Requerir pago para confirmar" description="El formulario público de inscripción incluye el paso de pago; si está desactivado, se lo salteamos." checked={settings.enrollments.requirePayment} onChange={(checked) => update('enrollments', { requirePayment: checked })} /></div>

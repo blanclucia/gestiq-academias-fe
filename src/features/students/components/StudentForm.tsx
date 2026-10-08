@@ -1,4 +1,5 @@
 import { FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 
 export type StudentFormValue = {
     firstName: string
@@ -66,11 +67,7 @@ export function StudentForm({ initialValues, value, onChange }: {
             <FormSection title="Estado y observaciones" description="Información base de seguimiento del estudiante.">
                 <FormGrid>
                     <FormField label="Estado inicial">
-                        <select className="form-input" value={form.status} onChange={(event) => update('status', event.target.value as StudentFormValue['status'])}>
-                            <option value="Activo">Activo</option>
-                            <option value="Pendiente">Pendiente</option>
-                            <option value="Inactivo">Inactivo</option>
-                        </select>
+                        <SearchableSelect value={form.status} onChange={(status) => update('status', status as StudentFormValue['status'])} options={[{ value: 'Activo', label: 'Activo' }, { value: 'Pendiente', label: 'Pendiente' }, { value: 'Inactivo', label: 'Inactivo' }]} />
                     </FormField>
                 </FormGrid>
 

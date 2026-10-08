@@ -1134,7 +1134,7 @@ html.dark .donut-chart {
     align-items: stretch;
   }
 
-  .cycle-context-compact select {
+  .cycle-context-compact .student-picker {
     flex: 1 1 auto;
     width: auto;
   }
@@ -1176,7 +1176,7 @@ html.dark .donut-chart {
     align-items: stretch;
   }
 
-  .cycle-context-compact select {
+  .cycle-context-compact .student-picker {
     flex: 1 1 auto;
     width: auto;
   }

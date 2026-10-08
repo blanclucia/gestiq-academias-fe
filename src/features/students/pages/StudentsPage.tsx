@@ -5,8 +5,9 @@ import { CrudListPage } from '@/components/crud/CrudListPage'
 import { DeleteConfirmationModal, EntityFormModal, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
 import { StudentForm, type StudentFormValue } from '../components/StudentForm'
 import { CommissionAssignmentModal } from '@/features/commissions'
-import { assignStudentsToCommission, getActiveAcademicCycleId, listCourses, useAcademyRepositoryVersion, useCreateStudent, useDeleteStudent, useStudents, useUpdateStudent } from '@/services/academyRepository'
+import { getActiveAcademicCycleId, listCourses, useAcademyRepositoryVersion, useAssignEnrollment, useCreateStudent, useDeleteStudent, useGenerateTuition, useStudents, useUpdateStudent } from '@/services/academyRepository'
 import { isStudentDocumentConflict } from '@/services/organization/studentsApi'
+import { describeEnrollmentFailure } from '@/services/organization/academicOffersApi'
 import { useCrudList } from '@/hooks/useCrudList'
 import type { Student } from '@/types/domain'
 import { useSelectedBranchId } from '@/services/branchRepository'
@@ -14,13 +15,13 @@ import { listCommunicationTemplates } from '@/services/communicationTemplateRepo
 import { csvHeaders, importFieldLabels, parseStudentCsv, requiredImportFields, suggestStudentImportMapping as suggestMapping, type ImportFieldKey, type ImportStudentRow } from '../model/studentImport'
 import { validateStudent } from '../model/studentValidation'
 import { validateConditions } from '@/components/forms/formValidation'
+import { splitFilterValue } from '@/components/crud/filterValues'
 import { StudentsTable } from '../components/StudentsTable'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { useToast } from '@/components/ui/ToastContext'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
 type StudentFilters = {
-    course: string
-    commission: string
     status: string
 }
 
@@ -48,8 +49,10 @@ export function StudentsPage() {
     const createStudent = useCreateStudent()
     const updateStudent = useUpdateStudent()
     const deleteStudent = useDeleteStudent()
+    const assignEnrollment = useAssignEnrollment()
+    const generateTuition = useGenerateTuition()
     const { showToast } = useToast()
-    const academicCourses = listCourses().filter((course) => course.cycleId === getActiveAcademicCycleId())
+    const academicCourses = listCourses().filter((course) => course.cycleId === getActiveAcademicCycleId() && course.branchId === selectedBranchId)
     const [studentForm, setStudentForm] = useState<StudentFormValue>(emptyStudentForm)
     const [statusChangeRequest, setStatusChangeRequest] = useState<StatusChangeRequest | null>(null)
     const [isBulkDeactivateOpen, setIsBulkDeactivateOpen] = useState(false)
@@ -74,11 +77,7 @@ export function StudentsPage() {
     const [createError, setCreateError] = useState('')
     const [rowCourseAssignments, setRowCourseAssignments] = useState<Record<number, string>>({})
     const [globalCourseAssignment, setGlobalCourseAssignment] = useState('')
-    const [appliedFilters, setAppliedFilters] = useState<StudentFilters>({
-        course: '',
-        commission: '',
-        status: '',
-    })
+    const [appliedFilters, setAppliedFilters] = useState<StudentFilters>({ status: '' })
 
     const importCourseOptions = useMemo(() => {
         const options = academicCourses.flatMap((course) =>
@@ -86,9 +85,8 @@ export function StudentsPage() {
                 key: `${course.name}|${commission.name}`,
                 label: `${course.name} · ${commission.name}`,
                 value: {
-                    name: course.name,
-                    group: commission.name,
-                    modality: 'Grupo' as const,
+                    courseId: course.id,
+                    commissionId: commission.id,
                 },
             })),
         )
@@ -101,27 +99,6 @@ export function StudentsPage() {
         [importCourseOptions],
     )
 
-    const courseToCommissions = useMemo(() => {
-        const map = new Map<string, string[]>()
-
-        studentList.forEach((student) => {
-            student.courses.forEach((course) => {
-                const current = map.get(course.name) ?? []
-
-                if (!current.includes(course.group)) {
-                    map.set(course.name, [...current, course.group])
-                }
-            })
-        })
-
-        return map
-    }, [studentList])
-
-    const courseFilterOptions = useMemo(
-        () => Array.from(new Set(studentList.flatMap((student) => student.courses.map((course) => course.name)))),
-        [studentList],
-    )
-
     const statusFilterOptions = useMemo(
         () => Array.from(new Set(studentList.map((student) => student.status))),
         [studentList],
@@ -131,6 +108,7 @@ export function StudentsPage() {
         () => academicCourses.flatMap((course) =>
             course.commissions.map((commission) => ({
                 id: commission.id,
+                courseId: course.id,
                 courseName: course.name,
                 commissionName: commission.name,
                 studentsCount: commission.studentsCount,
@@ -144,22 +122,10 @@ export function StudentsPage() {
     )
 
     const filteredStudentList = useMemo(
-        () =>
-            studentList.filter((student) => {
-                if (appliedFilters.status && student.status !== appliedFilters.status) {
-                    return false
-                }
-
-                if (appliedFilters.course && !student.courses.some((course) => course.name === appliedFilters.course)) {
-                    return false
-                }
-
-                if (appliedFilters.commission && !student.courses.some((course) => course.group === appliedFilters.commission)) {
-                    return false
-                }
-
-                return true
-            }),
+        () => {
+            const statuses = splitFilterValue(appliedFilters.status)
+            return studentList.filter((student) => statuses.length === 0 || statuses.includes(student.status))
+        },
         [studentList, appliedFilters],
     )
 
@@ -180,7 +146,6 @@ export function StudentsPage() {
         pageSize: 10,
         searchFields: [
             (student) => `${student.fullName} ${student.email}`,
-            (student) => student.courses.map((course) => `${course.name} ${course.group}`),
         ],
     })
 
@@ -285,6 +250,8 @@ export function StudentsPage() {
 
         let created = 0
         let failed = 0
+        let assignmentFailed = 0
+        let assignmentFailureReason: string | undefined
         for (const row of validImportRows) {
             const selectedCourseKey = Object.prototype.hasOwnProperty.call(rowCourseAssignments, row.rowNumber)
                 ? rowCourseAssignments[row.rowNumber]
@@ -296,12 +263,23 @@ export function StudentsPage() {
                     email: row.email || '', phone: row.phone || '', birthDate: row.birthDate, status: 'Pendiente',
                 })
                 created += 1
-                if (selectedCourse) assignStudentsToCommission([student.id], selectedCourse.name, selectedCourse.group, 0, undefined, 'Activo')
+                if (selectedCourse) {
+                    try {
+                        await assignEnrollment.mutateAsync({ courseId: selectedCourse.courseId, commissionId: selectedCourse.commissionId, studentId: student.id })
+                        await generateTuition.mutateAsync({ studentId: student.id, commissionId: selectedCourse.commissionId })
+                    } catch (error) {
+                        assignmentFailed += 1
+                        assignmentFailureReason ??= describeEnrollmentFailure(error)
+                    }
+                }
             } catch {
                 failed += 1
             }
         }
-        showToast(failed === 0 ? 'success' : 'error', failed === 0 ? `Se importaron ${created} alumnos.` : `Se importaron ${created} alumnos. ${failed} filas fallaron (documento duplicado u otro error).`)
+        const messageParts = [`Se importaron ${created} alumnos.`]
+        if (failed > 0) messageParts.push(`${failed} filas fallaron (documento duplicado u otro error).`)
+        if (assignmentFailed > 0) messageParts.push(assignmentFailureReason ?? `${assignmentFailed} no se pudieron asignar a su comisión.`)
+        showToast(failed === 0 && assignmentFailed === 0 ? 'success' : 'error', messageParts.join(' '))
         setIsImportModalOpen(false)
         setImportHeaders([])
         setImportRawRows([])
@@ -322,8 +300,22 @@ export function StudentsPage() {
                     setIsAssignmentModalOpen(false)
                     setAssignmentStudentIds([])
                 }}
-                onConfirm={({ commission, studentIds }) => {
-                    assignStudentsToCommission(studentIds, commission.courseName, commission.commissionName, commission.amount, commission.id, 'Activo')
+                onConfirm={async ({ commission, studentIds }) => {
+                    let failed = 0
+                    let failureReason: string | undefined
+                    for (const studentId of studentIds) {
+                        try {
+                            await assignEnrollment.mutateAsync({ courseId: commission.courseId, commissionId: commission.id, studentId })
+                            await generateTuition.mutateAsync({ studentId, commissionId: commission.id })
+                        } catch (error) {
+                            failed += 1
+                            failureReason ??= describeEnrollmentFailure(error)
+                        }
+                    }
+                    const message = failed === 0
+                        ? 'Alumnos asignados correctamente.'
+                        : failureReason ?? `No se pudo asignar a ${failed} alumno${failed === 1 ? '' : 's'}.`
+                    showToast(failed === 0 ? 'success' : 'error', message)
                     setIsAssignmentModalOpen(false)
                     setAssignmentStudentIds([])
                 }}
@@ -391,23 +383,17 @@ export function StudentsPage() {
                                 {(Object.keys(importFieldLabels) as ImportFieldKey[]).map((field) => (
                                     <label key={field} className="form-field">
                                         <span className="form-field-label">{importFieldLabels[field]}</span>
-                                        <select
-                                            className="form-input"
+                                        <SearchableSelect
                                             value={importMapping[field]}
-                                            onChange={(event) =>
+                                            onChange={(header) =>
                                                 setImportMapping((current) => ({
                                                     ...current,
-                                                    [field]: event.target.value,
+                                                    [field]: header,
                                                 }))
                                             }
-                                        >
-                                            <option value="">No mapear</option>
-                                            {importHeaders.map((header) => (
-                                                <option key={`${field}-${header}`} value={header}>
-                                                    {header}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            placeholder="No mapear"
+                                            options={importHeaders.map((header) => ({ value: header, label: header }))}
+                                        />
                                     </label>
                                 ))}
                             </div>
@@ -424,11 +410,9 @@ export function StudentsPage() {
                         <>
                             <div className="import-course-picker" style={{ marginBottom: 8 }}>
                                 <span>Asignar mismo curso a todos</span>
-                                <select
-                                    className="form-input"
+                                <SearchableSelect
                                     value={globalCourseAssignment}
-                                    onChange={(event) => {
-                                        const value = event.target.value
+                                    onChange={(value) => {
                                         setGlobalCourseAssignment(value)
 
                                         if (!value) {
@@ -439,14 +423,9 @@ export function StudentsPage() {
                                         const assignmentEntries = importRows.map((row) => [row.rowNumber, value] as const)
                                         setRowCourseAssignments(Object.fromEntries(assignmentEntries))
                                     }}
-                                >
-                                    <option value="">Sin asignar</option>
-                                    {importCourseOptions.map((option) => (
-                                        <option key={`global-${option.key}`} value={option.key}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    placeholder="Sin asignar"
+                                    options={importCourseOptions.map((option) => ({ value: option.key, label: option.label }))}
+                                />
                             </div>
 
                             <div className="import-stats">
@@ -462,10 +441,7 @@ export function StudentsPage() {
                                         <tr key={`${row.rowNumber}-${row.document}`}>
                                             <td>{row.rowNumber}</td>
                                             <td><strong>{[row.firstName, row.lastName].filter(Boolean).join(' ') || 'Sin nombre'}</strong><small>{row.email || 'Sin email'}</small></td>
-                                            <td><select className="form-input" value={rowCourseAssignments[row.rowNumber] ?? ''} onChange={(event) => setRowCourseAssignments((current) => ({ ...current, [row.rowNumber]: event.target.value }))}>
-                                                <option value="">Sin asignar</option>
-                                                {importCourseOptions.map((option) => <option key={`${row.rowNumber}-${option.key}`} value={option.key}>{option.label}</option>)}
-                                            </select></td>
+                                            <td><SearchableSelect value={rowCourseAssignments[row.rowNumber] ?? ''} onChange={(value) => setRowCourseAssignments((current) => ({ ...current, [row.rowNumber]: value }))} placeholder="Sin asignar" options={importCourseOptions.map((option) => ({ value: option.key, label: option.label }))} /></td>
                                             <td>{row.errors.length > 0 ? <span className="import-row-errors">{row.errors.join(' | ')}</span> : <span className="import-row-ok">Listo</span>}</td>
                                         </tr>
                                     ))}</tbody>
@@ -621,7 +597,7 @@ export function StudentsPage() {
                 }}
             >
                 {communicationSent && <div className="bulk-communication-success"><Send size={28} /><strong>Mensaje listo</strong><p>En esta versión de demostración no se contactará realmente a los alumnos.</p></div>}
-                {!communicationSent && <FormSection title="Contenido"><label className="form-field"><span className="form-field-label">Usar una comunicación configurada</span><select className="form-input" value={selectedCommunicationTemplateId} onChange={(event) => { const templateId = event.target.value; setCommunicationTemplateId(templateId); if (templateId === 'custom') { setCommunicationForm((current) => ({ ...current, subject: '', message: '' })); return } const template = communicationTemplates.find((item) => item.id === templateId); if (template) setCommunicationForm((current) => ({ ...current, subject: template.subject, message: template.message })) }}><option value="custom">Escribir un mensaje en el momento</option>{communicationTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label>{communicationTemplates.length === 0 && <p className="bulk-template-note">No hay comunicaciones activas para {communicationForm.channel} en esta sede.</p>}</FormSection>}
+                {!communicationSent && <FormSection title="Contenido"><label className="form-field"><span className="form-field-label">Usar una comunicación configurada</span><SearchableSelect value={selectedCommunicationTemplateId} onChange={(templateId) => { setCommunicationTemplateId(templateId); if (templateId === 'custom') { setCommunicationForm((current) => ({ ...current, subject: '', message: '' })); return } const template = communicationTemplates.find((item) => item.id === templateId); if (template) setCommunicationForm((current) => ({ ...current, subject: template.subject, message: template.message })) }} options={[{ value: 'custom', label: 'Escribir un mensaje en el momento' }, ...communicationTemplates.map((template) => ({ value: template.id, label: template.name }))]} /></label>{communicationTemplates.length === 0 && <p className="bulk-template-note">No hay comunicaciones activas para {communicationForm.channel} en esta sede.</p>}</FormSection>}
                 {communicationSent ? <div /> : communicationSent ? <div className="bulk-communication-success"><Send size={28} /><strong>Mensaje listo</strong><p>En esta versión de demostración no se contactará realmente a los alumnos.</p></div> : <div className="form-stack"><FormSection title="Canal y destinatarios"><div className="bulk-channel-options"><button type="button" className={communicationForm.channel === 'Email' ? 'selected' : ''} onClick={() => setCommunicationForm((current) => ({ ...current, channel: 'Email' }))}><Mail size={18} /> Email</button><button type="button" className={communicationForm.channel === 'WhatsApp' ? 'selected' : ''} onClick={() => setCommunicationForm((current) => ({ ...current, channel: 'WhatsApp' }))}><MessageCircle size={18} /> WhatsApp</button></div><div className="bulk-recipient-summary"><strong>{communicationRecipients.length} destinatarios disponibles</strong>{communicationRecipients.length < selectedStudents.length && <span>{selectedStudents.length - communicationRecipients.length} sin {communicationForm.channel === 'Email' ? 'email' : 'teléfono'} quedarán excluidos.</span>}</div></FormSection><FormSection title="Mensaje"><FormGrid>{communicationForm.channel === 'Email' && <label className="form-field"><span className="form-field-label">Asunto</span><input className="form-input" value={communicationForm.subject} onChange={(event) => setCommunicationForm((current) => ({ ...current, subject: event.target.value }))} placeholder="Asunto de la comunicación" /></label>}<label className="form-field academy-field-full"><span className="form-field-label">Mensaje</span><textarea className="form-input" rows={6} value={communicationForm.message} onChange={(event) => setCommunicationForm((current) => ({ ...current, message: event.target.value }))} placeholder="Escribí el mensaje para los alumnos seleccionados" /></label></FormGrid></FormSection></div>}
             </EntityFormModal>
 
@@ -631,32 +607,12 @@ export function StudentsPage() {
                 description="Seguimiento de estudiantes, cupos, pagos y próximas clases."
                 searchValue={search}
                 onSearchChange={setSearch}
-                searchPlaceholder="Buscar alumno, email o curso"
+                searchPlaceholder="Buscar alumno o email"
                 filterFields={[
-                    { key: 'course', label: 'Curso', options: courseFilterOptions },
-                    {
-                        key: 'commission',
-                        label: 'Comisión',
-                        options: (filters) => {
-                            if (!filters.course) {
-                                return Array.from(new Set(studentList.flatMap((student) => student.courses.map((course) => course.group))))
-                            }
-
-                            return courseToCommissions.get(filters.course) ?? []
-                        },
-                    },
                     { key: 'status', label: 'Estado', options: statusFilterOptions },
                 ]}
                 onApplyFilters={(filters) => {
-                    const course = filters.course ?? ''
-                    const commission = filters.commission ?? ''
-                    const validCommissions = course ? courseToCommissions.get(course) ?? [] : undefined
-
-                    setAppliedFilters({
-                        course,
-                        commission: validCommissions && commission && !validCommissions.includes(commission) ? '' : commission,
-                        status: filters.status ?? '',
-                    })
+                    setAppliedFilters({ status: filters.status ?? '' })
                 }}
                 toolbar={{
                     filters: { label: 'Filtros', variant: 'secondary' },

@@ -36,7 +36,6 @@ export function StudentsTable(props: Props) {
         columns={[
             { key: 'select', header: <input type="checkbox" checked={props.selectAllChecked} onChange={props.onToggleSelectAll} aria-label="Seleccionar todos" />, accessor: (student) => <input type="checkbox" checked={props.selectedIds.includes(student.id)} onChange={() => props.onToggleSelection(student.id)} aria-label={`Seleccionar ${student.fullName}`} />, align: 'center' },
             { key: 'student', header: 'Alumno', accessor: (student) => <EntityCell name={student.fullName} subtitle={student.document} avatar={student.fullName.charAt(0)} /> },
-            { key: 'courses', header: 'Cursos / Comisiones', accessor: (student) => <div className="student-tags-cell">{student.courses.map((course) => <div key={`${student.id}-${course.name}-${course.group}`} className="student-badge"><span className="student-badge-name">{course.name}</span><span className="student-badge-group">{course.group}</span></div>)}</div> },
             { key: 'contact', header: 'Contacto', accessor: (student) => <MetaCell primary={student.email} secondary={student.phone} /> },
             { key: 'status', header: 'Estado', accessor: (student) => <StatusBadge label={student.status} tone={statusToneMap[student.status]} />, align: 'center' },
         ]}

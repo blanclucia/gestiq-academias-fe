@@ -8,6 +8,10 @@ export type RowActionItem = {
     variant?: 'default' | 'danger'
     tone?: 'default' | 'danger'
     disabled?: boolean
+    // Shown as a native tooltip on the disabled item — mirrors the disabled+title pattern already
+    // used for primary action buttons (e.g. "Asignar alumnos", "Lanzar apertura"), so menu items
+    // disabled by a business rule can explain why instead of just not responding to clicks.
+    disabledReason?: string
 }
 
 type RowActionMenuProps = {
@@ -73,7 +77,7 @@ export function RowActionMenu({ ariaLabel = 'Acciones', active, open, actions, o
 
             {isActive && (
                 <TableActionMenu>
-                    {actions.map(({ label, icon, onClick, variant, tone, disabled = false }) => (
+                    {actions.map(({ label, icon, onClick, variant, tone, disabled = false, disabledReason }) => (
                         <button
                             key={label}
                             type="button"
@@ -83,6 +87,7 @@ export function RowActionMenu({ ariaLabel = 'Acciones', active, open, actions, o
                                 onToggle()
                             }}
                             disabled={disabled}
+                            title={disabled ? disabledReason : undefined}
                         >
                             {icon}
                             {label}

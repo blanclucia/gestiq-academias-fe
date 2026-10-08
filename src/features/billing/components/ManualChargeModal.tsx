@@ -16,18 +16,18 @@ export type ManualChargeValue = {
 }
 
 const categories = ['Examen', 'Material', 'Certificado', 'Matrícula', 'Recuperatorio', 'Otro']
-const paymentMethods: Payment['method'][] = ['Transferencia', 'Tarjeta', 'Efectivo']
 
 type ManualChargeModalProps = {
     open: boolean
     value: ManualChargeValue
     students: Pick<Student, 'id' | 'fullName' | 'document'>[]
+    paymentMethods: Payment['method'][]
     onChange: (value: ManualChargeValue) => void
     onClose: () => void
     onSubmit: () => void
 }
 
-export function ManualChargeModal({ open, value, students, onChange, onClose, onSubmit }: ManualChargeModalProps) {
+export function ManualChargeModal({ open, value, students, paymentMethods, onChange, onClose, onSubmit }: ManualChargeModalProps) {
     const update = (changes: Partial<ManualChargeValue>) => onChange({ ...value, ...changes })
 
     return (
@@ -44,9 +44,7 @@ export function ManualChargeModal({ open, value, students, onChange, onClose, on
                 <FormSection title="Concepto del cobro">
                     <FormGrid>
                         <FormField label="Categoría" required>
-                            <select name="category" className="form-input" value={value.category} onChange={(event) => update({ category: event.target.value })}>
-                                {categories.map((category) => <option key={category} value={category}>{category}</option>)}
-                            </select>
+                            <SearchableSelect name="category" value={value.category} onChange={(category) => update({ category })} options={categories.map((category) => ({ value: category, label: category }))} />
                         </FormField>
                         <FormField label={value.category === 'Otro' ? 'Concepto' : 'Detalle (opcional)'} required={value.category === 'Otro'}>
                             <input name="detail" className="form-input" value={value.detail} onChange={(event) => update({ detail: event.target.value })} placeholder="Ej: Examen internacional B2" />
@@ -55,24 +53,21 @@ export function ManualChargeModal({ open, value, students, onChange, onClose, on
                             <input name="amount" className="form-input" type="number" min={1} step={1000} value={value.amount} onChange={(event) => update({ amount: event.target.value })} />
                         </FormField>
                         <FormField label="Alumno" required>
-                            <SearchableSelect value={value.studentId} options={students.map((student) => ({ value: student.id, label: `${student.fullName} · ${student.document}` }))} onChange={(studentId) => update({ studentId })} placeholder="Buscar alumno" emptyLabel="No encontramos alumnos." />
+                            <SearchableSelect name="studentId" value={value.studentId} options={students.map((student) => ({ value: student.id, label: `${student.fullName} · ${student.document}` }))} onChange={(studentId) => update({ studentId })} placeholder="Buscar alumno" emptyLabel="No encontramos alumnos." />
                         </FormField>
                     </FormGrid>
                 </FormSection>
                 <FormSection title="Estado y fecha">
                     <FormGrid>
                         <FormField label="Estado">
-                            <select className="form-input" value={value.status} onChange={(event) => update({ status: event.target.value as ManualChargeValue['status'] })}>
-                                <option value="Pendiente">Pendiente</option>
-                                <option value="Pagado">Pagado</option>
-                            </select>
+                            <SearchableSelect value={value.status} onChange={(status) => update({ status: status as ManualChargeValue['status'] })} options={[{ value: 'Pendiente', label: 'Pendiente' }, { value: 'Pagado', label: 'Pagado' }]} />
                         </FormField>
                         {value.status === 'Pendiente' ? (
                             <FormField label="Vencimiento" required><input name="dueDate" className="form-input" type="date" value={value.dueDate} onChange={(event) => update({ dueDate: event.target.value })} /></FormField>
                         ) : (
                             <>
                                 <FormField label="Fecha de pago" required><input name="date" className="form-input" type="date" value={value.date} onChange={(event) => update({ date: event.target.value })} /></FormField>
-                                <FormField label="Medio de pago" required><select className="form-input" value={value.method} onChange={(event) => update({ method: event.target.value as Payment['method'] })}>{paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}</select></FormField>
+                                <FormField label="Medio de pago" required><SearchableSelect value={value.method} onChange={(method) => update({ method: method as Payment['method'] })} options={paymentMethods.map((method) => ({ value: method, label: method }))} /></FormField>
                             </>
                         )}
                         <FormField label="Nota interna (opcional)"><input className="form-input" value={value.notes} onChange={(event) => update({ notes: event.target.value })} /></FormField>

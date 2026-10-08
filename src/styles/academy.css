@@ -260,10 +260,10 @@
   flex-wrap: wrap;
 }
 
-.cycle-context-compact select {
+.cycle-context-compact .form-input {
   min-width: 190px;
   min-height: 36px;
-  padding: 0 32px 0 10px;
+  padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--panel);
@@ -737,6 +737,10 @@
   border: 1px solid var(--border);
   border-radius: 18px;
   background: var(--panel);
+}
+
+.academy-settings-card + .academy-settings-card {
+  margin-top: 14px;
 }
 
 .academy-section-heading {
@@ -1273,6 +1277,11 @@
   position: relative;
 }
 
+.student-picker.disabled .form-input {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .student-picker-options {
   position: absolute;
   z-index: 30;
@@ -1285,7 +1294,10 @@
   padding: 5px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--panel);
+  /* A floating overlay needs an opaque surface (same convention as .entity-modal) — the card
+     background (--panel) is intentionally translucent and let whatever sat beneath it (the next
+     field's label) show through. */
+  background: var(--panel-strong);
   box-shadow: 0 12px 28px rgba(15, 23, 42, .14);
 }
 
@@ -1301,9 +1313,22 @@
 }
 
 .student-picker-options button:hover,
-.student-picker-options button.highlighted,
-.student-picker-options button[aria-selected='true'] {
+.student-picker-options button.highlighted {
   background: var(--primary-soft);
+  color: var(--primary);
+}
+
+/* A selected value gets its own quieter marker (bold + check) instead of the same background as
+   hover/keyboard-highlight — sharing that style made it look like two options were selected at once
+   whenever the mouse happened to be over a different row than the active one. Used for both the
+   single current value (SearchableSelect) and any number of picks (MultiSearchableSelect). */
+.student-picker-options button[aria-selected='true'] {
+  font-weight: 700;
+}
+
+.student-picker-options button[aria-selected='true']::after {
+  content: '✓';
+  float: right;
   color: var(--primary);
 }
 

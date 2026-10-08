@@ -44,29 +44,24 @@ export function PrivateLessonForm({ value, onChange, studentOptions, teacherOpti
             <FormSection title="Alumno y asignación">
                 <FormGrid>
                     <FormField label="Alumno" required>
-                        <SearchableSelect value={value.studentId} options={studentOptions.map((option) => ({ value: option.id, label: option.label }))} onChange={(studentId) => onChange((current) => ({ ...current, studentId }))} placeholder="Buscar por nombre o documento" emptyLabel="No encontramos alumnos." />
+                        <SearchableSelect name="privateStudent" value={value.studentId} options={studentOptions.map((option) => ({ value: option.id, label: option.label }))} onChange={(studentId) => onChange((current) => ({ ...current, studentId }))} placeholder="Buscar por nombre o documento" emptyLabel="No encontramos alumnos." />
                     </FormField>
 
                     <FormField label="Docente" required>
-                        <SearchableSelect value={value.teacherId} options={teacherOptions.map((option) => ({ value: option.id, label: option.fullName }))} onChange={(teacherId) => onChange((current) => ({ ...current, teacherId }))} placeholder="Buscar docente" emptyLabel="No encontramos docentes." />
+                        <SearchableSelect name="privateTeacher" value={value.teacherId} options={teacherOptions.map((option) => ({ value: option.id, label: option.fullName }))} onChange={(teacherId) => onChange((current) => ({ ...current, teacherId }))} placeholder="Buscar docente" emptyLabel="No encontramos docentes." />
                     </FormField>
 
                     <FormField label="Plan" required>
-                        <select
-                            className="form-input"
+                        <SearchableSelect
                             value={value.plan}
-                            onChange={(event) => onChange((current) => ({ ...current, plan: event.target.value }))}
-                        >
-                            {planOptions.map((plan) => (
-                                <option key={plan} value={plan}>
-                                    {plan}
-                                </option>
-                            ))}
-                        </select>
+                            options={planOptions.map((plan) => ({ value: plan, label: plan }))}
+                            onChange={(plan) => onChange((current) => ({ ...current, plan }))}
+                        />
                     </FormField>
 
                     <FormField label={costLabel} required>
                         <input
+                            name="privateCost"
                             className="form-input"
                             type="number"
                             min="0"
@@ -77,7 +72,7 @@ export function PrivateLessonForm({ value, onChange, studentOptions, teacherOpti
                     </FormField>
 
                     <FormField label="Particular para" hint="Ej: preparación de examen, apoyo escolar o conversación" full>
-                        <textarea className="form-textarea private-lesson-purpose" value={value.purpose} onChange={(event) => onChange((current) => ({ ...current, purpose: event.target.value }))} placeholder="Ej: Preparación de examen final de Historia" rows={2} />
+                        <textarea name="privatePurpose" className="form-textarea private-lesson-purpose" value={value.purpose} onChange={(event) => onChange((current) => ({ ...current, purpose: event.target.value }))} placeholder="Ej: Preparación de examen final de Historia" rows={2} />
                     </FormField>
                 </FormGrid>
             </FormSection>
@@ -85,19 +80,20 @@ export function PrivateLessonForm({ value, onChange, studentOptions, teacherOpti
             <FormSection title="Agenda y saldo">
                 <FormGrid>
                     <FormField label="Fecha de inicio" required>
-                        <input className="form-input" type="date" value={value.startDate} onChange={(event) => onChange((current) => ({ ...current, startDate: event.target.value }))} />
+                        <input name="privateStart" className="form-input" type="date" value={value.startDate} onChange={(event) => onChange((current) => ({ ...current, startDate: event.target.value }))} />
                     </FormField>
 
                     <FormField label="Fecha de fin" required>
-                        <input className="form-input" type="date" min={value.startDate} value={value.endDate} onChange={(event) => onChange((current) => ({ ...current, endDate: event.target.value }))} />
+                        <input name="privateEnd" className="form-input" type="date" min={value.startDate} value={value.endDate} onChange={(event) => onChange((current) => ({ ...current, endDate: event.target.value }))} />
                     </FormField>
 
                     <FormField label="Día" required>
-                        <WeekDaysCheckboxGroup value={value.days} onChange={(days) => onChange((current) => ({ ...current, days }))} days={dayOptions} />
+                        <WeekDaysCheckboxGroup name="privateDays" value={value.days} onChange={(days) => onChange((current) => ({ ...current, days }))} days={dayOptions} />
                     </FormField>
 
                     <FormField label="Horario" required>
                         <TimeRangeField
+                            fromName="privateTime"
                             fromTime={value.fromTime}
                             toTime={value.toTime}
                             onFromTimeChange={(fromTime) => onChange((current) => ({ ...current, fromTime }))}

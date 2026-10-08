@@ -1,4 +1,5 @@
 import { EntityFormModal, FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { getPaymentDisplayDate } from '@/domain/billing/paymentRules'
 import type { Payment } from '@/types/domain'
 import { validatePaymentAdjustment } from '../model/billingValidation'
@@ -51,26 +52,23 @@ export function PaymentAdjustmentModal({ target, value, adjustedAmount, lateFeeP
                 <FormSection title="Tipo de ajuste" description="El importe original se conserva y el ajuste impacta sólo en el monto final a cobrar.">
                     <FormGrid>
                         <FormField label="Acción">
-                            <select
-                                className="form-input"
+                            <SearchableSelect
                                 value={value.type}
-                                onChange={(event) => {
-                                    const type = event.target.value as PaymentAdjustmentType
+                                onChange={(typeValue) => {
+                                    const type = typeValue as PaymentAdjustmentType
                                     update({ type, value: type === 'Recargo por mora' && !value.value ? String(lateFeePercent) : value.value })
                                 }}
-                            >
-                                <option value="Bonificacion total">Bonificar 100%</option>
-                                <option value="Promocion">Aplicar promoción</option>
-                                <option value="Recargo por mora">Aplicar recargo por mora</option>
-                                <option value="Importe manual">Definir importe manual</option>
-                            </select>
+                                options={[
+                                    { value: 'Bonificacion total', label: 'Bonificar 100%' },
+                                    { value: 'Promocion', label: 'Aplicar promoción' },
+                                    { value: 'Recargo por mora', label: 'Aplicar recargo por mora' },
+                                    { value: 'Importe manual', label: 'Definir importe manual' },
+                                ]}
+                            />
                         </FormField>
                         {value.type === 'Promocion' && (
                             <FormField label="Tipo de promoción">
-                                <select className="form-input" value={value.mode} onChange={(event) => update({ mode: event.target.value as PaymentAdjustmentMode })}>
-                                    <option value="percentage">Porcentaje</option>
-                                    <option value="fixed">Monto fijo</option>
-                                </select>
+                                <SearchableSelect value={value.mode} onChange={(mode) => update({ mode: mode as PaymentAdjustmentMode })} options={[{ value: 'percentage', label: 'Porcentaje' }, { value: 'fixed', label: 'Monto fijo' }]} />
                             </FormField>
                         )}
                         {value.type !== 'Bonificacion total' && (
