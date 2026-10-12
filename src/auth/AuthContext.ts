@@ -4,7 +4,7 @@ import type { Session } from './api/contracts'
 
 export type AuthContextValue = {
     client: AuthClient
-    phase: 'anonymous' | 'password-change' | 'signed-in'
+    phase: 'bootstrapping' | 'anonymous' | 'password-change' | 'signed-in'
     session: Session | null
     loading: boolean
     error: unknown

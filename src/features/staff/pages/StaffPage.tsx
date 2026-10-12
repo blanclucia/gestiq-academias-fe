@@ -10,6 +10,7 @@ import { StatusBadge, type StatusBadgeTone } from '@/components/ui/StatusBadge'
 import type { Teacher } from '@/data/teachers'
 import { listStaff, useAcademyRepositoryVersion, useCreateStaffMember, useDeleteStaffMember, useUpdateStaffMember } from '@/services/academyRepository'
 import { isMemberConflict } from '@/services/organization/membersApi'
+import { isStaffDniConflict } from '@/services/organization/staffApi'
 import { validateConditions } from '@/components/forms/formValidation'
 import { splitFilterValue } from '@/components/crud/filterValues'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
@@ -140,7 +141,7 @@ export function StaffPage({
                             setNewIsAdministrator(false)
                             setCreateError('')
                         },
-                        onError: (error) => setCreateError(isMemberConflict(error) ? 'Ya existe un miembro con ese DNI en esta organización.' : 'No se pudo crear el integrante. Intentá nuevamente.'),
+                        onError: (error) => setCreateError(isMemberConflict(error) || isStaffDniConflict(error) ? 'Ya existe un integrante con ese DNI en esta organización.' : 'No se pudo crear el integrante. Intentá nuevamente.'),
                     })
                 }}
             >
@@ -210,7 +211,7 @@ export function StaffPage({
                             if (editingIsAdministrator !== editingInitialIsAdministrator) onToggleAdministrator?.(id, editingIsAdministrator)
                             else showToast('success', 'Cambios guardados correctamente.')
                         },
-                        onError: (error) => showToast('error', isMemberConflict(error) ? 'Ya existe un miembro con ese DNI en esta organización.' : 'No se pudieron guardar los cambios. Intentá nuevamente.'),
+                        onError: (error) => showToast('error', isMemberConflict(error) || isStaffDniConflict(error) ? 'Ya existe un integrante con ese DNI en esta organización.' : 'No se pudieron guardar los cambios. Intentá nuevamente.'),
                     })
                     setIsEditModalOpen(false)
                     setEditingTeacher(null)

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { authClient } from '@/auth/api/authClient'
+import { ApiError } from '@/services/http/client'
 
 const apiBranchSchema = z.object({
     id: z.string(),
@@ -40,6 +41,10 @@ const defaultRequest: Requester = (path, init) => authClient.authorizedRequest(p
 
 function branchesPath(organizationSlug: string, suffix = '') {
     return `/organizations/${organizationSlug}/branches${suffix}`
+}
+
+export function isBranchNameConflict(error: unknown): boolean {
+    return error instanceof ApiError && error.code === 'branch_name_conflict'
 }
 
 export async function fetchBranches(organizationSlug: string, signal?: AbortSignal, request: Requester = defaultRequest): Promise<ApiBranch[]> {

@@ -33,16 +33,28 @@ Una cuenta nueva ingresa con DNI como contraseña inicial. La respuesta
 confirmar la contraseña nueva; después del `204`, se vuelve al login para ingresar
 con la clave elegida. Un token de primer acceso vencido obliga a repetir login.
 
-El enlace `/login?organization=academy-demo` selecciona la academia. Las rutas privadas
-redirigen al login de su organización; una sesión de otra academia no concede acceso.
-No existe todavía un endpoint para listar o elegir entre todas las membresías del usuario.
+El login es organization-agnostic: `/login` no recibe ni necesita ningún parámetro de
+academia — el backend resuelve la sesión contra la (única, por ahora) membresía activa
+del usuario. Una vez logueado, `App.tsx` redirige automáticamente al path de esa
+academia (`workspacePath(session.organization.slug, ...)`), leído de
+`GET /session/context`. Las rutas privadas redirigen a `/login` si no hay sesión; una
+sesión de otra academia no concede acceso a una URL de otra. No existe todavía un
+selector para elegir entre varias membresías si el usuario llegara a tener más de una.
 
 ## Sesión y permisos
 
-Access, refresh y token de primer acceso permanecen **solo en memoria**. No se guardan
-contraseñas ni tokens en localStorage, sessionStorage, URLs ni la caché de TanStack Query.
-Al recargar o abrir otra pestaña se requiere ingresar nuevamente. La persistencia con
-cookies HttpOnly no forma parte de esta entrega.
+El access token y el token de primer acceso permanecen **solo en memoria** — no se
+guardan contraseñas ni tokens en localStorage, sessionStorage, URLs ni la caché de
+TanStack Query. El refresh token nunca llega siquiera a JavaScript: el backend lo
+entrega como cookie `httpOnly`/`Secure`/`SameSite=Strict` (`gestiq_refresh`,
+`Path=/api/v1/auth`), invisible para `document.cookie` y para cualquier script
+(incluido un XSS). Al cargar la app, `AuthClient.bootstrap()` intenta un refresh
+silencioso contra esa cookie antes de mostrar nada — si sigue siendo válida (reload,
+pestaña nueva, volver más tarde dentro de su vencimiento de 7 días), la sesión se
+reanuda sola, sin pasar por el formulario de login. Si no hay cookie o venció, cae a
+`anonymous` y se muestra el login normal. Mientras se resuelve ese primer intento, la
+fase es `'bootstrapping'` (ver `AuthContext`) y la UI muestra un estado de carga en vez
+de parpadear el formulario de login.
 
 La renovación se coordina en una única promesa compartida. Un `401` reintenta la
 petición una vez con el acceso renovado; errores de permisos no renuevan la sesión.
@@ -50,10 +62,12 @@ Si se pierde la respuesta de refresh, se descartan las credenciales: no se reenv
 un token que el servidor pudo haber consumido. Un resultado tardío de login o refresh
 no puede restaurar una sesión cerrada.
 
-Logout limpia inmediatamente el estado privado y solicita la revocación en el backend.
-Si falla la conexión, el login informa que el cierre remoto no pudo confirmarse.
-Recargar la página pierde las credenciales locales pero no revoca por sí mismo la
-sesión remota, que conserva los vencimientos definidos por el backend.
+Logout limpia inmediatamente el estado privado, solicita la revocación en el backend
+y la cookie se borra en la propia respuesta del `/auth/logout`. Si falla la conexión,
+el login informa que el cierre remoto no pudo confirmarse. Recargar la página pierde
+el access token en memoria, pero ya no desloguea: `bootstrap()` lo recupera solo desde
+la cookie, que conserva los vencimientos definidos por el backend (7 días por
+defecto, sin extenderse al renovar).
 
 `GET /session/context` aporta identidad, organización, roles, modos, permisos y sedes
 accesibles. Se consulta al ingresar, al recuperar el foco y periódicamente mientras
@@ -65,15 +79,15 @@ cada operación. Elegir otro modo en la URL nunca agrega un rol.
 | Ubicación | Responsabilidad |
 | --- | --- |
 | `src/services/http/client.ts` | Transporte JSON, errores, timeout y configuración de URL |
-| `src/auth/api/authClient.ts` | Credenciales en memoria, login, cambio inicial, refresh y logout |
+| `src/auth/api/authClient.ts` | Access token en memoria (nunca el refresh), login, cambio inicial, refresh/logout vía cookie `credentials:'include'`, y `bootstrap()` (refresh silencioso al cargar la app) |
 | `src/auth/api/contracts.ts` | Validación de respuestas de la API con Zod |
 | `src/auth/AuthProvider.tsx` | Contexto React y consulta de sesión con TanStack Query |
 | `src/auth/LoginPage.tsx` | Formularios con React Hook Form y validación Zod |
 | `src/workspace/` | Rutas y modos según la sesión autenticada |
 
-La lectura de la academia en el login usa
-`GET /public/organizations/{organizationSlug}/context`. El perfil y el selector de
-sedes muestran los datos de la sesión real.
+El login ya no lee ninguna academia de antemano (pantalla genérica, "GestIQ -
+Academias"); recién después de loguear, `GET /session/context` trae la organización
+real. El perfil y el selector de sedes muestran los datos de esa sesión.
 
 **Alcance:** autenticación y contexto están conectados. Los módulos de configuración,
 branding editable, CRUD de sedes, alumnos, oferta, pagos y dashboards todavía mantienen
@@ -90,9 +104,11 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Las pruebas unitarias cubren validación, refresh concurrente, cancelación de sesiones
-y pérdida de respuestas. Playwright prueba login, primer cambio, logout, aislamiento
-de academia, roles, recarga y formularios móviles en claro/oscuro con respuestas controladas.
+Las pruebas unitarias cubren validación, refresh concurrente, cancelación de sesiones,
+pérdida de respuestas y el `bootstrap()` silencioso (sesión resumida o no según haya
+cookie). Playwright prueba login, primer cambio, logout, aislamiento de academia,
+roles, que una recarga reanuda la sesión (no la termina) y formularios móviles en
+claro/oscuro, con respuestas controladas incluido el `Set-Cookie` simulado.
 
 `e2e/auth-live.spec.ts` se habilita únicamente con `E2E_DISPOSABLE_API=1` y un
 `API_PROXY_TARGET` que apunte a una instancia Go con **bases temporales**, seed de

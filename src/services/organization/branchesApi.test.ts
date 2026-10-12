@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { assignBranchAdministratorApi, assignBranchStaffApi, createBranchApi, fetchBranches, revokeBranchAdministratorApi, revokeBranchStaffApi, updateBranchApi } from './branchesApi'
+import { ApiError } from '@/services/http/client'
+import { assignBranchAdministratorApi, assignBranchStaffApi, createBranchApi, fetchBranches, isBranchNameConflict, revokeBranchAdministratorApi, revokeBranchStaffApi, updateBranchApi } from './branchesApi'
 
 const apiBranch = {
     id: 'b1', name: 'Sede Centro', email: 'centro@example.com', phone: '+54 351 000-0000', address: 'Calle Falsa 123',
@@ -48,5 +49,10 @@ describe('branches API client', () => {
         const request = vi.fn().mockResolvedValue(undefined)
         await revokeBranchStaffApi('academy-demo', 'b1', 'u1', request)
         expect(request).toHaveBeenCalledWith('/organizations/academy-demo/branches/b1/staff/u1', { method: 'DELETE' })
+    })
+    it('recognizes a branch name conflict error', () => {
+        expect(isBranchNameConflict(new ApiError(409, 'branch_name_conflict'))).toBe(true)
+        expect(isBranchNameConflict(new ApiError(409, 'branch_code_conflict'))).toBe(false)
+        expect(isBranchNameConflict(new Error('boom'))).toBe(false)
     })
 })

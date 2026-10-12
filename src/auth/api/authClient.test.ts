@@ -2,11 +2,39 @@ import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/services/http/client'
 import { AuthClient } from './authClient'
 
-const pair = { mustChangePassword: false, accessToken: `a_${'a'.repeat(43)}`, refreshToken: `r_${'b'.repeat(43)}`, tokenType: 'Bearer', expiresIn: 900, refreshExpiresIn: 6000 }
-const rotated = { ...pair, accessToken: `a_${'c'.repeat(43)}`, refreshToken: `r_${'d'.repeat(43)}` }
-const login = { dni: '90000001', password: 'private-test-password', organizationSlug: 'academy-demo' }
+const pair = { mustChangePassword: false, accessToken: `a_${'a'.repeat(43)}`, tokenType: 'Bearer', expiresIn: 900 }
+const rotated = { ...pair, accessToken: `a_${'c'.repeat(43)}` }
+const login = { dni: '90000001', password: 'private-test-password' }
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>((done) => { resolve = done }); return { promise, resolve } }
 
+describe('silent bootstrap from the refresh cookie', () => {
+    it('resumes a session on reload without a login call, via the cookie the browser already sent', async () => {
+        const request = vi.fn(async (path: string, init?: RequestInit) => {
+            expect(path).toBe('/auth/refresh')
+            expect(init?.credentials).toBe('include')
+            return pair
+        })
+        const client = new AuthClient(request)
+        expect(client.getSnapshot().phase).toBe('bootstrapping')
+        await client.bootstrap()
+        expect(client.getSnapshot().phase).toBe('signed-in')
+        expect(request).toHaveBeenCalledTimes(1)
+    })
+    it('falls back to anonymous when there is no valid refresh cookie', async () => {
+        const request = vi.fn().mockRejectedValueOnce(new ApiError(401, 'unauthenticated'))
+        const client = new AuthClient(request)
+        await client.bootstrap()
+        expect(client.getSnapshot().phase).toBe('anonymous')
+    })
+    it('is a no-op once a real login has already moved past bootstrapping', async () => {
+        const request = vi.fn().mockResolvedValueOnce(pair)
+        const client = new AuthClient(request)
+        await client.login(login)
+        await client.bootstrap()
+        expect(client.getSnapshot().phase).toBe('signed-in')
+        expect(request).toHaveBeenCalledTimes(1)
+    })
+})
 describe('in-memory authentication', () => {
     it('keeps first access restricted and uses its token only to change the password', async () => {
         const request = vi.fn().mockResolvedValueOnce({ mustChangePassword: true, changePasswordToken: `p_${'p'.repeat(43)}`, expiresIn: 600 }).mockResolvedValueOnce(undefined)

@@ -954,7 +954,7 @@ html.dark .donut-chart {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: radial-gradient(circle at top left, var(--primary-soft), transparent 34%), var(--bg);
+  background: radial-gradient(circle at top left, var(--surface-subtle), transparent 34%), var(--bg);
   color: var(--text);
 }
 
@@ -979,8 +979,8 @@ html.dark .donut-chart {
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: var(--primary);
-  color: var(--primary-contrast);
+  background: var(--surface-subtle);
+  color: var(--text);
 }
 
 .login-brand>div {
@@ -1003,7 +1003,7 @@ html.dark .donut-chart {
 
 .login-heading p {
   margin: 0 0 7px;
-  color: var(--primary);
+  color: var(--muted);
   font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -1061,6 +1061,8 @@ html.dark .donut-chart {
 .login-form .primary-button {
   width: 100%;
   margin-top: 2px;
+  background: var(--muted);
+  color: var(--bg);
 }
 
 .login-demo-note {
@@ -1093,7 +1095,7 @@ html.dark .donut-chart {
 }
 
 .login-platform-link a {
-  color: var(--primary);
+  color: var(--muted);
   font-weight: 800;
   text-decoration: none;
 }

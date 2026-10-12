@@ -17,7 +17,7 @@ export function createHttpClient(baseUrl: string, fetcher: typeof fetch = (...ar
         if (init.body) headers.set('Content-Type', 'application/json')
         const timeout = AbortSignal.timeout(15000)
         const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout
-        const response = await fetcher(`${baseUrl.replace(/\/$/, '')}${path}`, { ...init, headers, signal, credentials: 'omit', cache: 'no-store' })
+        const response = await fetcher(`${baseUrl.replace(/\/$/, '')}${path}`, { ...init, headers, signal, credentials: init.credentials ?? 'omit', cache: 'no-store' })
         if (!response.ok) {
             const body = await response.json().catch(() => null)
             throw new ApiError(response.status, body?.error?.code ?? 'request_failed', response.headers.get('Retry-After') ?? undefined)
