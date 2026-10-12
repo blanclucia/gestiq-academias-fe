@@ -3,10 +3,11 @@ import { z } from 'zod'
 export const roleSchema = z.enum(['admin', 'teacher', 'student'])
 export const modeSchema = z.enum(['ADMINISTRATION', 'TEACHER', 'STUDENT'])
 export const organizationSchema = z.object({ id: z.string(), slug: z.string(), name: z.string(), productType: z.enum(['academy', 'gym']) })
+// The refresh token never appears here — it travels only as the httpOnly gestiq_refresh cookie,
+// set by the server and never readable from JavaScript (see cmd/api/handlers/auth.go backend-side).
 export const tokenPairSchema = z.object({
     accessToken: z.string().regex(/^a_[A-Za-z0-9_-]{43}$/),
-    refreshToken: z.string().regex(/^r_[A-Za-z0-9_-]{43}$/),
-    tokenType: z.literal('Bearer'), expiresIn: z.number().positive(), refreshExpiresIn: z.number().positive(),
+    tokenType: z.literal('Bearer'), expiresIn: z.number().positive(),
 })
 export const loginResponseSchema = z.union([
     tokenPairSchema.extend({ mustChangePassword: z.literal(false) }),
@@ -22,4 +23,4 @@ export const sessionSchema = z.object({
 })
 export type TokenPair = z.infer<typeof tokenPairSchema>
 export type Session = z.infer<typeof sessionSchema>
-export type LoginInput = { dni: string; password: string; organizationSlug: string }
+export type LoginInput = { dni: string; password: string }

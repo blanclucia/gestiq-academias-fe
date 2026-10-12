@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 
-const pair = { mustChangePassword: false, accessToken: `a_${'a'.repeat(43)}`, refreshToken: `r_${'b'.repeat(43)}`, tokenType: 'Bearer', expiresIn: 900, refreshExpiresIn: 6000 }
+const refreshCookieValue = `r_${'b'.repeat(43)}`
+const pair = { mustChangePassword: false, accessToken: `a_${'a'.repeat(43)}`, tokenType: 'Bearer', expiresIn: 900 }
 const organization = { id: 'organization-demo', slug: 'academy-demo', name: 'Academy Demo', productType: 'academy' }
 const owner = {
     user: { id: 'owner-demo', name: 'Owner Demo', email: 'owner@example.com' }, organization,
@@ -12,15 +13,25 @@ const owner = {
 async function mockAPI(page: Page, options: { initial?: boolean; denied?: boolean; student?: boolean; branchAdmin?: boolean } = {}) {
     const calls: { path: string; body: unknown }[] = []
     let initial = options.initial || false
+    const setRefreshCookie = { 'set-cookie': `gestiq_refresh=${refreshCookieValue}; Path=/api/v1/auth; HttpOnly` }
+    const clearRefreshCookie = { 'set-cookie': 'gestiq_refresh=; Path=/api/v1/auth; Max-Age=0; HttpOnly' }
     await page.route('**/api/v1/**', async (route) => {
         const path = new URL(route.request().url()).pathname.replace('/api/v1', '')
         const body = route.request().postDataJSON()
         calls.push({ path, body })
-        const json = (value: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) })
+        const json = (value: unknown, status = 200, headers: Record<string, string> = {}) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value), headers })
         if (path.startsWith('/public/organizations/')) return json({ organization })
         if (path === '/auth/login') {
             if (options.denied) return json({ error: { code: 'unauthenticated' } }, 401)
-            return json(initial ? { mustChangePassword: true, changePasswordToken: `p_${'p'.repeat(43)}`, expiresIn: 600 } : pair)
+            if (initial) return json({ mustChangePassword: true, changePasswordToken: `p_${'p'.repeat(43)}`, expiresIn: 600 })
+            return json(pair, 200, setRefreshCookie)
+        }
+        // Fires on every page load (the silent bootstrap refresh) — the real test of this feature:
+        // a reload resumes the session via this cookie instead of forcing the login form again.
+        if (path === '/auth/refresh') {
+            const cookieHeader = route.request().headers()['cookie'] ?? ''
+            if (!cookieHeader.includes(`gestiq_refresh=${refreshCookieValue}`)) return json({ error: { code: 'unauthenticated' } }, 401)
+            return json(pair, 200, setRefreshCookie)
         }
         if (path === '/auth/change-password') {
             expect(route.request().headers().authorization).toMatch(/^Bearer p_/)
@@ -29,7 +40,7 @@ async function mockAPI(page: Page, options: { initial?: boolean; denied?: boolea
         }
         if (path === '/session/context' && options.branchAdmin) return json({ ...owner, administrativeLevel: 'branch_admin', administrativeAccess: { level: 'BRANCH_ADMIN', scope: 'BRANCHES', branchIds: ['server-branch'] }, permissions: ['academy.read', 'branches.read'] })
         if (path === '/session/context') return json(options.student ? { ...owner, roles: ['student'], administrativeLevel: null, availableModes: ['STUDENT'], activeMode: 'STUDENT', administrativeAccess: null, accessibleBranches: [], permissions: ['academy.read'] } : owner)
-        if (path === '/auth/logout') return route.fulfill({ status: 204 })
+        if (path === '/auth/logout') return route.fulfill({ status: 204, headers: clearRefreshCookie })
         return json({ error: { code: 'unexpected_test_request' } }, 500)
     })
     return calls
@@ -48,11 +59,14 @@ test('login uses real identity, modes and branches; logout blocks back navigatio
     await expect(page.getByRole('button', { name: 'Seleccionar sede' })).toContainText('Sede desde API')
     await page.getByRole('button', { name: 'Administración', exact: true }).click()
     await expect(page.getByRole('menuitem', { name: /Profesor/ })).toHaveCount(0)
-    expect(calls.find((call) => call.path === '/auth/login')?.body).toMatchObject({ dni: '90000001', organizationSlug: 'academy-demo' })
+    expect(calls.find((call) => call.path === '/auth/login')?.body).toMatchObject({ dni: '90000001' })
     const storage = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))
     expect(storage).not.toContain(pair.accessToken)
-    expect(storage).not.toContain(pair.refreshToken)
+    expect(storage).not.toContain(refreshCookieValue)
     expect(storage).not.toContain('a-test-password')
+    // The refresh cookie is httpOnly — document.cookie must never be able to see it.
+    const visibleCookies = await page.evaluate(() => document.cookie)
+    expect(visibleCookies).not.toContain('gestiq_refresh')
     await page.getByRole('button', { name: 'User menu' }).click()
     await page.getByRole('menuitem', { name: 'Mi perfil' }).click()
     await page.getByRole('button', { name: 'User menu' }).click()
@@ -85,14 +99,14 @@ test('invalid credentials show an error and a persisted demo flag grants no acce
     await mockAPI(page, { denied: true })
     await page.addInitScript(() => localStorage.setItem('gestiq-demo-authenticated', 'true'))
     await page.goto('/academy-demo/admin')
-    await expect(page).toHaveURL(/\/login\?organization=academy-demo$/)
+    await expect(page).toHaveURL(/\/login$/)
     await enter(page)
     await expect(page.getByRole('alert')).toContainText('DNI o contraseña incorrectos')
     await expect(page.getByLabel('Contraseña', { exact: true })).toHaveValue('')
 })
 
-test('student cannot select administration or access another organization; reload ends session', async ({ page }) => {
-    await mockAPI(page, { student: true })
+test('student cannot select administration or access another organization; reload resumes the session', async ({ page }) => {
+    const calls = await mockAPI(page, { student: true })
     await page.goto('/login')
     await enter(page)
     await expect(page).toHaveURL(/\/academy-demo\/student$/)
@@ -103,8 +117,11 @@ test('student cannot select administration or access another organization; reloa
     await expect(page.getByRole('alert')).toContainText('Sin acceso a esta academia')
     await page.getByRole('link', { name: 'Volver a mi academia' }).click()
     await expect(page).toHaveURL(/\/academy-demo\/student$/)
+    // A reload clears the in-memory access token, but the httpOnly refresh cookie survives it —
+    // the app should silently resume the same session instead of bouncing back to the login form.
     await page.reload()
-    await expect(page.getByRole('heading', { name: 'Ingresá a tu academia' })).toBeVisible()
+    await expect(page).toHaveURL(/\/academy-demo\/student$/)
+    expect(calls.filter((call) => call.path === '/auth/refresh').length).toBeGreaterThan(0)
 })
 
 for (const dark of [false, true]) {

@@ -7,6 +7,7 @@ import { useAppBrand } from '@/theme/AppBrandContext'
 import { defaultAcademyBrand } from '@/theme/brandTheme'
 import { useAcademySettings, useSaveAcademySettings, type AcademySettings } from '@/services/academySettingsRepository'
 import { setSelectedBranchId, useBranchRoster, useBranches, useCreateBranch, useUpdateBranch } from '@/services/branchRepository'
+import { isBranchNameConflict } from '@/services/organization/branchesApi'
 import { copyBranchConfiguration } from '@/services/branchConfigurationRepository'
 import { listExpenses, useFinanceRepositoryVersion } from '@/services/financeRepository'
 import { getActiveAcademicCycleId, listCourses, listStaff, listStudents, useAcademyRepositoryVersion } from '@/services/academyRepository'
@@ -98,7 +99,7 @@ export function AcademySettingsPage() {
                 setSelectedBranchId(branch.id)
                 navigate(path(`sedes/${branch.id}`))
             },
-            onError: () => showToast('error', 'No se pudo crear la sede. Intentá nuevamente.'),
+            onError: (error) => showToast('error', isBranchNameConflict(error) ? 'Ya existe una sede con ese nombre en esta academia.' : 'No se pudo crear la sede. Intentá nuevamente.'),
         })
     }
 

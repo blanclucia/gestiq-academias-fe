@@ -8,6 +8,9 @@ export function AuthProvider({ children, client = authClient }: { children: Reac
     const state = useSyncExternalStore(client.subscribe, client.getSnapshot)
     const cache = useQueryClient()
     const [logoutMessage, setLogoutMessage] = useState('')
+    // Runs once per mount: tries a silent refresh against whatever the browser's cookie jar
+    // already has, so a page reload resumes the session instead of forcing a fresh login.
+    useEffect(() => { void client.bootstrap() }, [client])
     const session = useQuery({
         queryKey: ['session', state.generation],
         queryFn: async ({ signal }) => {

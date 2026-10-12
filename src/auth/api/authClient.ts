@@ -1,15 +1,19 @@
 import { ApiError, apiBaseUrl, createHttpClient } from '@/services/http/client'
 import { loginResponseSchema, sessionSchema, tokenPairSchema, type LoginInput, type TokenPair } from './contracts'
 
-type AuthState = { phase: 'anonymous' | 'signed-in' | 'password-change'; generation: number; organizationSlug?: string; challengeExpiresAt?: number }
+type AuthState = { phase: 'bootstrapping' | 'anonymous' | 'signed-in' | 'password-change'; generation: number; organizationSlug?: string; challengeExpiresAt?: number }
 type Request = ReturnType<typeof createHttpClient>
 
-// Credentials live only in this instance, never in browser storage or query keys.
+// The access token lives only in this instance, never in browser storage or query keys. The
+// refresh token never reaches this instance at all — the server sets it as an httpOnly cookie
+// (see cmd/api/handlers/auth.go), so it survives a reload without ever being readable by
+// JavaScript. login/refresh/logout send that cookie via `credentials: 'include'`; every other
+// request stays `credentials: 'omit'` (the default) since it only needs the in-memory access token.
 export class AuthClient {
     private tokens: TokenPair | null = null
     private accessExpiresAt = 0
     private challenge: string | null = null
-    private state: AuthState = { phase: 'anonymous', generation: 0 }
+    private state: AuthState = { phase: 'bootstrapping', generation: 0 }
     private listeners = new Set<() => void>()
     private refreshing: Promise<void> | null = null
 
@@ -35,20 +39,35 @@ export class AuthClient {
     private checkGeneration(generation: number) {
         if (generation !== this.state.generation) throw new DOMException('Operación cancelada', 'AbortError')
     }
+    // Called once, on app start. Attempts a silent refresh against whatever the browser already
+    // has in its cookie jar — succeeds into 'signed-in' without a login form if the refresh
+    // cookie from an earlier session is still valid, otherwise falls back to 'anonymous'.
+    async bootstrap() {
+        if (this.state.phase !== 'bootstrapping') return
+        const generation = this.state.generation
+        try {
+            await this.refresh()
+            if (generation === this.state.generation && this.state.phase === 'bootstrapping') {
+                this.publish({ ...this.state, phase: 'signed-in' })
+            }
+        } catch {
+            // refresh() already moved to 'anonymous' via clear() on failure — nothing left to do.
+        }
+    }
     async login(input: LoginInput) {
         this.clear()
         const generation = this.state.generation
-        const result = loginResponseSchema.parse(await this.request('/auth/login', { method: 'POST', body: JSON.stringify(input) }))
+        const result = loginResponseSchema.parse(await this.request('/auth/login', { method: 'POST', credentials: 'include', body: JSON.stringify(input) }))
         if (generation !== this.state.generation) {
-            if (!result.mustChangePassword) await this.revoke(result.refreshToken).catch(() => undefined)
+            if (!result.mustChangePassword) await this.revoke().catch(() => undefined)
             this.checkGeneration(generation)
         }
         if (result.mustChangePassword) {
             this.challenge = result.changePasswordToken
-            this.publish({ phase: 'password-change', generation, organizationSlug: input.organizationSlug, challengeExpiresAt: Date.now() + result.expiresIn * 1000 })
+            this.publish({ phase: 'password-change', generation, challengeExpiresAt: Date.now() + result.expiresIn * 1000 })
         } else {
             this.storeTokens(result)
-            this.publish({ phase: 'signed-in', generation, organizationSlug: input.organizationSlug })
+            this.publish({ phase: 'signed-in', generation })
         }
     }
     async changeInitialPassword(newPassword: string) {
@@ -63,22 +82,21 @@ export class AuthClient {
             throw error
         }
     }
-    private revoke(refreshToken: string) {
-        return this.request('/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken }) })
+    private revoke() {
+        return this.request('/auth/logout', { method: 'POST', credentials: 'include' })
     }
     async logout() {
-        const token = this.tokens?.refreshToken
         this.clear()
-        if (token) await this.revoke(token)
+        // Best-effort: the server's logout is idempotent even without a live cookie, so this is
+        // safe to call unconditionally rather than depending on in-memory state we no longer keep.
+        await this.revoke()
     }
     private refresh(): Promise<void> {
         if (this.refreshing) return this.refreshing
-        const token = this.tokens?.refreshToken
-        if (!token) return Promise.reject(new ApiError(401, 'unauthenticated'))
         const generation = this.state.generation
         const operation = (async () => {
             try {
-                const pair = tokenPairSchema.parse(await this.request('/auth/refresh', { method: 'POST', body: JSON.stringify({ refreshToken: token }) }))
+                const pair = tokenPairSchema.parse(await this.request('/auth/refresh', { method: 'POST', credentials: 'include' }))
                 this.checkGeneration(generation)
                 this.storeTokens(pair)
             } catch (error) {
@@ -126,7 +144,13 @@ export class AuthClient {
         const generation = this.state.generation
         try {
             const session = sessionSchema.parse(await this.authorizedRequest('/session/context', { signal }))
-            if (session.organization.slug !== this.state.organizationSlug) throw new ApiError(403, 'forbidden')
+            // Login never picks an organization upfront — the first successful read here is what
+            // pins this session to one. A later read resolving to a different org (membership
+            // changed underneath an idle tab) is treated as forbidden rather than silently switched.
+            if (this.state.organizationSlug && session.organization.slug !== this.state.organizationSlug) throw new ApiError(403, 'forbidden')
+            if (generation === this.state.generation && this.state.organizationSlug !== session.organization.slug) {
+                this.publish({ ...this.state, organizationSlug: session.organization.slug })
+            }
             return session
         } catch (error) {
             if (generation === this.state.generation && error instanceof ApiError && error.status === 403) this.clear()

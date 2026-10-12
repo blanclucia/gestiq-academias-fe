@@ -119,7 +119,10 @@ function App() {
   const authenticated = phase === 'signed-in'
   const home = session ? workspacePath(session.organization.slug, sessionRole(session)) : '/login'
   const name = session?.organization.name || 'GestIQ Academias'
-  const login = loading ? <div className="workspace-loading" role="status">Cargando tu sesión…</div>
+  // Still trying a silent refresh from the cookie jar — hold off on <LoginPage /> so a reload
+  // doesn't flash the login form before bouncing back into the signed-in session.
+  const login = phase === 'bootstrapping' ? <div className="workspace-loading" role="status">Cargando tu sesión…</div>
+    : loading ? <div className="workspace-loading" role="status">Cargando tu sesión…</div>
     : authenticated && error ? <div className="workspace-error" role="alert"><p>No pudimos cargar tu sesión.</p><button onClick={retrySession}>Reintentar</button><button onClick={() => { void logout() }}>Volver al ingreso</button></div>
     : session ? <Navigate to={home} replace /> : <LoginPage />
 

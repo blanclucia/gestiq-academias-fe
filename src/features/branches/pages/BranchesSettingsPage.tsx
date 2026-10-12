@@ -5,6 +5,7 @@ import { StaffPage } from '@/features/staff'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EntityFormModal, FormField, FormGrid } from '@/components/crud/EntityFormModal'
 import { setSelectedBranchId, useBranchRoster, useBranchRosterInvalidation, useBranches, useSelectedBranchId, useSetBranchAdministrator, useSetBranchStaffScope, useUpdateBranch } from '@/services/branchRepository'
+import { isBranchNameConflict } from '@/services/organization/branchesApi'
 import { listStaff } from '@/services/academyRepository'
 import { getBranchSettings, listBranchAutomations, saveBranchAutomations, saveBranchSettings, type BranchAutomation, type BranchSettings } from '@/services/branchConfigurationRepository'
 import { defaultCommunicationTemplates as defaultTemplates, listCommunicationTemplates, saveCommunicationTemplates, type CommunicationTemplate } from '@/services/communicationTemplateRepository'
@@ -96,7 +97,7 @@ export function BranchesSettingsPage() {
         if (!selectedBranch) return
         updateBranch.mutate({ id: selectedBranch.id, changes: { name: normalized.name, address: normalized.address, email: normalized.email, phone: normalized.phone, weekDays: normalized.weekDays, openingTime: normalized.openingTime, closingTime: normalized.closingTime, timezone: normalized.timezone, status: normalized.status } }, {
             onSuccess: () => showToast('success', 'Cambios guardados correctamente.'),
-            onError: () => showToast('error', 'No se pudieron guardar los datos de la sede. Intentá nuevamente.'),
+            onError: (error) => showToast('error', isBranchNameConflict(error) ? 'Ya existe una sede con ese nombre en esta academia.' : 'No se pudieron guardar los datos de la sede. Intentá nuevamente.'),
         })
     }
 

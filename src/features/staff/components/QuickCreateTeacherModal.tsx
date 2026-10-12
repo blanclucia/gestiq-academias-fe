@@ -4,6 +4,7 @@ import { validateConditions } from '@/components/forms/formValidation'
 import { useToast } from '@/components/ui/ToastContext'
 import { useCreateStaffMember } from '@/services/academyRepository'
 import { isMemberConflict } from '@/services/organization/membersApi'
+import { isStaffDniConflict } from '@/services/organization/staffApi'
 
 const dniPattern = /^[0-9]{7,8}$/
 
@@ -62,7 +63,7 @@ export function QuickCreateTeacherModal({ open, onClose, onCreated }: QuickCreat
                         showToast('success', 'Profesor creado correctamente.')
                         close()
                     },
-                    onError: (mutationError) => setError(isMemberConflict(mutationError) ? 'Ya existe un miembro con ese DNI en esta organización.' : 'No se pudo crear el profesor. Intentá nuevamente.'),
+                    onError: (mutationError) => setError(isMemberConflict(mutationError) || isStaffDniConflict(mutationError) ? 'Ya existe un integrante con ese DNI en esta organización.' : 'No se pudo crear el profesor. Intentá nuevamente.'),
                 })
             }}
         >
