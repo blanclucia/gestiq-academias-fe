@@ -1116,10 +1116,6 @@ html.dark .donut-chart {
 }
 
 @media (max-width: 980px) {
-  .offer-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .offer-overview-columns {
     grid-template-columns: 1fr;
   }
@@ -1150,10 +1146,6 @@ html.dark .donut-chart {
   .offer-overview-actions,
   .offer-overview-actions button {
     width: 100%;
-  }
-
-  .offer-kpi-grid {
-    grid-template-columns: 1fr;
   }
 
   .offer-detail-list {
@@ -1966,6 +1958,12 @@ html.dark .donut-chart {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--field);
+}
+
+.staff-role-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .staff-role-picker label {

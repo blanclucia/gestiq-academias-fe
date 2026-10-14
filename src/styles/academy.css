@@ -19,17 +19,6 @@
   padding: 4px 0 8px;
 }
 
-.offer-overview-eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .offer-overview-description {
   max-width: 720px;
   margin: 10px 0;
@@ -53,49 +42,6 @@
   color: var(--muted);
   font-size: 0.86rem;
   font-weight: 650;
-}
-
-.offer-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.offer-kpi {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  column-gap: 8px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--panel) 94%, var(--primary) 6%);
-}
-
-.offer-kpi>svg {
-  color: var(--primary);
-}
-
-.offer-kpi>span {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.offer-kpi>strong {
-  grid-column: 1 / -1;
-  margin-top: 8px;
-  font-size: 1.75rem;
-  letter-spacing: -0.04em;
-}
-
-.offer-kpi>small {
-  grid-column: 1 / -1;
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 0.76rem;
 }
 
 .offer-overview-columns {
@@ -1106,6 +1052,12 @@
   display: flex;
   align-items: flex-start;
   gap: 11px;
+}
+
+.branch-section-heading-copy>svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--primary);
 }
 
 .branch-add-button {

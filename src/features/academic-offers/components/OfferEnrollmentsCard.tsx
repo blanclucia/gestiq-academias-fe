@@ -1,7 +1,9 @@
 import { CheckCircle2, PencilLine, Plus, Search, Trash2, UserRoundCheck } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Card } from '@/components/ui/Card'
 import { DataTable } from '@/components/ui/DataTable'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
+import { SectionHeading } from '@/components/ui/SectionHeading'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 
 export type OfferEnrollmentRow = {
@@ -20,8 +22,8 @@ type Props = { courseName: string; rows: OfferEnrollmentRow[]; search: string; o
 const formatShortDate = (value: string) => value.split('-').reverse().join('/')
 
 export function OfferEnrollmentsCard(props: Props) {
-    return <section className="data-table-card offer-enrollments-card" style={{ padding: 20 }}><div style={{ marginTop: 0 }}>
-        <div className="offer-overview-eyebrow"><UserRoundCheck size={15} /> Inscripciones</div>
+    return <Card className="offer-enrollments-card"><div style={{ marginTop: 0 }}>
+        <SectionHeading icon={<UserRoundCheck size={20} />} title="Inscripciones" />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '1 1 280px', maxWidth: 520, minWidth: 260, flexWrap: 'wrap' }}>
                 <label className="search-input-wrap" style={{ flex: 1, minWidth: 0 }}><Search aria-hidden="true" size={16} strokeWidth={2.2} className="search-input-icon" /><input type="text" value={props.search} onChange={(event) => props.onSearchChange(event.target.value)} placeholder="Buscar período o estado" /></label>
@@ -41,5 +43,5 @@ export function OfferEnrollmentsCard(props: Props) {
             { label: 'Cerrar', icon: <CheckCircle2 size={15} />, onClick: () => props.onCloseEnrollment(row) },
             { label: 'Eliminar', icon: <Trash2 size={15} />, onClick: () => props.onDelete(row), variant: 'danger' },
         ]} />} />
-    </div></section>
+    </div></Card>
 }

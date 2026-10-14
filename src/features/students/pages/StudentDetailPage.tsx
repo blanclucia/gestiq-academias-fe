@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DataTable } from '@/components/ui/DataTable'
+import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { listStudents, useAcademyRepositoryVersion, useStudentEnrollments } from '@/services/academyRepository'
 import { calculateAge } from '@/domain/students/studentRules'
@@ -76,39 +77,12 @@ export function StudentDetailPage() {
 
                 {activeTab === 'overview' && (
                     <div className="detail-section">
-                        <div className="detail-metric-grid">
-                            <div className="detail-metric-card">
-                                <div className="detail-metric-label">
-                                    <GraduationCap size={14} />
-                                    Cursos activos
-                                </div>
-                                <div className="detail-metric-value detail-metric-value-large">{activeCoursesCount}</div>
-                            </div>
-
-                            <div className="detail-metric-card">
-                                <div className="detail-metric-label">
-                                    <CalendarDays size={14} />
-                                    Fecha de nacimiento
-                                </div>
-                                <div className="detail-metric-value detail-metric-value-medium">{student.birthDate ?? 'Sin dato'}</div>
-                            </div>
-
-                            <div className="detail-metric-card">
-                                <div className="detail-metric-label">
-                                    <Mail size={14} />
-                                    Email
-                                </div>
-                                <div className="detail-metric-value">{student.email || 'Sin email'}</div>
-                            </div>
-
-                            <div className="detail-metric-card">
-                                <div className="detail-metric-label">
-                                    <Phone size={14} />
-                                    Teléfono
-                                </div>
-                                <div className="detail-metric-value">{student.phone || 'Sin teléfono'}</div>
-                            </div>
-                        </div>
+                        <MetricTileGrid>
+                            <MetricTile icon={<GraduationCap size={20} />} label="Cursos activos" value={activeCoursesCount} />
+                            <MetricTile icon={<CalendarDays size={20} />} label="Fecha de nacimiento" value={student.birthDate ?? 'Sin dato'} />
+                            <MetricTile icon={<Mail size={20} />} label="Email" value={student.email || 'Sin email'} />
+                            <MetricTile icon={<Phone size={20} />} label="Teléfono" value={student.phone || 'Sin teléfono'} />
+                        </MetricTileGrid>
 
                         <div className="detail-info-grid">
                             <div className="detail-info-card">

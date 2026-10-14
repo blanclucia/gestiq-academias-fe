@@ -496,7 +496,10 @@
     }
 }
 
-.no-branch-banner {
+/* Shared by NoBranchBanner (global, in AppShell) and any page-level "missing prerequisite"
+   banner (e.g. "no academic cycle yet" in Ofertas académicas) — same edge-to-edge warning strip
+   with an icon, a message, and an optional CTA button. */
+.inline-warning-banner {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -508,22 +511,102 @@
     line-height: 1.4;
 }
 
-.no-branch-banner svg {
+.inline-warning-banner svg {
     flex-shrink: 0;
 }
 
-.no-branch-banner span {
+.inline-warning-banner span {
     flex: 1;
 }
 
-.no-branch-banner .primary-button {
+.inline-warning-banner .primary-button {
     flex-shrink: 0;
     text-decoration: none;
 }
 
 @media (max-width: 640px) {
-    .no-branch-banner {
+    .inline-warning-banner {
         padding: 10px 16px;
         flex-wrap: wrap;
     }
+}
+
+.info-tooltip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.info-tooltip-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.info-tooltip-trigger:hover,
+.info-tooltip-trigger:focus-visible {
+    color: var(--text);
+    background: var(--surface-subtle);
+}
+
+.info-tooltip-panel {
+    /* Portaled to document.body (see InfoTooltip.tsx) so a clipping ancestor — e.g. EntityFormModal's
+       scrollable, rounded .entity-modal — can't cut it off. top/left come from the trigger's own
+       getBoundingClientRect(), set inline; this just handles appearance and centering under it. */
+    position: fixed;
+    z-index: 200;
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 230px;
+    padding: 9px 11px;
+    border: 1px solid color-mix(in srgb, var(--info) 30%, var(--border));
+    border-radius: 10px;
+    background: var(--panel-strong);
+    box-shadow: var(--shadow);
+    color: var(--text);
+    font-size: 12.5px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    line-height: 1.4;
+    pointer-events: none;
+}
+
+.info-tooltip-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: var(--info);
+}
+
+.info-tooltip-panel::before,
+.info-tooltip-panel::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+}
+
+.info-tooltip-panel::before {
+    top: -7px;
+    border-bottom: 7px solid color-mix(in srgb, var(--info) 30%, var(--border));
+}
+
+.info-tooltip-panel::after {
+    top: -6px;
+    border-bottom: 6px solid var(--panel-strong);
 }

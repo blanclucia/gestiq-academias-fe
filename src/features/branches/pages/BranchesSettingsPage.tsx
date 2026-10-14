@@ -12,7 +12,9 @@ import { defaultCommunicationTemplates as defaultTemplates, listCommunicationTem
 import { validateConditions } from '@/components/forms/formValidation'
 import { SettingsField as Field, SettingsToggleOption as ToggleOption } from '@/components/forms/SettingsControls'
 import { WeekDaysCheckboxGroup } from '@/components/forms/WeekDaysCheckboxGroup'
+import { Card } from '@/components/ui/Card'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import { SectionHeading } from '@/components/ui/SectionHeading'
 import { useToast } from '@/components/ui/ToastContext'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
@@ -22,6 +24,10 @@ const tabs = [
     { id: 'comunicaciones', label: 'Comunicaciones' },
     { id: 'automatizaciones', label: 'Automatizaciones' },
 ] as const
+
+/* Comunicaciones y automatizaciones están diseñadas pero todavía no se ofrecen: mientras sea false,
+   esas tabs muestran un aviso de "próximamente". Cambiar a true para volver a habilitarlas. */
+const BRANCH_MESSAGING_ENABLED = false
 
 const emptyTemplate: Omit<CommunicationTemplate, 'id'> = {
     name: '', description: '', subject: '', message: '', enabled: true, channels: ['Email'],
@@ -149,7 +155,7 @@ export function BranchesSettingsPage() {
                         <p>Definí los datos, accesos, equipo y comunicaciones de tus sedes.</p>
                     </div>
                 </div>
-                <section className="academy-settings-card">
+                <Card>
                     <div className="academy-placeholder">
                         <div className="academy-placeholder-icon">
                             <Building2 size={22} />
@@ -158,7 +164,7 @@ export function BranchesSettingsPage() {
                         <p>Es la base de todo lo demás — alumnos, cursos, egresos. Creá la primera desde Mi academia para poder configurarla acá.</p>
                         <Link to={path('academy')} className="primary-button">Ir a Mi academia</Link>
                     </div>
-                </section>
+                </Card>
             </div>
         )
     }
@@ -179,8 +185,8 @@ export function BranchesSettingsPage() {
         <div className="academy-tabs-wrap">
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as (typeof tabs)[number]['id'])}><TabsList variant="line" aria-label="Configuración de sedes">{tabs.map((tab) => <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>)}</TabsList></Tabs>
             <div className="academy-tab-panel">
-                {activeTab === 'personalizacion' && <section className="academy-settings-card">
-                    <div className="academy-section-heading"><Building2 size={20} /><div><h2>Datos de la sede</h2><p>Esta información aparecerá en comunicaciones, comprobantes y enlaces públicos.</p></div></div>
+                {activeTab === 'personalizacion' && <Card>
+                    <SectionHeading icon={<Building2 size={20} />} title="Datos de la sede" description="Esta información aparecerá en comunicaciones, comprobantes y enlaces públicos." />
                     <div className="form-grid academy-settings-grid">
                         <Field label="Nombre de la sede" required><input className="form-input" value={settings.name} onChange={(event) => updateSettings({ name: event.target.value })} /></Field>
                         <Field label="Correo electrónico" required><input className="form-input" type="email" value={settings.email} onChange={(event) => updateSettings({ email: event.target.value })} /></Field>
@@ -188,19 +194,31 @@ export function BranchesSettingsPage() {
                         <Field label="Teléfono"><input className="form-input" type="tel" value={settings.phone} onChange={(event) => updateSettings({ phone: event.target.value })} /></Field>
                         <Field label="Estado"><SearchableSelect value={settings.status} onChange={(status) => updateSettings({ status: status as 'Activa' | 'Inactiva' })} options={[{ value: 'Activa', label: 'Activa' }, { value: 'Inactiva', label: 'Inactiva' }]} /></Field>
                     </div>
-                </section>}
-                {activeTab === 'personalizacion' && <section className="academy-settings-card">
-                    <div className="academy-section-heading"><Clock3 size={20} /><div><h2>Horario de atención</h2><p>Define cuándo se considera disponible esta sede.</p></div></div>
+                </Card>}
+                {activeTab === 'personalizacion' && <Card>
+                    <SectionHeading icon={<Clock3 size={20} />} title="Horario de atención" description="Define cuándo se considera disponible esta sede." />
                     <div className="form-grid academy-settings-grid">
                         <Field label="Días de atención" full><WeekDaysCheckboxGroup value={settings.weekDays} onChange={(weekDays) => updateSettings({ weekDays })} /></Field>
                         <Field label="Hora de apertura"><input className="form-input" type="time" value={settings.openingTime} onChange={(event) => updateSettings({ openingTime: event.target.value })} /></Field>
                         <Field label="Hora de cierre"><input className="form-input" type="time" value={settings.closingTime} onChange={(event) => updateSettings({ closingTime: event.target.value })} /></Field>
                         <Field label="Zona horaria"><SearchableSelect value={settings.timezone} onChange={(timezone) => updateSettings({ timezone })} options={[{ value: 'America/Argentina/Buenos_Aires', label: 'Argentina' }, { value: 'America/Montevideo', label: 'Uruguay' }]} /></Field>
                     </div>
-                </section>}
+                </Card>}
                 {activeTab === 'staff' && <StaffPage compact contentInset title="Staff de la sede" staffIds={realStaffIds} administratorIds={realAdministratorIds} onStaffCreated={onStaffCreated} onToggleAdministrator={toggleAdministrator} />}
-                {activeTab === 'comunicaciones' && <section className="academy-settings-card">
-                    <div className="academy-section-heading branch-section-heading"><div className="branch-section-heading-copy"><Mail size={20} /><div><h2>Plantillas de comunicación</h2><p>Guardá mensajes predeterminados para comunicarte con alumnos y responsables.</p></div></div><button type="button" className="secondary-button branch-add-button" onClick={() => setNewTemplateOpen(true)}><Plus size={16} />Nueva comunicación</button></div>
+                {!BRANCH_MESSAGING_ENABLED && activeTab === 'comunicaciones' && <Card>
+                    <SectionHeading icon={<Mail size={20} />} title="Plantillas de comunicación" description="Mensajes predeterminados para alumnos y responsables." />
+                    <div className="academy-placeholder">
+                        <p>Próximamente vas a poder configurar plantillas de comunicación por email y WhatsApp para esta sede.</p>
+                    </div>
+                </Card>}
+                {!BRANCH_MESSAGING_ENABLED && activeTab === 'automatizaciones' && <Card>
+                    <SectionHeading icon={<Sparkles size={20} />} title="Automatizaciones de la sede" description="Comunicaciones que se envían automáticamente." />
+                    <div className="academy-placeholder">
+                        <p>Próximamente vas a poder elegir qué comunicaciones se envían automáticamente y en qué momento.</p>
+                    </div>
+                </Card>}
+                {BRANCH_MESSAGING_ENABLED && activeTab === 'comunicaciones' && <Card>
+                    <SectionHeading icon={<Mail size={20} />} title="Plantillas de comunicación" description="Guardá mensajes predeterminados para comunicarte con alumnos y responsables." actions={<button type="button" className="secondary-button branch-add-button" onClick={() => setNewTemplateOpen(true)}><Plus size={16} />Nueva comunicación</button>} />
                     <div className="branch-template-list">{templates.map((template) => {
                         const expanded = expandedTemplateId === template.id
                         return <article className={`branch-template ${expanded ? 'expanded' : ''}`} key={template.id}>
@@ -214,15 +232,15 @@ export function BranchesSettingsPage() {
                         </article>
                     })}</div>
                     <p className="branch-template-hint">Variables disponibles: {'{nombre}'}, {'{periodo}'}, {'{fecha_vencimiento}'}, {'{enlace_pago}'}, {'{sede}'} y {'{email_sede}'}.</p>
-                </section>}
-                {activeTab === 'automatizaciones' && <section className="academy-settings-card">
-                    <div className="academy-section-heading"><Sparkles size={20} /><div><h2>Automatizaciones de la sede</h2><p>Elegí qué comunicaciones se envían automáticamente y en qué momento.</p></div></div>
+                </Card>}
+                {BRANCH_MESSAGING_ENABLED && activeTab === 'automatizaciones' && <Card>
+                    <SectionHeading icon={<Sparkles size={20} />} title="Automatizaciones de la sede" description="Elegí qué comunicaciones se envían automáticamente y en qué momento." />
                     <div className="academy-options-grid">{automations.map((automation) => <ToggleOption key={automation.id} label={automation.label} description={automation.description} checked={automation.enabled} onChange={(enabled) => updateAutomation(automation.id, enabled)} />)}</div>
                     <div className="branch-automation-note"><Clock3 size={17} /><span>Las automatizaciones respetan los canales habilitados en cada plantilla y la zona horaria de la sede.</span></div>
-                </section>}
+                </Card>}
                 {activeTab === 'personalizacion' && <div className="academy-form-actions"><span>Los cambios se guardan solo para esta sede.</span><button type="button" className="primary-button academy-save-button" onClick={saveBranchCore}><Save size={16} />Guardar cambios</button></div>}
-                {activeTab === 'comunicaciones' && <div className="academy-form-actions"><span>Los cambios se guardan solo para esta sede.</span><button type="button" className="primary-button academy-save-button" onClick={saveCommunications}><Save size={16} />Guardar cambios</button></div>}
-                {activeTab === 'automatizaciones' && <div className="academy-form-actions"><span>Los cambios se guardan solo para esta sede.</span><button type="button" className="primary-button academy-save-button" onClick={saveAutomations}><Save size={16} />Guardar cambios</button></div>}
+                {BRANCH_MESSAGING_ENABLED && activeTab === 'comunicaciones' && <div className="academy-form-actions"><span>Los cambios se guardan solo para esta sede.</span><button type="button" className="primary-button academy-save-button" onClick={saveCommunications}><Save size={16} />Guardar cambios</button></div>}
+                {BRANCH_MESSAGING_ENABLED && activeTab === 'automatizaciones' && <div className="academy-form-actions"><span>Los cambios se guardan solo para esta sede.</span><button type="button" className="primary-button academy-save-button" onClick={saveAutomations}><Save size={16} />Guardar cambios</button></div>}
             </div>
         </div>
     </div>

@@ -134,6 +134,9 @@ export async function revokeEnrollmentApi(organizationSlug: string, courseId: st
 export function isCommissionNameConflict(error: unknown): boolean {
     return error instanceof ApiError && error.code === 'commission_name_conflict'
 }
+export function isCycleOverlap(error: unknown): boolean {
+    return error instanceof ApiError && error.code === 'academic_cycle_overlap'
+}
 export function isCourseHasActiveCommissions(error: unknown): boolean {
     return error instanceof ApiError && error.code === 'course_has_active_commissions'
 }

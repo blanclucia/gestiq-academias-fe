@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CheckCircle2, Gauge, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { CommissionForm, type CommissionFormValue } from '@/features/commissions'
@@ -18,6 +18,7 @@ import { OfferSummaryCard } from '../components/OfferSummaryCard'
 import { OfferCommissionsCard } from '../components/OfferCommissionsCard'
 import { OfferEnrollmentsCard, type OfferEnrollmentRow } from '../components/OfferEnrollmentsCard'
 import { FilterModal } from '@/components/crud/FilterModal'
+import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
 import { calculateOccupancy, getEligibleCommissions } from '@/domain/commissions/commissionRules'
 import { useAcademySettings } from '@/services/academySettingsRepository'
 import { useToast } from '@/components/ui/ToastContext'
@@ -498,13 +499,17 @@ export function AcademicOfferDetailPage() {
 
                 <div className="offer-detail-stack">
                     {activeTab === 'overview' && (
+                        <MetricTileGrid>
+                            <MetricTile icon={<Users size={20} />} label="Alumnos" value={assignedStudents} caption="asignados al curso" />
+                            <MetricTile icon={<Gauge size={20} />} label="Ocupación" value={`${occupancyPercentage}%`} caption={`${assignedStudents} de ${totalCapacity} cupos`} />
+                            <MetricTile icon={<CalendarDays size={20} />} label="Comisiones" value={course.commissions.length} caption={`${activeCommissions} activas`} />
+                            <MetricTile icon={<CheckCircle2 size={20} />} label="Inscripciones" value={openEnrollments.length} caption="abiertas ahora" />
+                        </MetricTileGrid>
+                    )}
+
+                    {activeTab === 'overview' && (
                         <OfferSummaryCard
                             course={course}
-                            assignedStudents={assignedStudents}
-                            totalCapacity={totalCapacity}
-                            occupancyPercentage={occupancyPercentage}
-                            activeCommissions={activeCommissions}
-                            openEnrollments={openEnrollments.length}
                             onEdit={() => {
                                 setCourseForm({ name: course.name, description: course.description ?? '', status: course.status })
                                 setIsEditCourseOpen(true)

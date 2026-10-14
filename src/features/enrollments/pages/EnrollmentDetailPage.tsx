@@ -1,6 +1,7 @@
 import { ArrowLeft, CalendarDays, CheckCircle2, CreditCard, ExternalLink, StickyNote, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -201,40 +202,12 @@ export function EnrollmentDetailPage() {
 
                 {activeTab === 'overview' && (
                     <div className="detail-section">
-                        <div className="detail-metric-grid">
-                            <div className="detail-metric-card">
-                                <div className="detail-metric-label">
-                                    <Users size={14} />
-                                    Inscriptos
-                                </div>
-                                <div className="detail-metric-value detail-metric-value-large">{enrollment.studentsCount}</div>
-                            </div>
-
-                            <div className="detail-metric-card">
-                                <div className="detail-metric-label">
-                                    <CreditCard size={14} />
-                                    Costo
-                                </div>
-                                <div className="detail-metric-value detail-metric-value-large">${enrollment.amount.toLocaleString('es-AR')}</div>
-                            </div>
-
-                            <div className="detail-metric-card">
-                                <div className="detail-metric-label">
-                                    <CalendarDays size={14} />
-                                    Periodo
-                                </div>
-                                <div className="detail-metric-value detail-metric-value-medium">{enrollment.startDate} → {enrollment.endDate}</div>
-                            </div>
-
-                            <div className="detail-metric-card">
-                                <div className="detail-metric-label">
-                                    Estado
-                                </div>
-                                <div className="detail-status">
-                                    <StatusBadge label={enrollment.status} tone={statusTone} />
-                                </div>
-                            </div>
-                        </div>
+                        <MetricTileGrid>
+                            <MetricTile icon={<Users size={20} />} label="Inscriptos" value={enrollment.studentsCount} />
+                            <MetricTile icon={<CreditCard size={20} />} label="Costo" value={`$${enrollment.amount.toLocaleString('es-AR')}`} />
+                            <MetricTile icon={<CalendarDays size={20} />} label="Periodo" value={`${enrollment.startDate} → ${enrollment.endDate}`} />
+                            <MetricTile icon={<CheckCircle2 size={20} />} label="Estado" value={<StatusBadge label={enrollment.status} tone={statusTone} />} />
+                        </MetricTileGrid>
 
                         <div className="detail-info-grid">
                             <div className="detail-info-card">

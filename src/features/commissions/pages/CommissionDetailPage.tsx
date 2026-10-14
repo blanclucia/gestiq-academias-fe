@@ -1,6 +1,8 @@
-import { ArrowLeft, Award, Mail, MessageCircle, Send } from 'lucide-react'
+import { Activity, ArrowLeft, Award, Gauge, GraduationCap, Mail, MessageCircle, Send, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { createCommissionExam, listCommissionExams, listCourses, listStudents, updateCommissionExam, useAcademyRepositoryVersion, useAssignEnrollment, useCommissionRoster, useGenerateTuition, useUpdateCommission, type CommissionStudentStatus } from '@/services/academyRepository'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
@@ -72,6 +74,7 @@ export function CommissionDetailPage() {
         )
     }
 
+    const statusTone = commission.status === 'Activa' ? 'success' : commission.status === 'Programada' ? 'warning' : 'neutral'
     const allStudents = listStudents()
     const rosterIds = new Set(commissionStudents.map((student) => student.id))
     // Mirrors the backend guards on AssignEnrollment (closed course/commission, full capacity) so
@@ -313,8 +316,8 @@ export function CommissionDetailPage() {
                 }}
             />
 
-            <div className="page-header compact" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, width: '100%' }}>
-                <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="page-header compact">
+                <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: 'var(--muted)', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                         <Link to={path(`oferta/${course.id}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--muted)', textDecoration: 'none' }}>
                             <ArrowLeft size={14} />
@@ -327,14 +330,9 @@ export function CommissionDetailPage() {
                     </div>
                     <h1 style={{ marginTop: 16 }}>{commission.name}</h1>
                 </div>
-
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0 }}>
-                    <Link to={path(`oferta/${course.id}?editCommission=${commission.id}`)} className="secondary-button compact-button">Editar comisión</Link>
-                    {commission.status !== 'Cerrada' && <button type="button" className="secondary-button compact-button" onClick={() => setIsCloseCommissionOpen(true)}>Cerrar comisión</button>}
-                </div>
             </div>
 
-            <div className="data-table-card" style={{ padding: 20 }}>
+            <div className="academy-tabs-wrap">
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'students' | 'exams')}>
                     <TabsList variant="line" aria-label="Detalle de comisión">
                         <TabsTrigger value="overview">Resumen</TabsTrigger>
@@ -343,30 +341,45 @@ export function CommissionDetailPage() {
                     </TabsList>
                 </Tabs>
 
-                {activeTab === 'overview' && (
-                    <CommissionSummary courseName={course.name} commission={commission} studentCount={commissionStudents.length} />
-                )}
+                <div className="offer-detail-stack">
+                    {activeTab === 'overview' && (
+                        <MetricTileGrid>
+                            <MetricTile icon={<GraduationCap size={20} />} label="Alumnos" value={commissionStudents.length} />
+                            <MetricTile icon={<Gauge size={20} />} label="Cupos" value={`${commissionStudents.length}/${commission.capacity}`} />
+                            <MetricTile icon={<Users size={20} />} label="Profesores" value={commission.teachers.join(', ') || 'Sin asignar'} />
+                            <MetricTile icon={<Activity size={20} />} label="Estado" value={<StatusBadge label={commission.status} tone={statusTone} />} />
+                        </MetricTileGrid>
+                    )}
 
-                {activeTab === 'students' && (
-                    <CommissionStudentsTable
-                        rows={commissionStudents}
-                        selectedIds={selectedStudentIds}
-                        openMenuId={openMenuId}
-                        onSelectionChange={setSelectedStudentIds}
-                        onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)}
-                        onAssign={() => setIsAssignmentModalOpen(true)}
-                        assignDisabledReason={assignDisabledReason}
-                        onView={(student) => navigate(path(`alumnos/${student.id}`))}
-                        onCommunicate={openCommunication}
-                        onCertificate={openCertificate}
-                        onStatus={openStatus}
-                    />
-                )}
+                    {activeTab === 'overview' && (
+                        <CommissionSummary
+                            courseName={course.name}
+                            commission={commission}
+                            onEdit={() => navigate(path(`oferta/${course.id}?editCommission=${commission.id}`))}
+                            onCloseCommission={() => setIsCloseCommissionOpen(true)}
+                        />
+                    )}
 
-                {activeTab === 'exams' && (
-                    <CommissionExamsTab exams={commissionExams} openMenuId={openMenuId} onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)} onCreate={openExam} onEdit={openEditExam} />
-                )}
+                    {activeTab === 'students' && (
+                        <CommissionStudentsTable
+                            rows={commissionStudents}
+                            selectedIds={selectedStudentIds}
+                            openMenuId={openMenuId}
+                            onSelectionChange={setSelectedStudentIds}
+                            onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)}
+                            onAssign={() => setIsAssignmentModalOpen(true)}
+                            assignDisabledReason={assignDisabledReason}
+                            onView={(student) => navigate(path(`alumnos/${student.id}`))}
+                            onCommunicate={openCommunication}
+                            onCertificate={openCertificate}
+                            onStatus={openStatus}
+                        />
+                    )}
 
+                    {activeTab === 'exams' && (
+                        <CommissionExamsTab exams={commissionExams} openMenuId={openMenuId} onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)} onCreate={openExam} onEdit={openEditExam} />
+                    )}
+                </div>
             </div>
         </div>
     )

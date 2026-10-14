@@ -22,14 +22,14 @@ export function NoBranchBanner() {
     if (branches.length === 0) {
         if (!canCreateBranch) {
             return (
-                <div className="no-branch-banner" role="status">
+                <div className="inline-warning-banner" role="status">
                     <Building2 size={16} />
                     <span>Todavía no hay ninguna sede disponible en esta organización. Pedile al administrador que cree una.</span>
                 </div>
             )
         }
         return (
-            <div className="no-branch-banner" role="status">
+            <div className="inline-warning-banner" role="status">
                 <Building2 size={16} />
                 <span>Todavía no creaste ninguna sede — es la base de todo lo demás (alumnos, cursos, egresos). Creá la primera para empezar a cargar datos.</span>
                 <Link to={path('sedes')} className="primary-button compact-button">Crear sede</Link>
@@ -37,8 +37,19 @@ export function NoBranchBanner() {
         )
     }
 
+    // El selector global solo ofrece sedes activas; si están todas inactivas no hay nada para elegir.
+    if (!branches.some((branch) => branch.status === 'Activa')) {
+        return (
+            <div className="inline-warning-banner" role="status">
+                <Building2 size={16} />
+                <span>{session?.permissions.includes('branches.update') ? 'Todas las sedes están inactivas. Activá una para ver y cargar datos.' : 'No hay ninguna sede activa en esta organización. Pedile al administrador que active una.'}</span>
+                {session?.permissions.includes('branches.update') && <Link to={path('sedes')} className="primary-button compact-button">Ver sedes</Link>}
+            </div>
+        )
+    }
+
     return (
-        <div className="no-branch-banner" role="status">
+        <div className="inline-warning-banner" role="status">
             <Building2 size={16} />
             <span>No tenés ninguna sede seleccionada. Elegí una arriba a la izquierda para ver y cargar datos.</span>
         </div>

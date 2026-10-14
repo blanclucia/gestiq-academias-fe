@@ -16,6 +16,7 @@ import { useExpenses } from '@/services/financeRepository'
 import { usePrivateLessons } from '@/services/academy/privateLessonsRepository'
 import { useEnrollmentOpenings } from '@/services/academy/enrollmentsRepository'
 import { useAcademyBrand } from '@/theme/AcademyBrandContext'
+import { useAppBrand } from '@/theme/AppBrandContext'
 import { ProfilePage } from '@/features/profile'
 import { BranchesSettingsPage } from '@/features/branches'
 import { BillingPage, PublicPaymentPage } from '@/features/billing'
@@ -36,13 +37,23 @@ import { useActiveRole } from '@/auth/RoleContext'
 import { LegacyRedirect } from '@/workspace/LegacyRedirect'
 
 // Hydrates the theme with the organization's saved brand once settings load — otherwise the
-// UI shows the hardcoded default until someone opens "Mi academia" in that session.
+// UI shows the hardcoded default until someone opens "Mi academia" in that session. Also keeps
+// AppBrandContext's visibleName in sync: the sidebar/topbar read that (seeded once from the
+// session's organization.name at login) rather than AcademyBrandContext's brand.name, so without
+// this a renamed academy only shows its new name in the same tab, right after hitting Save —
+// any reload/relogin/other tab falls back to the stale name from the session snapshot.
 function BrandSync() {
   const { session } = useAuth()
   const canReadSettings = session?.permissions.includes('academy.update') ?? false
   const { settings } = useAcademySettings({ enabled: canReadSettings })
   const { setBrand } = useAcademyBrand()
-  useEffect(() => { if (settings) setBrand(settings.brand) }, [settings, setBrand])
+  const { config, setConfig } = useAppBrand()
+  useEffect(() => {
+    if (!settings) return
+    setBrand(settings.brand)
+    setConfig({ ...config, visibleName: settings.general.commercialName, shortName: settings.brand.shortName, logoText: settings.brand.shortName })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings, setBrand, setConfig])
   return null
 }
 

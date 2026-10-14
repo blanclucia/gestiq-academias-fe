@@ -8,7 +8,7 @@ import { EntityFormModal, FormField } from './EntityFormModal'
 afterEach(cleanup)
 
 describe('EntityFormModal validation', () => {
-    it('shows the general error, focuses the first invalid field and blocks submit', () => {
+    it('shows the specific field error (not the generic summary), focuses the first invalid field and blocks submit', () => {
         const onSubmit = vi.fn()
         render(
             <EntityFormModal open title="Formulario" onClose={() => undefined} onSubmit={onSubmit} validate={() => invalidForm('Revisá los datos.', { email: 'Email inválido.' })}>
@@ -16,9 +16,21 @@ describe('EntityFormModal validation', () => {
             </EntityFormModal>,
         )
         fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
-        expect(screen.getByRole('alert')).toHaveTextContent('Revisá los datos.')
+        expect(screen.getByRole('alert')).toHaveTextContent('Email inválido.')
         expect(screen.getByRole('textbox')).toHaveFocus()
         expect(screen.getByRole('textbox')).toHaveClass('field-invalid')
+        expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('falls back to the generic summary when no field-specific messages are available', () => {
+        const onSubmit = vi.fn()
+        render(
+            <EntityFormModal open title="Formulario" onClose={() => undefined} onSubmit={onSubmit} validate={() => ({ valid: false, message: 'Revisá los datos.' })}>
+                <FormField label="Email"><input name="email" /></FormField>
+            </EntityFormModal>,
+        )
+        fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+        expect(screen.getByRole('alert')).toHaveTextContent('Revisá los datos.')
         expect(onSubmit).not.toHaveBeenCalled()
     })
 

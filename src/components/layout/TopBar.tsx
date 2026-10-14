@@ -45,20 +45,23 @@ export function TopBar({
     const [academyMenuOpen, setAcademyMenuOpen] = useState(false)
     const academyMenuRef = useRef<HTMLDivElement>(null)
     const userMenuRef = useRef<HTMLDivElement>(null)
-    const { branches, isLoading: branchesLoading } = useBranches()
+    const { branches: allBranches, isLoading: branchesLoading } = useBranches()
+    // Las sedes inactivas siguen administrándose desde Configuración, pero no se pueden operar.
+    const branches = allBranches.filter((branch) => branch.status === 'Activa')
     const selectedBranchId = useSelectedBranchId()
     const selectedBranch = branches.find((branch) => branch.id === selectedBranchId) ?? branches[0]
     const selectedAcademy = selectedBranch?.name ?? 'Sin sede activa'
 
     // La sede seleccionada se persiste en localStorage y puede quedar apuntando a una sede que ya
-    // no existe (por ejemplo, tras una limpieza de datos) — se autolimpia acá en vez de dejar que
-    // cada pantalla que lee getSelectedBranchId() choque con un id inválido contra el backend.
+    // no existe o que se inactivó — se autolimpia acá en vez de dejar que cada pantalla que lee
+    // getSelectedBranchId() opere sobre una sede inválida.
+    const hasValidSelection = branches.some((branch) => branch.id === selectedBranchId)
     useEffect(() => {
         if (branchesLoading) return
-        if (selectedBranchId && !branches.some((branch) => branch.id === selectedBranchId)) {
+        if (selectedBranchId && !hasValidSelection) {
             setSelectedBranchId('')
         }
-    }, [branchesLoading, branches, selectedBranchId])
+    }, [branchesLoading, hasValidSelection, selectedBranchId])
     const academyName = config.visibleName || brand.name
     const academyMark = config.logoText || brand.shortName || brand.name.charAt(0).toUpperCase()
 

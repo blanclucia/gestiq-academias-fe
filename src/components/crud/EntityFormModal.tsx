@@ -74,8 +74,12 @@ export function EntityFormModal({
                             // Clear any marks from a previous failed attempt before applying this one.
                             namedFields.forEach((field) => field.classList.remove('field-invalid'))
                             if (result?.valid === false) {
-                                setSubmitError(result.message ?? 'Revisá los campos obligatorios.')
                                 const invalidKeys = result.fieldErrors ? Object.keys(result.fieldErrors) : []
+                                // Every caller already computes a specific reason per invalid field (e.g.
+                                // "Ingresá una fecha de fin válida.") — show those instead of the generic
+                                // summary passed as a fallback, which told the user nothing about what to fix.
+                                const fieldMessages = invalidKeys.map((key) => result.fieldErrors?.[key]).filter((message): message is string => Boolean(message))
+                                setSubmitError(fieldMessages.length > 0 ? fieldMessages.join(' ') : (result.message ?? 'Revisá los campos obligatorios.'))
                                 // Mark every invalid field, not just the first — a red border is a much
                                 // harder thing to miss than a focus ring that can land below the fold or
                                 // get silently lost to a re-render, and the user may have more than one
