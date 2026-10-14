@@ -65,7 +65,7 @@ export function AdminDashboardPage() {
             <div className="page-header">
                 <div>
                     <h1>Dashboard académico</h1>
-                    <p>{selectedBranch && <>Sede <strong>{selectedBranch.name}</strong> · </>}{activeCycle ? <>Ciclo lectivo <strong>{activeCycle.name}</strong> · </> : 'Sin ciclo lectivo activo · '}Este mes: <strong>{currentMonthLabel}</strong></p>
+                    <p>{selectedBranch && <>Sede <strong>{selectedBranch.name}</strong> · </>}{activeCycle ? <>Ciclo lectivo <strong>{activeCycle.name}</strong> · </> : 'Sin ciclo lectivo activo · '}Mes de <strong>{currentMonthLabel}</strong></p>
                 </div>
             </div>
 
