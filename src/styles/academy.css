@@ -18,32 +18,14 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 24px;
-  padding: 4px 0 8px;
+  padding-top: 4px;
 }
 
-.offer-overview-description {
-  max-width: 720px;
-  margin: 10px 0;
-  color: var(--text);
-  font-size: 1rem;
-  line-height: 1.6;
-}
-
-.offer-overview-meta,
 .offer-overview-actions {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-.offer-overview-meta>span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 0.86rem;
-  font-weight: 650;
 }
 
 .offer-overview-columns {
@@ -80,9 +62,31 @@
 
 .offer-detail-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 18px 24px;
   margin: 0;
+}
+
+/* Estado is a short badge: let it size to content and give Descripción the rest of the row. */
+.offer-detail-list.offer-summary-list {
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 48px;
+}
+
+@media (max-width: 640px) {
+  .offer-detail-list.offer-summary-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+.offer-detail-list dd.offer-detail-text {
+  max-width: 720px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.offer-detail-list dd.offer-detail-empty {
+  color: var(--muted);
 }
 
 .offer-detail-list div {
