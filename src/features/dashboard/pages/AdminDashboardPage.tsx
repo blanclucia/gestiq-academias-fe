@@ -22,7 +22,8 @@ export function AdminDashboardPage() {
     const activeCycle = listAcademicCycles().find((cycle) => cycle.id === activeCycleId)
     const today = new Date()
     const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
-    const currentMonthLabel = new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric' }).format(today)
+    // With a cycle shown next to it the year is redundant; keep it only when there's no cycle to anchor the month.
+    const currentMonthLabel = new Intl.DateTimeFormat('es-AR', activeCycle ? { month: 'long' } : { month: 'long', year: 'numeric' }).format(today)
     const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
     const reminderLimit = new Date(today)
     reminderLimit.setDate(reminderLimit.getDate() + 14)
@@ -62,7 +63,7 @@ export function AdminDashboardPage() {
             <div className="page-header">
                 <div>
                     <h1>Dashboard académico</h1>
-                    <p>Este mes: <strong>{currentMonthLabel}</strong> · {activeCycle?.name ?? 'ciclo seleccionado'}</p>
+                    <p>{activeCycle ? <>Ciclo lectivo <strong>{activeCycle.name}</strong> · </> : 'Sin ciclo lectivo activo · '}Este mes: <strong>{currentMonthLabel}</strong></p>
                 </div>
             </div>
 
