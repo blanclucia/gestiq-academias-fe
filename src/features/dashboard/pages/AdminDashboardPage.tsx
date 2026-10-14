@@ -7,7 +7,7 @@ import { getExpenseDisplayStatus, listExpenses, useFinanceRepositoryVersion } fr
 import { listUpcomingAgendaEvents, useAgendaRepositoryVersion } from '@/services/agendaRepository'
 import { calculateOccupancy } from '@/domain/commissions/commissionRules'
 import { formatCurrencyARS, formatShortDate } from '@/domain/shared/formattingRules'
-import { useSelectedBranchId } from '@/services/branchRepository'
+import { useBranches, useSelectedBranchId } from '@/services/branchRepository'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
 const currency = { format: formatCurrencyARS }
@@ -18,6 +18,8 @@ export function AdminDashboardPage() {
     useFinanceRepositoryVersion()
     useAgendaRepositoryVersion()
     const selectedBranchId = useSelectedBranchId()
+    const { branches } = useBranches()
+    const selectedBranch = branches.find((branch) => branch.id === selectedBranchId)
     const activeCycleId = getActiveAcademicCycleId()
     const activeCycle = listAcademicCycles().find((cycle) => cycle.id === activeCycleId)
     const today = new Date()
@@ -63,7 +65,7 @@ export function AdminDashboardPage() {
             <div className="page-header">
                 <div>
                     <h1>Dashboard académico</h1>
-                    <p>{activeCycle ? <>Ciclo lectivo <strong>{activeCycle.name}</strong> · </> : 'Sin ciclo lectivo activo · '}Este mes: <strong>{currentMonthLabel}</strong></p>
+                    <p>{selectedBranch && <>Sede <strong>{selectedBranch.name}</strong> · </>}{activeCycle ? <>Ciclo lectivo <strong>{activeCycle.name}</strong> · </> : 'Sin ciclo lectivo activo · '}Este mes: <strong>{currentMonthLabel}</strong></p>
                 </div>
             </div>
 
