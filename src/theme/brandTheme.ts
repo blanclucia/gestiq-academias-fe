@@ -59,3 +59,41 @@ export function applyAppBrandConfig(config: AppBrandConfig = defaultAppBrandConf
     root.style.setProperty('--brand-short-name', config.shortName ?? config.visibleName.slice(0, 2).toUpperCase())
     root.style.setProperty('--logo-text', config.logoText ?? config.visibleName.charAt(0).toUpperCase())
 }
+
+// The real brand only arrives after the session refresh and the settings request, so the default
+// purple would flash on every reload. The last known colors are cached (colors only — a logo data
+// URL can weigh up to 1 MB) and applied before the first render, like the dark mode flag.
+const brandColorsCacheKey = 'gestiq-academy-brand-colors'
+
+type BrandColors = Pick<AcademyBrand, 'primary' | 'primaryStrong' | 'primarySoft' | 'primaryContrast' | 'accent'>
+type CachedBrandColors = { organizationId: string; colors: BrandColors }
+
+function readBrandColorsCache(): CachedBrandColors | null {
+    try {
+        const cached = JSON.parse(window.localStorage.getItem(brandColorsCacheKey) ?? 'null') as CachedBrandColors | null
+        return cached?.organizationId && cached.colors?.primary ? cached : null
+    } catch {
+        return null
+    }
+}
+
+// Without an organization id (session still loading) the last organization's colors are the best guess.
+export function readCachedBrandColors(organizationId?: string): Partial<BrandColors> {
+    const cached = readBrandColorsCache()
+    if (!cached || (organizationId && cached.organizationId !== organizationId)) return {}
+    return cached.colors
+}
+
+export function cacheBrandColors(organizationId: string, { primary, primaryStrong, primarySoft, primaryContrast, accent }: AcademyBrand) {
+    try {
+        window.localStorage.setItem(brandColorsCacheKey, JSON.stringify({ organizationId, colors: { primary, primaryStrong, primarySoft, primaryContrast, accent } }))
+    } catch {
+        // Storage can be unavailable (private mode, quota); the brand still applies once settings load.
+    }
+}
+
+export function applyCachedBrandColors() {
+    const colors = readCachedBrandColors()
+    if (colors.primary) applyAcademyBrand({ ...defaultAcademyBrand, ...colors })
+}
+

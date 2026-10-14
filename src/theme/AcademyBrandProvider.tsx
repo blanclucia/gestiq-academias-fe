@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useState, type ReactNode } from 'react'
 import {
     AcademyBrandContext,
     defaultAcademyBrand,
@@ -17,7 +17,8 @@ export function AcademyBrandProvider({
 }: AcademyBrandProviderProps) {
     const [brand, setBrand] = useState<AcademyBrand>(initialBrand)
 
-    useEffect(() => {
+    // Layout effect: apply before paint so a remount never shows the previous colors for a frame.
+    useLayoutEffect(() => {
         applyAcademyBrand(brand)
     }, [brand])
 

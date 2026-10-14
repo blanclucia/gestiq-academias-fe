@@ -25,7 +25,7 @@ import { AgendaPage } from '@/features/agenda'
 import { StudentDetailPage, StudentsPage } from '@/features/students'
 import { AcademyBrandProvider } from '@/theme/AcademyBrandProvider'
 import { AppBrandProvider } from '@/theme/AppBrandProvider'
-import { defaultAcademyBrand, defaultAppBrandConfig } from '@/theme/brandTheme'
+import { cacheBrandColors, defaultAcademyBrand, defaultAppBrandConfig, readCachedBrandColors } from '@/theme/brandTheme'
 import { LoginPage } from '@/auth/LoginPage'
 import { useAuth } from '@/auth/AuthContext'
 import { RequireSession } from '@/auth/RequireSession'
@@ -48,12 +48,14 @@ function BrandSync() {
   const { settings } = useAcademySettings({ enabled: canReadSettings })
   const { setBrand } = useAcademyBrand()
   const { config, setConfig } = useAppBrand()
+  const organizationId = session?.organization.id
   useEffect(() => {
     if (!settings) return
     setBrand(settings.brand)
+    if (organizationId) cacheBrandColors(organizationId, settings.brand)
     setConfig({ ...config, visibleName: settings.general.commercialName, shortName: settings.brand.shortName, logoText: settings.brand.shortName })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings, setBrand, setConfig])
+  }, [settings, setBrand, setConfig, organizationId])
   return null
 }
 
@@ -146,7 +148,7 @@ function App() {
         logoText: name.slice(0, 2).toUpperCase(),
       }}
     >
-      <AcademyBrandProvider initialBrand={{ ...defaultAcademyBrand, name, shortName: name.slice(0, 2).toUpperCase() }}>
+      <AcademyBrandProvider initialBrand={{ ...defaultAcademyBrand, ...readCachedBrandColors(session?.organization.id), name, shortName: name.slice(0, 2).toUpperCase() }}>
         <BrandSync />
         <StudentsSync />
         <AcademicOffersSync />
