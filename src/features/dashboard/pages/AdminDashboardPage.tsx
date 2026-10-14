@@ -7,7 +7,7 @@ import { getExpenseDisplayStatus, listExpenses, useFinanceRepositoryVersion } fr
 import { listUpcomingAgendaEvents, useAgendaRepositoryVersion } from '@/services/agendaRepository'
 import { calculateOccupancy } from '@/domain/commissions/commissionRules'
 import { formatCurrencyARS, formatShortDate } from '@/domain/shared/formattingRules'
-import { useBranches, useSelectedBranchId } from '@/services/branchRepository'
+import { useBranchRoster, useBranches, useSelectedBranchId } from '@/services/branchRepository'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
 const currency = { format: formatCurrencyARS }
@@ -20,6 +20,7 @@ export function AdminDashboardPage() {
     const selectedBranchId = useSelectedBranchId()
     const { branches } = useBranches()
     const selectedBranch = branches.find((branch) => branch.id === selectedBranchId)
+    const { roster } = useBranchRoster(selectedBranchId || undefined)
     const activeCycleId = getActiveAcademicCycleId()
     const activeCycle = listAcademicCycles().find((cycle) => cycle.id === activeCycleId)
     const today = new Date()
@@ -31,7 +32,7 @@ export function AdminDashboardPage() {
     reminderLimit.setDate(reminderLimit.getDate() + 14)
     const reminderLimitKey = `${reminderLimit.getFullYear()}-${String(reminderLimit.getMonth() + 1).padStart(2, '0')}-${String(reminderLimit.getDate()).padStart(2, '0')}`
     const expenseReminders = listExpenses().filter((expense) => expense.branchId === selectedBranchId && expense.status !== 'Pagado' && expense.dueDate && expense.dueDate <= reminderLimitKey).slice(0, 4)
-    const upcomingAgendaEvents = listUpcomingAgendaEvents(todayKey, 5, ['clase'])
+    const upcomingAgendaEvents = listUpcomingAgendaEvents(todayKey, 5, ['clase'], { branchId: selectedBranchId, teacherUserIds: roster.teacherIds })
 
     const data = (() => {
         const students = listStudents().filter((student) => student.branchId === selectedBranchId)
@@ -50,7 +51,7 @@ export function AdminDashboardPage() {
             courses,
             activeStudents: students.filter((student) => student.status === 'Activo').length,
             pendingStudents: students.filter((student) => student.status === 'Pendiente').length,
-            activeTeachers: listStaff().filter((teacher) => teacher.status === 'Activo').length,
+            activeTeachers: listStaff().filter((teacher) => teacher.status === 'Activo' && teacher.userId !== undefined && roster.teacherIds.includes(teacher.userId)).length,
             commissions,
             confirmedPayments,
             pendingPayments,

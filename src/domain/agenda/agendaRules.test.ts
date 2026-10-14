@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatAgendaTime, getAgendaDatesInYear, getAgendaRangeSegments, getCalendarDays, getWeeklyAgendaDates, shiftAgendaDate } from './agendaRules'
+import { formatAgendaTime, getAgendaDatesInYear, getAgendaRangeSegments, getCalendarDays, getWeeklyAgendaDates, isAgendaEventInBranch, shiftAgendaDate } from './agendaRules'
 
 describe('agenda rules', () => {
     it('creates a stable six-week calendar grid', () => {
@@ -22,5 +22,26 @@ describe('agenda rules', () => {
         expect(shiftAgendaDate('2026-12-31', 1)).toBe('2027-01-01')
         expect(getAgendaDatesInYear('2025-12-30', '2026-01-02', 2026)).toEqual(['2026-01-01', '2026-01-02'])
         expect(getWeeklyAgendaDates('2026-09-07', '2026-09-13', [1, 3], 2026)).toEqual(['2026-09-07', '2026-09-09'])
+    })
+})
+
+describe('isAgendaEventInBranch', () => {
+    const scope = { branchId: 'b1', teacherUserIds: ['u-teacher'] }
+    const commissions = new Map([['c1', 'b1'], ['c2', 'b2']])
+
+    it('keeps academy-wide events and those of the selected branch', () => {
+        expect(isAgendaEventInBranch({}, scope, commissions)).toBe(true)
+        expect(isAgendaEventInBranch({ branchId: 'b1' }, scope, commissions)).toBe(true)
+        expect(isAgendaEventInBranch({ branchId: 'b2' }, scope, commissions)).toBe(false)
+    })
+
+    it('resolves commission events through the commission branch', () => {
+        expect(isAgendaEventInBranch({ commissionId: 'c1' }, scope, commissions)).toBe(true)
+        expect(isAgendaEventInBranch({ commissionId: 'c2' }, scope, commissions)).toBe(false)
+    })
+
+    it('shows staff birthdays only for staff in the branch roster', () => {
+        expect(isAgendaEventInBranch({ staffUserId: 'u-teacher' }, scope, commissions)).toBe(true)
+        expect(isAgendaEventInBranch({ staffUserId: 'u-other' }, scope, commissions)).toBe(false)
     })
 })

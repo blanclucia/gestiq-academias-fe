@@ -68,3 +68,15 @@ export function getAgendaDatesInYear(startDate: string, endDate: string, year: n
 export function getWeeklyAgendaDates(startDate: string, endDate: string, weekdays: number[], year: number) {
     return getAgendaDatesInYear(startDate, endDate, year).filter((date) => weekdays.includes(new Date(`${date}T12:00:00`).getDay()))
 }
+
+export type AgendaBranchScope = { branchId: string; teacherUserIds: string[] }
+
+type BranchScopedEvent = { branchId?: string; commissionId?: string; staffUserId?: string }
+
+// Staff birthdays follow the branch roster (a teacher can work at several branches); commission
+// events resolve their branch through the commission; anything without a branch is academy-wide.
+export function isAgendaEventInBranch(event: BranchScopedEvent, scope: AgendaBranchScope, commissionBranchIds: Map<string, string>) {
+    if (event.staffUserId) return scope.teacherUserIds.includes(event.staffUserId)
+    const branchId = event.branchId ?? (event.commissionId ? commissionBranchIds.get(event.commissionId) : undefined)
+    return branchId === undefined || branchId === scope.branchId
+}
