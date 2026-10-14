@@ -70,7 +70,7 @@ export function AdminDashboardPage() {
             <div className="kpi-grid">
                 <KpiCard title="Alumnos activos" value={String(data.activeStudents)} change={`${data.pendingStudents} pendientes de activación`} positive={false} />
                 <KpiCard title="Docentes activos" value={String(data.activeTeachers)} change={`Asignados a ${data.commissions.length} comisiones`} />
-                <KpiCard title="Curso vigente" value={String(data.courses.length)} change={`${data.commissions.length} comisiones configuradas`} />
+                <KpiCard title="Cursos vigentes" value={String(data.courses.length)} change={`${data.commissions.length} comisiones configuradas`} />
                 <KpiCard title="Inscripciones registradas" value={String(data.registrations)} change="Con pago pendiente de confirmar" positive={false} />
             </div>
 
