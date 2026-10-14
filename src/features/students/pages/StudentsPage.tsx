@@ -604,7 +604,7 @@ export function StudentsPage() {
             <CrudListPage
                 contentInset
                 title="Alumnos"
-                description="Seguimiento de estudiantes, cupos, pagos y próximas clases."
+                description="Registro de alumnos de la sede y su asignación a comisiones."
                 searchValue={search}
                 onSearchChange={setSearch}
                 searchPlaceholder="Buscar alumno o email"
