@@ -5,7 +5,7 @@ import { SectionHeading } from '@/components/ui/SectionHeading'
 import type { AcademicCommission } from '@/services/academyRepository'
 import { CommissionTable } from './CommissionTable'
 
-type Props = { rows: AcademicCommission[]; search: string; openMenuId: string | null; onSearchChange: (value: string) => void; onOpenFilters: () => void; filterChips?: ReactNode; onCreate: () => void; onToggleMenu: (id: string) => void; onView: (commission: AcademicCommission) => void; onDuplicate: (commission: AcademicCommission) => void; onEdit: (commission: AcademicCommission) => void; onDelete: (commission: AcademicCommission) => void }
+type Props = { rows: AcademicCommission[]; search: string; openMenuId: string | null; onSearchChange: (value: string) => void; onOpenFilters: () => void; filterChips?: ReactNode; onCreate: () => void; onToggleMenu: (id: string) => void; onView: (commission: AcademicCommission) => void; onViewStudents: (commission: AcademicCommission) => void; onDuplicate: (commission: AcademicCommission) => void; onEdit: (commission: AcademicCommission) => void; onDelete: (commission: AcademicCommission) => void }
 
 export function OfferCommissionsCard(props: Props) {
     return <Card className="offer-commissions-card"><div style={{ marginTop: 0 }}>
@@ -18,6 +18,6 @@ export function OfferCommissionsCard(props: Props) {
             </div>
             <button type="button" className="primary-button compact-button" onClick={props.onCreate}><Plus size={16} /> Nueva comisión</button>
         </div>
-        <CommissionTable rows={props.rows} openMenuId={props.openMenuId} onToggleMenu={props.onToggleMenu} onView={props.onView} onDuplicate={props.onDuplicate} onEdit={props.onEdit} onDelete={props.onDelete} />
+        <CommissionTable rows={props.rows} openMenuId={props.openMenuId} onToggleMenu={props.onToggleMenu} onView={props.onView} onViewStudents={props.onViewStudents} onDuplicate={props.onDuplicate} onEdit={props.onEdit} onDelete={props.onDelete} />
     </div></Card>
 }

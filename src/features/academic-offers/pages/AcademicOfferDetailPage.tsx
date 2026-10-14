@@ -529,6 +529,7 @@ export function AcademicOfferDetailPage() {
                             }}
                             onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)}
                             onView={(commission) => navigate(path(`oferta/${course.id}/comisiones/${commission.id}`))}
+                            onViewStudents={(commission) => navigate(path(`oferta/${course.id}/comisiones/${commission.id}?tab=students`))}
                             onDuplicate={handleDuplicateCommission}
                             onEdit={openEditCommissionModal}
                             onDelete={setDeleteCommissionTarget}

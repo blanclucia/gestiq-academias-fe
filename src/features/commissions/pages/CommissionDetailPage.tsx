@@ -1,6 +1,6 @@
 import { Activity, ArrowLeft, Award, Gauge, GraduationCap, Mail, MessageCircle, Send, Users } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -20,12 +20,19 @@ import { CommissionExamModal, type CommissionExamAudience, type CommissionExamFo
 import { getActiveExamStudents, resolveExamStudentIds } from '@/domain/examinations/examinationRules'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
+type CommissionTab = 'overview' | 'students' | 'exams'
+
 export function CommissionDetailPage() {
     useAcademyRepositoryVersion()
     const { courseId, commissionId } = useParams()
     const navigate = useNavigate()
     const { path } = useWorkspace()
-    const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'exams'>('overview')
+    // The active tab lives in the URL (?tab=students) so links can open a specific tab and going back
+    // from a student's profile returns to the same one.
+    const [searchParams, setSearchParams] = useSearchParams()
+    const requestedTab = searchParams.get('tab')
+    const activeTab: CommissionTab = requestedTab === 'students' || requestedTab === 'exams' ? requestedTab : 'overview'
+    const setActiveTab = (tab: CommissionTab) => setSearchParams(tab === 'overview' ? {} : { tab }, { replace: true })
     const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false)
     const [isCloseCommissionOpen, setIsCloseCommissionOpen] = useState(false)
     const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([])
@@ -333,7 +340,7 @@ export function CommissionDetailPage() {
             </div>
 
             <div className="academy-tabs-wrap">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'students' | 'exams')}>
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CommissionTab)}>
                     <TabsList variant="line" aria-label="Detalle de comisión">
                         <TabsTrigger value="overview">Resumen</TabsTrigger>
                         <TabsTrigger value="students">Alumnos</TabsTrigger>
