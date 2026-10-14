@@ -78,7 +78,9 @@ export function SearchableSelect({ value, options, onChange, placeholder = 'Busc
             name={name}
             aria-label={ariaLabel}
             className="form-input"
-            value={query}
+            // While closed, always show the current selection — the query only matters while searching,
+            // and reading it here would leave stale text whenever `value` changes from outside.
+            value={open ? query : selectedOption?.label ?? ''}
             disabled={disabled}
             onChange={(event) => { setQuery(event.target.value); setOpen(true); setHighlightedIndex(0) }}
             // Clear the query on focus so the full option list shows right away — otherwise it's

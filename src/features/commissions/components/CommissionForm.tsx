@@ -6,8 +6,7 @@ import { QuickCreateTeacherModal } from '@/features/staff'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { getActiveAcademicCycleId, listCourses, listStaff, useAcademyRepositoryVersion } from '@/services/academyRepository'
 import { useEffect, useRef, useState } from 'react'
-
-const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+import { commissionWeekDays as weekDays, parseCommissionSchedule } from '../model/commissionSchedule'
 
 function TeacherMultiSelect({ options, value, onChange }: { options: Array<{ id: string; fullName: string }>; value: string[]; onChange: (value: string[]) => void }) {
     const [open, setOpen] = useState(false)
@@ -73,7 +72,6 @@ export type CommissionFormValue = {
 }
 
 function getInitialValue(initialValues?: { name?: string; teacher?: string; teachers?: string[]; capacity?: number; amount?: number; startDate?: string; endDate?: string; dueDay?: number; status?: CommissionFormValue['status']; schedule?: string }): CommissionFormValue {
-    const schedule = initialValues?.schedule ?? ''
     return {
         name: initialValues?.name ?? '',
         teachers: initialValues?.teachers ?? (initialValues?.teacher && initialValues.teacher !== 'Docente por asignar' ? [initialValues.teacher] : []),
@@ -83,9 +81,7 @@ function getInitialValue(initialValues?: { name?: string; teacher?: string; teac
         endDate: initialValues?.endDate ?? '2026-12-15',
         dueDay: initialValues?.dueDay ?? 10,
         status: initialValues?.status ?? 'Programada',
-        days: weekDays.filter((day) => schedule.includes(day.slice(0, 3))),
-        fromTime: schedule.match(/(\d{2}:\d{2})/)?.[1] ?? '18:30',
-        toTime: schedule.match(/-\s*(\d{2}:\d{2})/)?.[1] ?? '20:00',
+        ...parseCommissionSchedule(initialValues?.schedule),
     }
 }
 

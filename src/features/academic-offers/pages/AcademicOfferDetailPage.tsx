@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { type AcademicCommission, getActiveAcademicCycleId, listAcademicCycles, listCourses, listEnrollmentOpenings, useAcademyRepositoryVersion, useCreateCommission, useCreateEnrollmentOpening, useDeleteCommission, useDeleteEnrollmentOpening, useUpdateCommission, useUpdateCourse, useUpdateEnrollmentOpening } from '@/services/academyRepository'
 import { isCommissionNameConflict, isCourseClosed } from '@/services/organization/academicOffersApi'
 import { isCourseNotActive } from '@/services/organization/enrollmentsApi'
-import { validateCommission } from '@/features/commissions'
+import { formatCommissionSchedule, parseCommissionSchedule, validateCommission } from '@/features/commissions'
 import { validateEnrollment } from '@/features/enrollments'
 import { validateConditions } from '@/components/forms/formValidation'
 import { OfferSummaryCard } from '../components/OfferSummaryCard'
@@ -25,11 +25,6 @@ import { useToast } from '@/components/ui/ToastContext'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
 type CourseCommission = AcademicCommission
-
-function formatCommissionSchedule(value: CommissionFormValue) {
-    const days = value.days.map((day) => day.slice(0, 3)).join(' / ')
-    return days ? `${days} · ${value.fromTime} - ${value.toTime}` : `Horario a definir · ${value.fromTime} - ${value.toTime}`
-}
 
 function defaultEnrollmentWindow() {
     const start = new Date()
@@ -63,7 +58,7 @@ export function AcademicOfferDetailPage() {
     const [isEditEnrollmentOpen, setIsEditEnrollmentOpen] = useState(false)
     const [newCommissionForm, setNewCommissionForm] = useState<CommissionFormValue>(() => emptyCommissionForm(undefined, undefined, defaultCommissionCapacity))
     const [courseForm, setCourseForm] = useState<CourseFormValue>({ name: '', description: '', status: 'Borrador' })
-    const [editingCommissionForm, setEditingCommissionForm] = useState<CommissionFormValue>(() => ({ name: requestedCommission?.name ?? '', teachers: requestedCommission?.teachers ?? (requestedCommission?.teacher ? [requestedCommission.teacher] : []), capacity: requestedCommission?.capacity ?? 20, amount: requestedCommission?.amount ?? 48000, startDate: requestedCommission?.startDate ?? '2026-03-01', endDate: requestedCommission?.endDate ?? '2026-12-15', dueDay: requestedCommission?.dueDay ?? 10, status: requestedCommission?.status ?? 'Programada', days: [], fromTime: '18:30', toTime: '20:00' }))
+    const [editingCommissionForm, setEditingCommissionForm] = useState<CommissionFormValue>(() => ({ name: requestedCommission?.name ?? '', teachers: requestedCommission?.teachers ?? (requestedCommission?.teacher && requestedCommission.teacher !== 'Docente por asignar' ? [requestedCommission.teacher] : []), capacity: requestedCommission?.capacity ?? 20, amount: requestedCommission?.amount ?? 48000, startDate: requestedCommission?.startDate ?? '2026-03-01', endDate: requestedCommission?.endDate ?? '2026-12-15', dueDay: requestedCommission?.dueDay ?? 10, status: requestedCommission?.status ?? 'Programada', ...parseCommissionSchedule(requestedCommission?.schedule) }))
     const [editingCommission, setEditingCommission] = useState<CourseCommission | null>(requestedCommission)
     const [viewCommission, setViewCommission] = useState<CourseCommission | null>(null)
     const [deleteCommissionTarget, setDeleteCommissionTarget] = useState<CourseCommission | null>(null)
@@ -192,7 +187,7 @@ export function AcademicOfferDetailPage() {
 
     const openEditCommissionModal = (commission: (typeof course.commissions)[number]) => {
         setEditingCommission(commission)
-        setEditingCommissionForm({ name: commission.name, teachers: commission.teachers, capacity: commission.capacity, amount: commission.amount, startDate: commission.startDate, endDate: commission.endDate, dueDay: commission.dueDay, status: commission.status, days: ['Lunes', 'Miércoles', 'Viernes'].filter((day) => commission.schedule.includes(day.slice(0, 3))), fromTime: commission.schedule.match(/(\d{2}:\d{2})/)?.[1] ?? '18:30', toTime: commission.schedule.match(/-\s*(\d{2}:\d{2})/)?.[1] ?? '20:00' })
+        setEditingCommissionForm({ name: commission.name, teachers: commission.teachers, capacity: commission.capacity, amount: commission.amount, startDate: commission.startDate, endDate: commission.endDate, dueDay: commission.dueDay, status: commission.status, ...parseCommissionSchedule(commission.schedule) })
         setIsEditCommissionOpen(true)
     }
 
