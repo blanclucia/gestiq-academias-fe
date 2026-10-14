@@ -110,10 +110,13 @@ export function AcademicOfferDetailPage() {
             }
         })
     const allEnrollmentRows = persistedEnrollmentRows
-    const assignedStudents = course.commissions.reduce((total, commission) => total + commission.studentsCount, 0)
-    const totalCapacity = course.commissions.reduce((total, commission) => total + commission.capacity, 0)
+    // Cerradas ya terminaron: sus cupos no están disponibles, así que no cuentan para alumnos ni ocupación.
+    const currentCommissions = course.commissions.filter((commission) => commission.status !== 'Cerrada')
+    const assignedStudents = currentCommissions.reduce((total, commission) => total + commission.studentsCount, 0)
+    const totalCapacity = currentCommissions.reduce((total, commission) => total + commission.capacity, 0)
     const occupancyPercentage = calculateOccupancy(assignedStudents, totalCapacity)
     const activeCommissions = course.commissions.filter((commission) => commission.status === 'Activa').length
+    const scheduledCommissions = course.commissions.filter((commission) => commission.status === 'Programada').length
     const openEnrollments = allEnrollmentRows.filter((enrollment) => enrollment.status === 'Abierta')
     const commissionFilterFields = [
         { key: 'commission', label: 'Comisión', options: course.commissions.map((commission) => commission.name) },
@@ -500,9 +503,9 @@ export function AcademicOfferDetailPage() {
                 <div className="offer-detail-stack">
                     {activeTab === 'overview' && (
                         <MetricTileGrid>
-                            <MetricTile icon={<Users size={20} />} label="Alumnos" value={assignedStudents} caption="asignados al curso" />
-                            <MetricTile icon={<Gauge size={20} />} label="Ocupación" value={`${occupancyPercentage}%`} caption={`${assignedStudents} de ${totalCapacity} cupos`} />
-                            <MetricTile icon={<CalendarDays size={20} />} label="Comisiones" value={course.commissions.length} caption={`${activeCommissions} activas`} />
+                            <MetricTile icon={<CalendarDays size={20} />} label="Comisiones" value={course.commissions.length} caption={scheduledCommissions > 0 ? `${activeCommissions} activas · ${scheduledCommissions} programadas` : `${activeCommissions} activas`} />
+                            <MetricTile icon={<Users size={20} />} label="Alumnos asignados" value={assignedStudents} caption="en comisiones activas y programadas" />
+                            <MetricTile icon={<Gauge size={20} />} label="Ocupación" value={`${occupancyPercentage}%`} caption={`${assignedStudents} de ${totalCapacity} cupos en comisiones activas y programadas`} />
                             <MetricTile icon={<CheckCircle2 size={20} />} label="Inscripciones" value={openEnrollments.length} caption="abiertas ahora" />
                         </MetricTileGrid>
                     )}
