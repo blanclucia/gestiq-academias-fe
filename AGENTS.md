@@ -64,6 +64,15 @@ Este proyecto debe seguir la estrategia definida en `estrategia-frontend-platafo
 - Pensar en bulk actions, importación masiva, asignación grupal y flujo de trabajo como parte de la base del producto.
 - La experiencia debe ser simple, clara y operativa para el usuario final, aunque la arquitectura interna sea sólida.
 
+### Contenido de tabs
+
+- En páginas de detalle (oferta, comisión, inscripción, alumno, configuración), el contenido de cada tab va dentro de `Card` con un `SectionHeading`: ícono, título y, si aplica, descripción y acciones. Nunca tablas o listas sueltas sobre el fondo de la página.
+- El título es obligatorio aunque la tab tenga una sola card y repita su nombre (ej. tab "Alumnos" → card "Alumnos"). Preferir un título más específico cuando aporte información (ej. tab "Cobros" → "Configuración de cobros").
+- El contador de registros va como `description` del `SectionHeading` (ej. "2 alumnos asignados") y la acción principal de la card en `actions`, no en una barra aparte.
+- Las cards de una tab se apilan dentro de `.offer-detail-stack`: el `gap` del contenedor define la separación, sin márgenes propios.
+- Los datos de solo lectura van como pares etiqueta/valor en `dl.offer-detail-list`, no como texto suelto ni badges sin etiqueta.
+- Excepción: cuando las tabs filtran o cambian el listado de una página (Cobros, Finanzas → Egresos, Oferta académica → Cursos/Particulares), el título es el de la página y la tab funciona como filtro; no se agrega un título por tab.
+
 ## Arquitectura y organización por módulos
 
 GestIQ utiliza una arquitectura **feature-first**. Las pantallas y componentes de negocio deben organizarse por módulo funcional, no agruparse en una carpeta global `pages` ni mezclarse con las primitivas compartidas.
