@@ -1,6 +1,8 @@
 import { ArrowLeft, CalendarDays, GraduationCap, Mail, Phone } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Card } from '@/components/ui/Card'
+import { SectionHeading } from '@/components/ui/SectionHeading'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DataTable } from '@/components/ui/DataTable'
 import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
@@ -115,10 +117,8 @@ export function StudentDetailPage() {
                 )}
 
                 {activeTab === 'courses' && (
-                    <div className="detail-section">
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                            <span style={{ color: 'var(--muted)' }}>{commissionHistory.length} comisiones registradas</span>
-                        </div>
+                    <Card className="detail-section">
+                        <SectionHeading icon={<GraduationCap size={20} />} title="Cursos y comisiones" description={`${commissionHistory.length} comisi${commissionHistory.length === 1 ? 'ón registrada' : 'ones registradas'}`} />
                         <DataTable
                             rows={commissionHistory}
                             getRowKey={(entry) => `${entry.courseName}-${entry.commissionName}`}
@@ -132,7 +132,7 @@ export function StudentDetailPage() {
                                 { key: 'status', header: 'Estado', accessor: (entry) => <StatusBadge label={entry.status} tone={entry.status === 'Activo' ? 'success' : entry.status === 'Pausado' ? 'warning' : entry.status === 'Baja' ? 'danger' : 'neutral'} />, align: 'center' },
                             ]}
                         />
-                    </div>
+                    </Card>
                 )}
 
             </div>

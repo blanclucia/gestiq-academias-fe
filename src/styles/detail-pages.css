@@ -12,8 +12,6 @@
 .detail-info-title { margin: 0 0 12px; }
 .detail-info-list { margin: 0; padding-left: 18px; color: var(--muted); line-height: 1.8; }
 .detail-info-copy { margin: 0; color: var(--muted); line-height: 1.7; }
-.detail-list-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
-.detail-list-meta { display: block; margin-top: 3px; color: var(--muted); }
 .detail-row-title { font-weight: 700; }
 .detail-row-meta { color: var(--muted); font-size: 13px; }
 .detail-row-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }

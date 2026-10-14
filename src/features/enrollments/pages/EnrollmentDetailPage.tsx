@@ -1,8 +1,10 @@
 import { ArrowLeft, CalendarDays, CheckCircle2, CreditCard, ExternalLink, StickyNote, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { Card } from '@/components/ui/Card'
 import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import { SectionHeading } from '@/components/ui/SectionHeading'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -237,11 +239,8 @@ export function EnrollmentDetailPage() {
                 )}
 
                 {activeTab === 'students' && (
-                    <div className="enrollment-students-view">
-                        <div className="detail-list-heading">
-                            <div><strong>Inscriptos</strong><span className="detail-list-meta">{registrations.length} alumnos</span></div>
-                            {publicEnrollmentLink && <a className="secondary-button compact-button" href={publicEnrollmentLink} target="_blank" rel="noreferrer"><ExternalLink size={15} />Abrir formulario público</a>}
-                        </div>
+                    <Card className="enrollment-students-view">
+                        <SectionHeading icon={<Users size={20} />} title="Inscriptos" description={`${registrations.length} alumno${registrations.length === 1 ? '' : 's'} inscripto${registrations.length === 1 ? '' : 's'}`} actions={publicEnrollmentLink ? <a className="secondary-button compact-button" href={publicEnrollmentLink} target="_blank" rel="noreferrer"><ExternalLink size={15} />Abrir formulario público</a> : undefined} />
 
                         <div className="enrollment-commission-groups">
                             {[...commissionGroups, ...(unassignedStudents.length > 0 ? [{ id: 'unassigned', name: 'Sin comisión asignada', schedule: 'Requiere revisión', capacity: unassignedStudents.length, students: unassignedStudents }] : [])].map((commission) => (
@@ -281,7 +280,7 @@ export function EnrollmentDetailPage() {
                                 </section>
                             ))}
                         </div>
-                    </div>
+                    </Card>
                 )}
 
             </div>
