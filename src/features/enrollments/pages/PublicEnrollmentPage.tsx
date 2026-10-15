@@ -97,7 +97,7 @@ export function PublicEnrollmentPage() {
     };
     const requiredFields = new Set(requiredFieldsFromApi(settings.enrollments.requiredFields));
     const enabledMethods = paymentMethodsFromApi(settings.payments.enabledMethods);
-    const paymentOptions = getPublicPaymentOptions({ enabledMethods, paymentLink: settings.payments.paymentLink, transferAlias: settings.payments.transferAlias, transferCbu: settings.payments.transferCbu });
+    const paymentOptions = getPublicPaymentOptions({ ...settings.payments, enabledMethods });
     const canUseMercadoPago = paymentOptions.mercadoPago;
     const canUseTransferencia = paymentOptions.transfer;
     const canUseEfectivo = paymentOptions.inPerson;

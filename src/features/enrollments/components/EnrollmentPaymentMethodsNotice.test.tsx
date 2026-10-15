@@ -7,7 +7,7 @@ import { EnrollmentPaymentMethodsNotice } from './EnrollmentPaymentMethodsNotice
 
 const settings = {
     general: { address: 'Dirección general 100' },
-    payments: { enabledMethods: ['Transferencia', 'Efectivo'], transferAlias: '', transferCbu: '', accountHolder: '', paymentLink: '' },
+    payments: { enabledMethods: ['Transferencia', 'Efectivo'], transferAlias: '', transferCbu: '', accountHolder: '', accountTaxId: '', paymentLink: '' },
 }
 
 vi.mock('@/services/academySettingsRepository', () => ({ useAcademySettings: () => ({ settings }) }))
@@ -16,7 +16,7 @@ vi.mock('@/workspace/useWorkspace', () => ({ useWorkspace: () => ({ path: (to: s
 
 afterEach(() => {
     cleanup()
-    settings.payments = { enabledMethods: ['Transferencia', 'Efectivo'], transferAlias: '', transferCbu: '', accountHolder: '', paymentLink: '' }
+    settings.payments = { enabledMethods: ['Transferencia', 'Efectivo'], transferAlias: '', transferCbu: '', accountHolder: '', accountTaxId: '', paymentLink: '' }
 })
 
 const renderNotice = (amount = 48000) => render(<MemoryRouter><EnrollmentPaymentMethodsNotice branchId="b1" amount={amount} /></MemoryRouter>)
@@ -30,7 +30,7 @@ describe('EnrollmentPaymentMethodsNotice', () => {
     })
 
     it('shows the transfer alias once it is configured', () => {
-        settings.payments = { ...settings.payments, transferAlias: 'ACADEMIA.MP', accountHolder: 'Academia SRL' }
+        settings.payments = { ...settings.payments, transferAlias: 'ACADEMIA.MP', transferCbu: '0000003100000000000000', accountHolder: 'Academia SRL', accountTaxId: '30-71234567-8' }
         renderNotice()
         expect(screen.getByText(/alias ACADEMIA\.MP/)).toBeInTheDocument()
     })
