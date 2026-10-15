@@ -89,7 +89,7 @@ export function AdminDashboardPage() {
             </div>
 
             <div className="content-grid">
-                <ChartCard title="Alumnos por comisión" subtitle="Asignaciones actuales" className="large-panel">
+                <ChartCard title="Alumnos por comisión" className="large-panel">
                     <div className="progress-list dashboard-progress-list">
                         {data.commissions.map((commission) => {
                             const enrolled = commission.studentsCount
@@ -103,7 +103,7 @@ export function AdminDashboardPage() {
                     </div>
                 </ChartCard>
 
-                <ChartCard title="Comisiones activas" subtitle="Oferta académica actual" className="medium-panel">
+                <ChartCard title="Comisiones activas" className="medium-panel">
                     <div className="dashboard-commission-list">
                         {data.commissions.map((commission) => <div key={commission.id}><strong>{commission.name}</strong><span>{commission.teachers.join(', ') || 'Sin profesores'} · {commission.schedule}</span></div>)}
                     </div>
