@@ -30,7 +30,7 @@ export function OfferEnrollmentsCard(props: Props) {
                 <button type="button" className="secondary-button compact-button" onClick={props.onOpenFilters}>Filtros</button>
                 {props.filterChips}
             </div>
-            <button type="button" className="primary-button compact-button" onClick={props.onCreate} disabled={Boolean(props.createDisabledReason)} title={props.createDisabledReason}><Plus size={16} /> Lanzar autoinscripción</button>
+            <button type="button" className="primary-button compact-button" onClick={props.onCreate} disabled={Boolean(props.createDisabledReason)} title={props.createDisabledReason}><Plus size={16} /> Lanzar inscripción</button>
         </div>
         <DataTable rows={props.rows} getRowKey={(row) => row.id} onRowClick={props.onView} emptyLabel="No hay inscripciones para esta oferta académica." columns={[
             { key: 'period', header: 'Período', accessor: (row) => <div><strong>{formatShortDate(row.startDate)} al {formatShortDate(row.endDate)}</strong><small className="table-secondary-text">{row.commissions} disponibles</small></div> },
