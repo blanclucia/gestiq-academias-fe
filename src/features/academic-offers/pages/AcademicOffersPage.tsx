@@ -1,4 +1,4 @@
-import { Eye, PencilLine, Trash2, BookOpen, CalendarDays, CalendarPlus } from 'lucide-react'
+import { Trash2, BookOpen, CalendarDays, CalendarPlus } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CourseForm, type CourseFormValue } from '../components/CourseForm'
@@ -12,7 +12,7 @@ import { EntityCell } from '@/components/ui/PersonCell'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
 import { StatusBadge, type StatusBadgeTone } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { type AcademicCourse, getActiveAcademicCycleId, getCourseRemovalBlockers, listAcademicCycles, listCourses, listPrivateLessons, listStaff, listStudents, useAcademyRepositoryVersion, useActivateCycle, useCreateCourse, useCreateCycle, useCreatePrivateLesson, useDeleteCourse, useUpdateCourse, useUpdatePrivateLesson } from '@/services/academyRepository'
+import { type AcademicCourse, getActiveAcademicCycleId, getCourseRemovalBlockers, listAcademicCycles, listCourses, listPrivateLessons, listStaff, listStudents, useAcademyRepositoryVersion, useActivateCycle, useCreateCourse, useCreateCycle, useCreatePrivateLesson, useDeleteCourse, useUpdatePrivateLesson } from '@/services/academyRepository'
 import { isCycleOverlap } from '@/services/organization/academicOffersApi'
 import { PrivateLessonsTable, type PrivateStudentRow } from '../components/PrivateLessonsTable'
 import { splitFilterValue } from '@/components/crud/filterValues'
@@ -41,9 +41,6 @@ export function AcademicOffersPage() {
     const [openMenuId, setOpenMenuId] = useState<string | null>(null)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [createCourseError, setCreateCourseError] = useState('')
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-    const [editCourseError, setEditCourseError] = useState('')
-    const [editingCourse, setEditingCourse] = useState<Course | null>(null)
     const [courseForm, setCourseForm] = useState<CourseFormValue>({ name: '', description: '', status: 'Borrador' })
     const [deleteTarget, setDeleteTarget] = useState<Course | null>(null)
     const cycles = listAcademicCycles()
@@ -54,7 +51,6 @@ export function AcademicOffersPage() {
     const createCycle = useCreateCycle()
     const activateCycle = useActivateCycle()
     const createCourse = useCreateCourse()
-    const updateCourse = useUpdateCourse()
     const deleteCourse = useDeleteCourse()
     const createPrivateLesson = useCreatePrivateLesson()
     const updatePrivateLesson = useUpdatePrivateLesson()
@@ -263,44 +259,6 @@ export function AcademicOffersPage() {
                 {createCourseError && <p className="form-error-message" role="alert">{createCourseError}</p>}
             </EntityFormModal>
 
-            <EntityFormModal
-                open={isEditModalOpen}
-                title="Editar oferta académica"
-                subtitle="Actualiza los datos principales de la oferta académica."
-                validate={() => validateConditions({ courseName: !courseForm.name.trim() && 'Ingresá el nombre de la oferta.' })}
-                onClose={() => {
-                    setIsEditModalOpen(false)
-                    setEditingCourse(null)
-                    setEditCourseError('')
-                }}
-                onSubmit={() => {
-                    setEditCourseError('')
-                    if (!editingCourse || !courseForm.name.trim()) {
-                        setIsEditModalOpen(false)
-                        setEditingCourse(null)
-                        return
-                    }
-                    updateCourse.mutate({ id: editingCourse.id, changes: courseForm }, {
-                        onSuccess: () => {
-                            setIsEditModalOpen(false)
-                            setEditingCourse(null)
-                            showToast('success', 'Oferta académica actualizada correctamente.')
-                        },
-                        onError: () => setEditCourseError('No se pudo actualizar la oferta académica. Intentá nuevamente.'),
-                    })
-                }}
-            >
-                <CourseForm
-                    value={courseForm}
-                    onValueChange={setCourseForm}
-                    initialValues={{
-                        name: editingCourse?.name,
-                        description: 'Oferta académica orientada a nivel inicial con foco en speaking y listening.',
-                    }}
-                />
-                {editCourseError && <p className="form-error-message" role="alert">{editCourseError}</p>}
-            </EntityFormModal>
-
             <DeleteConfirmationModal
                 open={Boolean(deleteTarget)}
                 title="Eliminar oferta académica"
@@ -411,7 +369,18 @@ export function AcademicOffersPage() {
                             {
                                 key: 'course',
                                 header: 'Oferta académica',
-                                accessor: (course) => <EntityCell name={course.name} subtitle={`${course.commissions.length} comisiones`} avatar={course.name.charAt(0)} />,
+                                accessor: (course) => <EntityCell name={course.name} avatar={course.name.charAt(0)} />,
+                            },
+                            {
+                                key: 'description',
+                                header: 'Descripción',
+                                accessor: (course) => course.description ? <span className="table-description" title={course.description}>{course.description}</span> : <span className="table-secondary-text">Sin descripción</span>,
+                            },
+                            {
+                                key: 'commissions',
+                                header: 'Comisiones',
+                                accessor: (course) => <strong>{course.commissions.length}</strong>,
+                                align: 'center',
                             },
                             {
                                 key: 'students',
@@ -433,14 +402,6 @@ export function AcademicOffersPage() {
                                 onToggle={() => setOpenMenuId((current) => (current === course.id ? null : course.id))}
                                 actions={[
                                     { label: 'Ver oferta académica', icon: <BookOpen size={15} />, onClick: () => navigate(path(`offers/${course.id}`)) },
-                                    {
-                                        label: 'Editar', icon: <PencilLine size={15} />, onClick: () => {
-                                            setEditingCourse(course)
-                                            setCourseForm({ name: course.name, description: course.description ?? '', status: course.status })
-                                            setIsEditModalOpen(true)
-                                        }
-                                    },
-                                    { label: 'Detalle', icon: <Eye size={15} />, onClick: () => navigate(path(`offers/${course.id}`)) },
                                     { label: 'Eliminar', icon: <Trash2 size={15} />, onClick: () => setDeleteTarget(course), variant: 'danger' },
                                 ]}
                             />

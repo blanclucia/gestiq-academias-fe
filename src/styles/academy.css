@@ -1168,6 +1168,18 @@
   font-size: .74rem;
 }
 
+/* Long free text in a table cell: two lines max, full text on hover (title attribute). */
+.table-description {
+  display: -webkit-box;
+  max-width: 420px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: .82rem;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .student-picker {
   position: relative;
 }
