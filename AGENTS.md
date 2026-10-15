@@ -72,6 +72,7 @@ Este proyecto debe seguir la estrategia definida en `estrategia-frontend-platafo
 - Las cards de una tab se apilan dentro de `.offer-detail-stack`: el `gap` del contenedor define la separación, sin márgenes propios.
 - Los datos de una entidad se editan en su propio detalle, no en un modal: las cards muestran los campos ya como formulario (`SettingsField` dentro de `form-grid academy-settings-grid`) y un pie `academy-form-actions` con "Descartar cambios" y "Guardar cambios" (como Mis sedes, Mi academia, oferta académica y comisión). Validar con `markInvalidFields` y que el título de la página cambie recién al guardar.
 - Los modales (`EntityFormModal`) quedan para crear desde un listado y para acciones puntuales (asignar, registrar un pago, confirmar). La acción "Editar" de una fila lleva al detalle de la entidad.
+- Las acciones sobre toda la entidad (cerrar, reabrir) van en el encabezado de la página (`.page-header-actions`), visibles desde cualquier tab, no en el pie del formulario. Si tienen consecuencias, piden confirmación explicando qué implica, y ese estado no se ofrece como opción editable del campo Estado.
 - Excepción: cuando las tabs filtran o cambian el listado de una página (Cobros, Finanzas → Egresos, Oferta académica → Cursos/Particulares), el título es el de la página y la tab funciona como filtro; no se agrega un título por tab.
 
 ## Arquitectura y organización por módulos
