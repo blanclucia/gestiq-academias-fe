@@ -22,6 +22,7 @@ import { PaymentEditModal } from '../components/PaymentEditModal'
 import { PaymentLinkModal } from '../components/PaymentLinkModal'
 import { splitFilterValue } from '@/components/crud/filterValues'
 import { useWorkspace } from '@/workspace/useWorkspace'
+import { useSelectedBranchId } from '@/services/branchRepository'
 
 const defaultAdjustmentForm: PaymentAdjustmentValue = {
     type: 'Bonificacion total',
@@ -71,8 +72,11 @@ export function BillingPage() {
     const [activeFilters, setActiveFilters] = useState({ student: '' })
     const [isManualChargeOpen, setIsManualChargeOpen] = useState(false)
     const [manualChargeForm, setManualChargeForm] = useState({ studentId: '', category: 'Examen', detail: '', amount: '', status: 'Pendiente' as 'Pendiente' | 'Pagado', method: 'Transferencia' as Payment['method'], dueDate: suggestedDueDate, date: format(today, 'yyyy-MM-dd'), notes: '' })
-    const paymentList = listPayments()
-    const studentOptions = listStudents()
+    // Like the dashboard and Finanzas: a charge belongs to the selected sede through its student.
+    const selectedBranchId = useSelectedBranchId()
+    const studentOptions = listStudents().filter((student) => student.branchId === selectedBranchId)
+    const studentIdsInBranch = new Set(studentOptions.map((student) => student.id))
+    const paymentList = listPayments().filter((payment) => payment.studentId !== undefined && studentIdsInBranch.has(payment.studentId))
     const paymentRemovalBlocker = deleteTarget ? getPaymentRemovalBlocker() : null
 
     const graceDays = academySettings?.payments.graceDays ?? 0
