@@ -1,4 +1,5 @@
 import { endOfMonth, format, isWithinInterval, parseISO, startOfDay, startOfMonth } from 'date-fns'
+import { useSearchParams } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { CrudListPage } from '@/components/crud/CrudListPage'
 import { DeleteConfirmationModal } from '@/components/crud/EntityFormModal'
@@ -42,7 +43,11 @@ export function BillingPage() {
     const enabledPaymentMethods = paymentMethods.filter((method) => academySettings?.payments.enabledMethods.includes(method))
     // Never leave staff unable to register any payment at all if the org hasn't enabled any method yet.
     const availablePaymentMethods = enabledPaymentMethods.length > 0 ? enabledPaymentMethods : paymentMethods
-    const [activeTab, setActiveTab] = useState<BillingTab>('resumen')
+    // The active tab lives in the URL (?tab=pendientes) so the dashboard cards can link straight to it.
+    const [searchParams, setSearchParams] = useSearchParams()
+    const requestedTab = searchParams.get('tab')
+    const activeTab: BillingTab = requestedTab === 'recibidos' || requestedTab === 'pendientes' || requestedTab === 'vencidos' ? requestedTab : 'resumen'
+    const setActiveTab = (tab: BillingTab) => setSearchParams(tab === 'resumen' ? {} : { tab }, { replace: true })
     const today = startOfDay(new Date())
     const suggestedDueDate = getNextDueDateForDay(academySettings?.payments.defaultDueDay ?? 10, format(today, 'yyyy-MM-dd'))
     const [dateRange, setDateRange] = useState({

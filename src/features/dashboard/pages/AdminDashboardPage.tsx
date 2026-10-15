@@ -98,11 +98,11 @@ export function AdminDashboardPage() {
                     </div>
                 </ChartCard>
 
-                <ChartCard title="Cobros confirmados" value={currency.format(data.receivedAmount)} subtitle={`${data.confirmedPayments.length} pagos registrados`} className="dashboard-payment-card small-panel">
+                <ChartCard title="Cobros confirmados" value={currency.format(data.receivedAmount)} subtitle={`${data.confirmedPayments.length} pagos registrados`} action={<Link to={path('billing?tab=recibidos')} className="card-header-action">Ver recibidos</Link>} className="dashboard-payment-card small-panel">
                     <div className="dashboard-summary-icon positive"><CreditCard size={22} /></div>
                 </ChartCard>
 
-                <ChartCard title="Cobros a gestionar" value={currency.format(data.pendingAmount)} subtitle={`${data.pendingPayments.length} pagos pendientes o rechazados`} className="dashboard-payment-card medium-panel">
+                <ChartCard title="Cobros a gestionar" value={currency.format(data.pendingAmount)} subtitle={`${data.pendingPayments.length} pagos pendientes o rechazados`} action={<Link to={path('billing?tab=pendientes')} className="card-header-action">Ver pendientes</Link>} className="dashboard-payment-card medium-panel">
                     <div className="dashboard-summary-icon warning"><CreditCard size={22} /></div>
                 </ChartCard>
 
