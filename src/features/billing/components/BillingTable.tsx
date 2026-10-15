@@ -27,7 +27,6 @@ type BillingTableProps = {
     selectedIds: string[]
     selectAllChecked: boolean
     openMenuId: string | null
-    canAdjust: boolean
     onPageChange: (page: number) => void
     onToggleSelection: (id: string) => void
     onToggleSelectAll: () => void
@@ -101,7 +100,8 @@ export function BillingTable(props: BillingTableProps) {
                         { label: 'Generar link de pago', icon: <Link2 size={15} />, onClick: () => props.onPaymentLink(payment) },
                         { label: status === 'En verificación' ? 'Confirmar transferencia' : 'Registrar cobro', icon: <CreditCard size={15} />, onClick: () => props.onCollect(payment) },
                     ] : []),
-                    ...(props.canAdjust ? [{ label: 'Ajustar pago', icon: <PencilLine size={15} />, onClick: () => props.onAdjust(payment) }] : []),
+                    // A discount or surcharge applies to anything still unpaid — overdue included (late fees).
+                    ...(status !== 'Pagado' && status !== 'Anulado' ? [{ label: 'Ajustar pago', icon: <PencilLine size={15} />, onClick: () => props.onAdjust(payment) }] : []),
                     ...(status === 'En verificación' ? [{ label: 'Rechazar transferencia', icon: <XCircle size={15} />, onClick: () => props.onRejectTransfer(payment) }] : []),
                     // Próximamente, con Comunicaciones: recordar hoy no le envía nada al alumno.
                     // ...(status === 'Pendiente' || status === 'Vencido' ? [{ label: status === 'Vencido' ? 'Recordar vencido' : 'Recordar próximo vencimiento', icon: <BellRing size={15} />, onClick: () => props.onRemind(payment) }] : []),

@@ -568,7 +568,6 @@ export function BillingPage() {
                         selectedIds={selectedIds}
                         selectAllChecked={isSelectAllChecked}
                         openMenuId={openMenuId}
-                        canAdjust={activeTab === 'pendientes'}
                         onPageChange={setCurrentPage}
                         onToggleSelection={toggleSelection}
                         onToggleSelectAll={toggleSelectAll}
