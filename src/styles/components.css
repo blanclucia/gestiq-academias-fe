@@ -557,6 +557,16 @@
     background: var(--surface-subtle);
 }
 
+/* Wider variant for multi-line help such as a status legend (<StatusHelp />). */
+.info-tooltip-panel.wide {
+    max-width: 320px;
+}
+
+.status-help-list {
+    display: grid;
+    gap: 6px;
+}
+
 .info-tooltip-panel {
     /* Portaled to document.body (see InfoTooltip.tsx) so a clipping ancestor — e.g. EntityFormModal's
        scrollable, rounded .entity-modal — can't cut it off. top/left come from the trigger's own

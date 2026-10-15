@@ -1,6 +1,8 @@
 import { FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { useState } from 'react'
+import { StatusHelp } from '@/components/ui/StatusHelp'
+import { courseStatusHelp } from '../model/courseStatusHelp'
 
 const statusOptions = [{ value: 'Borrador', label: 'Borrador' }, { value: 'Activo', label: 'Activo' }, { value: 'Cerrado', label: 'Cerrado' }]
 
@@ -42,7 +44,7 @@ export function CourseForm({ initialValues, value, onValueChange }: {
                         placeholder="Ej: Oferta académica orientada a nivel inicial con foco en speaking y listening."
                     />
                 </FormField>
-                <FormField label="Estado"><SearchableSelect value={formValue.status} options={statusOptions} onChange={(status) => update({ status: status as CourseFormValue['status'] })} /></FormField>
+                <FormField label="Estado" info={<StatusHelp label="Qué significa cada estado" items={courseStatusHelp} />}><SearchableSelect value={formValue.status} options={statusOptions} onChange={(status) => update({ status: status as CourseFormValue['status'] })} /></FormField>
             </FormSection>
         </div>
     )

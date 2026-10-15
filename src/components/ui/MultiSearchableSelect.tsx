@@ -1,4 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { useFloatingPanel } from './useFloatingPanel'
 import type { SearchableSelectOption } from './SearchableSelect'
 
 type MultiSearchableSelectProps = {
@@ -17,6 +19,7 @@ type MultiSearchableSelectProps = {
 // valid thing to ask for, not just one or the other.
 export function MultiSearchableSelect({ values, options, onChange, placeholder = 'Buscar...', emptyLabel = 'No hay opciones disponibles.', name, footerAction }: MultiSearchableSelectProps) {
     const containerRef = useRef<HTMLDivElement>(null)
+    const panelRef = useRef<HTMLDivElement>(null)
     const listboxId = `multi-searchable-select-options-${useId()}`
     const [query, setQuery] = useState('')
     const [open, setOpen] = useState(false)
@@ -24,7 +27,9 @@ export function MultiSearchableSelect({ values, options, onChange, placeholder =
 
     useEffect(() => {
         const handlePointerDown = (event: PointerEvent) => {
-            if (!containerRef.current?.contains(event.target as Node)) {
+            const target = event.target as Node
+            // The options panel is portaled outside the container, so it counts as "inside" too.
+            if (!containerRef.current?.contains(target) && !panelRef.current?.contains(target)) {
                 setOpen(false)
                 setQuery('')
             }
@@ -33,6 +38,7 @@ export function MultiSearchableSelect({ values, options, onChange, placeholder =
         return () => document.removeEventListener('pointerdown', handlePointerDown)
     }, [])
 
+    const panelStyle = useFloatingPanel(containerRef, open)
     const filteredOptions = options.filter((option) => option.label.toLocaleLowerCase('es-AR').includes(query.toLocaleLowerCase('es-AR')))
     const toggleOption = (option: SearchableSelectOption) => {
         onChange(values.includes(option.value) ? values.filter((value) => value !== option.value) : [...values, option.value])
@@ -73,7 +79,7 @@ export function MultiSearchableSelect({ values, options, onChange, placeholder =
             aria-controls={listboxId}
             autoComplete="off"
         />
-        {open && <div className="student-picker-options" id={listboxId} role="listbox">
+        {open && panelStyle && createPortal(<div className="student-picker-options" id={listboxId} role="listbox" ref={panelRef} style={panelStyle}>
             {filteredOptions.length > 0 ? filteredOptions.map((option, index) => (
                 <button
                     key={option.value}
@@ -88,6 +94,6 @@ export function MultiSearchableSelect({ values, options, onChange, placeholder =
                 </button>
             )) : <span className="student-picker-empty">{emptyLabel}</span>}
             {footerAction && <button type="button" className="student-picker-footer-action" onClick={() => { setOpen(false); setQuery(''); footerAction.onClick() }}>{footerAction.icon}{footerAction.label}</button>}
-        </div>}
+        </div>, document.body)}
     </div>
 }

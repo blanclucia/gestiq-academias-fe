@@ -1,4 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
+import { useFloatingPanel } from './useFloatingPanel'
 
 export type SearchableSelectOption = {
     value: string
@@ -24,6 +26,7 @@ type SearchableSelectProps = {
 
 export function SearchableSelect({ value, options, onChange, placeholder = 'Buscar...', emptyLabel = 'No hay opciones disponibles.', name, disabled = false, 'aria-label': ariaLabel, className = '' }: SearchableSelectProps) {
     const containerRef = useRef<HTMLDivElement>(null)
+    const panelRef = useRef<HTMLDivElement>(null)
     const listboxId = `searchable-select-options-${useId()}`
     const selectedOption = options.find((option) => option.value === value)
     const [query, setQuery] = useState(selectedOption?.label ?? '')
@@ -38,7 +41,9 @@ export function SearchableSelect({ value, options, onChange, placeholder = 'Busc
 
     useEffect(() => {
         const handlePointerDown = (event: PointerEvent) => {
-            if (!containerRef.current?.contains(event.target as Node)) {
+            const target = event.target as Node
+            // The options panel is portaled outside the container, so it counts as "inside" too.
+            if (!containerRef.current?.contains(target) && !panelRef.current?.contains(target)) {
                 setOpen(false)
                 // Without a pick, the box should go back to showing the real selection (or blank
                 // for "Todas") instead of staying on whatever the user typed to search with.
@@ -49,6 +54,7 @@ export function SearchableSelect({ value, options, onChange, placeholder = 'Busc
         return () => document.removeEventListener('pointerdown', handlePointerDown)
     }, [])
 
+    const panelStyle = useFloatingPanel(containerRef, open && !disabled)
     const filteredOptions = options.filter((option) => option.label.toLocaleLowerCase('es-AR').includes(query.toLocaleLowerCase('es-AR')))
     const selectOption = (option: SearchableSelectOption) => {
         onChange(option.value)
@@ -94,8 +100,8 @@ export function SearchableSelect({ value, options, onChange, placeholder = 'Busc
             aria-controls={listboxId}
             autoComplete="off"
         />
-        {open && !disabled && <div className="student-picker-options" id={listboxId} role="listbox">
+        {open && !disabled && panelStyle && createPortal(<div className="student-picker-options" id={listboxId} role="listbox" ref={panelRef} style={panelStyle}>
             {filteredOptions.length > 0 ? filteredOptions.map((option, index) => <button key={option.value} type="button" role="option" aria-selected={option.value === value} disabled={option.disabled} className={index === highlightedIndex ? 'highlighted' : ''} onMouseEnter={() => setHighlightedIndex(index)} onClick={() => selectOption(option)}>{option.label}</button>) : <span className="student-picker-empty">{emptyLabel}</span>}
-        </div>}
+        </div>, document.body)}
     </div>
 }

@@ -143,6 +143,12 @@
     min-width: 0;
 }
 
+/* Optional help icon after a field's label (FormField/SettingsField `info`). */
+.form-field-label-text .info-tooltip {
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
 .form-field-label {
     display: flex;
     flex-direction: column;

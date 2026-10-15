@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom'
 // ancestor with overflow:hidden/auto (e.g. EntityFormModal's scrollable .entity-modal), which a
 // portal escapes. Reusable anywhere a label needs a short explanation without permanently
 // visible hint text cluttering the form.
-export function InfoTooltip({ label = 'Más información', children }: { label?: string; children: ReactNode }) {
+export function InfoTooltip({ label = 'Más información', wide = false, children }: { label?: string; wide?: boolean; children: ReactNode }) {
     const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
     const triggerRef = useRef<HTMLButtonElement>(null)
     const tooltipId = useId()
@@ -34,7 +34,7 @@ export function InfoTooltip({ label = 'Más información', children }: { label?:
                 <CircleHelp size={14} />
             </button>
             {position && createPortal(
-                <span className="info-tooltip-panel" role="tooltip" id={tooltipId} style={{ top: position.top, left: position.left }}>
+                <span className={`info-tooltip-panel${wide ? ' wide' : ''}`} role="tooltip" id={tooltipId} style={{ top: position.top, left: position.left }}>
                     <Info size={14} className="info-tooltip-icon" />
                     <span>{children}</span>
                 </span>,

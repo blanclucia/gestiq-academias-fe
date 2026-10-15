@@ -197,13 +197,15 @@ type FormFieldProps = {
     full?: boolean
     required?: boolean
     error?: string
+    // Optional help next to the label (e.g. <StatusHelp />).
+    info?: ReactNode
 }
 
-export function FormField({ label, hint, children, full = false, required = false, error }: FormFieldProps) {
+export function FormField({ label, hint, children, full = false, required = false, error, info }: FormFieldProps) {
     return (
         <label className={`form-field ${full ? 'form-field-full' : ''}`}>
             <span className="form-field-label">
-                <span>{label}{required && <b aria-hidden="true" className="form-required-mark"> *</b>}</span>
+                <span className="form-field-label-text">{label}{required && <b aria-hidden="true" className="form-required-mark"> *</b>}{info}</span>
                 {hint && <small>{hint}</small>}
             </span>
             {children}

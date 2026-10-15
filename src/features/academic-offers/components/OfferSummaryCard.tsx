@@ -6,7 +6,9 @@ import { SettingsField as Field } from '@/components/forms/SettingsControls'
 import { Card } from '@/components/ui/Card'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { SectionHeading } from '@/components/ui/SectionHeading'
+import { StatusHelp } from '@/components/ui/StatusHelp'
 import type { AcademicCourse } from '@/services/academyRepository'
+import { courseStatusHelp } from '../model/courseStatusHelp'
 
 type OfferChanges = Pick<AcademicCourse, 'name' | 'description' | 'status'>
 
@@ -41,7 +43,7 @@ export function OfferSummaryCard({ course, saving, onSave }: OfferSummaryCardPro
             <SectionHeading icon={<BookOpenCheck size={20} />} title="Información general" description="Datos generales de esta oferta académica." />
             <div className="form-grid academy-settings-grid">
                 <Field label="Nombre" required><input name="courseName" className="form-input" value={draft.name} onChange={(event) => update({ name: event.target.value })} placeholder="Ej: Inglés General" /></Field>
-                <Field label="Estado"><SearchableSelect value={draft.status} onChange={(status) => update({ status: status as OfferChanges['status'] })} options={statusOptions} /></Field>
+                <Field label="Estado" info={<StatusHelp label="Qué significa cada estado" items={courseStatusHelp} />}><SearchableSelect value={draft.status} onChange={(status) => update({ status: status as OfferChanges['status'] })} options={statusOptions} /></Field>
                 <Field label="Descripción" full><textarea className="form-input form-textarea" rows={4} value={draft.description} onChange={(event) => update({ description: event.target.value })} placeholder="Contá de qué se trata la oferta, a quién está dirigida y qué incluye." /></Field>
             </div>
         </Card>

@@ -5,6 +5,8 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { getActiveAcademicCycleId, listCourses, listStaff, useAcademyRepositoryVersion } from '@/services/academyRepository'
 import { useState } from 'react'
 import { TeacherMultiSelect } from './TeacherMultiSelect'
+import { StatusHelp } from '@/components/ui/StatusHelp'
+import { commissionStatusHelp } from '../model/commissionStatusHelp'
 import { commissionWeekDays as weekDays, parseCommissionSchedule } from '../model/commissionSchedule'
 
 export type CommissionFormValue = {
@@ -131,7 +133,7 @@ export function CommissionForm({
 
             <FormSection title="Estado" description="Controla el ciclo de la comisión.">
                 <FormGrid>
-                    <FormField label="Estado inicial">
+                    <FormField label="Estado inicial" info={<StatusHelp label="Qué significa cada estado" items={commissionStatusHelp} />}>
                         <SearchableSelect value={formValue.status} onChange={(status) => update({ status: status as CommissionFormValue['status'] })} options={[{ value: 'Programada', label: 'Programada' }, { value: 'Activa', label: 'Activa' }, { value: 'Cerrada', label: 'Cerrada' }]} />
                     </FormField>
                 </FormGrid>

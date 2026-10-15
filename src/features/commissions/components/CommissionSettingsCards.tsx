@@ -7,8 +7,10 @@ import { WeekDaysCheckboxGroup } from '@/components/forms/WeekDaysCheckboxGroup'
 import { Card } from '@/components/ui/Card'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { SectionHeading } from '@/components/ui/SectionHeading'
+import { StatusHelp } from '@/components/ui/StatusHelp'
 import { listStaff, type AcademicCommission } from '@/services/academyRepository'
 import { toCommissionFormValue } from '../model/commissionFormValue'
+import { commissionStatusHelp } from '../model/commissionStatusHelp'
 import { commissionWeekDays, formatCommissionSchedule } from '../model/commissionSchedule'
 import { validateCommission } from '../model/commissionValidation'
 import type { CommissionFormValue } from './CommissionForm'
@@ -48,7 +50,7 @@ export function CommissionSettingsCards({ commission, siblingNames, saving, onSa
             <SectionHeading icon={<ClipboardList size={20} />} title="Datos de la comisión" description="Identificación, equipo docente y cupo." />
             <div className="form-grid academy-settings-grid">
                 <Field label="Nombre" required><input name="commissionName" className="form-input" value={draft.name} onChange={(event) => update({ name: event.target.value })} placeholder="Ej: Grupo A" /></Field>
-                <Field label="Estado"><SearchableSelect value={draft.status} onChange={(status) => update({ status: status as CommissionFormValue['status'] })} options={statusOptions} /></Field>
+                <Field label="Estado" info={<StatusHelp label="Qué significa cada estado" items={commissionStatusHelp} />}><SearchableSelect value={draft.status} onChange={(status) => update({ status: status as CommissionFormValue['status'] })} options={statusOptions} /></Field>
                 <Field label="Profesores asignados"><TeacherMultiSelect options={teacherOptions} value={draft.teachers} onChange={(teachers) => update({ teachers })} /></Field>
                 <Field label="Cupo máximo" required><input name="commissionCapacity" className="form-input" type="number" min={1} value={draft.capacity} onChange={(event) => update({ capacity: Number(event.target.value || 1) })} /></Field>
             </div>
