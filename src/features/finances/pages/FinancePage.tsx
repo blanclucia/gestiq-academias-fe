@@ -20,6 +20,7 @@ import { formatCurrencyARS, formatShortDate as formatDate } from '@/domain/share
 import { DateRangeControl } from '@/components/ui/DateRangeControl'
 import { calculateFinancialProjection } from '@/domain/finance/expenseRules'
 import { useToast } from '@/components/ui/ToastContext'
+import { paymentMethods } from '@/domain/billing/paymentMethods'
 
 type FinanceTab = 'summary' | 'expenses'
 const currency = { format: formatCurrencyARS }
@@ -124,7 +125,7 @@ export function FinancePage() {
             {!editingExpense && <FormSection title="Calendarización"><FormGrid>
                 <FormField label="Frecuencia"><SearchableSelect value={expenseForm.recurrence} onChange={(recurrence) => setExpenseForm((current) => ({ ...current, recurrence: recurrence as ExpenseInput['recurrence'] }))} options={[{ value: 'Único', label: 'Pago único' }, { value: 'Mensual', label: 'Todos los meses' }]} /></FormField>
                 {expenseForm.recurrence === 'Único' && <FormField label="Estado"><SearchableSelect value={expenseForm.status} onChange={(status) => setExpenseForm((current) => ({ ...current, status: status as ExpenseInput['status'], dueDate: status === 'Pagado' ? '' : current.dueDate, paidDate: status === 'Pagado' ? (current.paidDate || localDate()) : current.paidDate }))} options={[{ value: 'Pendiente', label: 'Pendiente' }, { value: 'Pagado', label: 'Pagado' }]} /></FormField>}
-                {expenseForm.recurrence === 'Único' && expenseForm.status === 'Pagado' && <><FormField label="Fecha de pago"><input className="form-input" type="date" value={expenseForm.paidDate ?? ''} onChange={(event) => setExpenseForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio de pago"><SearchableSelect value={expenseForm.method ?? 'Transferencia'} onChange={(method) => setExpenseForm((current) => ({ ...current, method: method as PaymentMethod }))} options={[{ value: 'Transferencia', label: 'Transferencia' }, { value: 'Tarjeta', label: 'Tarjeta' }, { value: 'Efectivo', label: 'Efectivo' }]} /></FormField></>}
+                {expenseForm.recurrence === 'Único' && expenseForm.status === 'Pagado' && <><FormField label="Fecha de pago"><input className="form-input" type="date" value={expenseForm.paidDate ?? ''} onChange={(event) => setExpenseForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio de pago"><SearchableSelect value={expenseForm.method ?? 'Transferencia'} onChange={(method) => setExpenseForm((current) => ({ ...current, method: method as PaymentMethod }))} options={paymentMethods.map((method) => ({ value: method, label: method }))} /></FormField></>}
                 {expenseForm.recurrence === 'Mensual' && <FormField label="Generar vencimientos hasta"><div className="finance-date-with-help"><input className="form-input" type="date" min={expenseForm.dueDate} value={expenseForm.repeatUntil} onChange={(event) => setExpenseForm((current) => ({ ...current, repeatUntil: event.target.value }))} /><small>Opcional · por defecto 12 meses</small></div></FormField>}
             </FormGrid></FormSection>}</div>
         </EntityFormModal>
@@ -136,7 +137,7 @@ export function FinancePage() {
                 })
             }
             setPayTarget(null)
-        }}><FormGrid><FormField label="Fecha de pago"><input className="form-input" type="date" value={paymentForm.paidDate} onChange={(event) => setPaymentForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio"><SearchableSelect value={paymentForm.method} onChange={(method) => setPaymentForm((current) => ({ ...current, method: method as PaymentMethod }))} options={[{ value: 'Transferencia', label: 'Transferencia' }, { value: 'Tarjeta', label: 'Tarjeta' }, { value: 'Efectivo', label: 'Efectivo' }]} /></FormField></FormGrid></EntityFormModal>
+        }}><FormGrid><FormField label="Fecha de pago"><input className="form-input" type="date" value={paymentForm.paidDate} onChange={(event) => setPaymentForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio"><SearchableSelect value={paymentForm.method} onChange={(method) => setPaymentForm((current) => ({ ...current, method: method as PaymentMethod }))} options={paymentMethods.map((method) => ({ value: method, label: method }))} /></FormField></FormGrid></EntityFormModal>
         <DeleteConfirmationModal open={Boolean(deleteTarget)} title="Eliminar egreso" description={`Se eliminará solamente el vencimiento de “${deleteTarget?.concept ?? ''}”.`} onClose={() => setDeleteTarget(null)} onConfirm={() => {
             if (deleteTarget) {
                 deleteExpense.mutate(deleteTarget.id, { onError: () => showToast('error', 'No se pudo eliminar el egreso. Intentá nuevamente.') })

@@ -21,6 +21,8 @@ import { useToast } from '@/components/ui/ToastContext'
 import { useWorkspace } from '@/workspace/useWorkspace'
 import { getEligibleCommissions } from '@/domain/commissions/commissionRules'
 import { formatCurrencyARS, formatShortDate } from '@/domain/shared/formattingRules'
+import { getRecordablePaymentMethods } from '@/domain/billing/paymentMethods'
+import { useAcademySettings } from '@/services/academySettingsRepository'
 
 function getTodayString() {
     const date = new Date()
@@ -34,6 +36,7 @@ export function EnrollmentDetailPage() {
     useAcademyRepositoryVersion()
     const { courseId, enrollmentId } = useParams()
     const { showToast } = useToast()
+    const { settings: academySettings } = useAcademySettings()
     // The active tab lives in the URL (?tab=students), like the offer and commission details.
     const [searchParams, setSearchParams] = useSearchParams()
     const activeTab: EnrollmentTab = searchParams.get('tab') === 'students' ? 'students' : 'overview'
@@ -148,7 +151,7 @@ export function EnrollmentDetailPage() {
                             <FormField label="Alumno"><input className="form-input" value={collectTarget?.name ?? ''} readOnly /></FormField>
                             <FormField label="Importe"><input className="form-input" value={`$${(collectTarget?.chargeAmount ?? enrollment.amount).toLocaleString('es-AR')}`} readOnly /></FormField>
                             <FormField label="Fecha de cobro"><input name="collectionDate" className="form-input" type="date" value={collectForm.date} onChange={(event) => setCollectForm((current) => ({ ...current, date: event.target.value }))} /></FormField>
-                            <FormField label="Medio de pago"><SearchableSelect value={collectForm.method} onChange={(method) => setCollectForm((current) => ({ ...current, method: method as Payment['method'] }))} options={[{ value: 'Transferencia', label: 'Transferencia' }, { value: 'Tarjeta', label: 'Tarjeta' }, { value: 'Efectivo', label: 'Efectivo' }]} /></FormField>
+                            <FormField label="Medio de pago"><SearchableSelect value={collectForm.method} onChange={(method) => setCollectForm((current) => ({ ...current, method: method as Payment['method'] }))} options={getRecordablePaymentMethods(academySettings?.payments.enabledMethods).map((method) => ({ value: method, label: method }))} /></FormField>
                         </FormGrid>
                     </FormSection>
                 </div>

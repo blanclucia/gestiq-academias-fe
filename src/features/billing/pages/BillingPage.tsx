@@ -8,6 +8,7 @@ import type { Payment } from '@/types/domain'
 import { confirmPaymentRecord, getPaymentRemovalBlocker, listPayments, listStudents, updatePaymentRecord, useAcademyRepositoryVersion, useCreateCharge, useDeleteCharge, useUpdateCharge } from '@/services/academyRepository'
 import { chargeMethodToApi, chargeStatusToApi } from '@/services/organization/chargesMapping'
 import { getNextDueDateForDay } from '@/domain/billing/billingRules'
+import { getRecordablePaymentMethods, paymentMethods } from '@/domain/billing/paymentMethods'
 import { getPaymentReferenceDate as getReferenceDate, resolveChargeCollectionStatus } from '@/domain/billing/paymentRules'
 import { useAcademySettings } from '@/services/academySettingsRepository'
 import { useToast } from '@/components/ui/ToastContext'
@@ -31,7 +32,6 @@ const defaultAdjustmentForm: PaymentAdjustmentValue = {
     reason: '',
 }
 
-const paymentMethods: Payment['method'][] = ['Transferencia', 'Tarjeta', 'Efectivo']
 
 export function BillingPage() {
     const { organization } = useWorkspace()
@@ -41,9 +41,7 @@ export function BillingPage() {
     const updateCharge = useUpdateCharge()
     const deleteCharge = useDeleteCharge()
     const { settings: academySettings } = useAcademySettings()
-    const enabledPaymentMethods = paymentMethods.filter((method) => academySettings?.payments.enabledMethods.includes(method))
-    // Never leave staff unable to register any payment at all if the org hasn't enabled any method yet.
-    const availablePaymentMethods = enabledPaymentMethods.length > 0 ? enabledPaymentMethods : paymentMethods
+    const availablePaymentMethods = getRecordablePaymentMethods(academySettings?.payments.enabledMethods)
     // The active tab lives in the URL (?tab=pendientes) so the dashboard cards can link straight to it.
     const [searchParams, setSearchParams] = useSearchParams()
     const requestedTab = searchParams.get('tab')
@@ -382,6 +380,7 @@ export function BillingPage() {
             <PaymentEditModal
                 open={isEditModalOpen}
                 target={editingPayment}
+                paymentMethods={availablePaymentMethods}
                 value={editingPaymentForm}
                 onChange={setEditingPaymentForm}
                 onClose={() => {
