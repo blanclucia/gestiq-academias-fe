@@ -113,7 +113,7 @@ export function AdminDashboardPage() {
                     <div className="dashboard-summary-icon positive"><CreditCard size={22} /></div>
                 </ChartCard>
 
-                <ChartCard title="Cobros a gestionar" value={currency.format(data.pendingAmount)} subtitle={`${data.overdueCount} vencido${data.overdueCount === 1 ? '' : 's'} · ${data.pendingCount} pendiente${data.pendingCount === 1 ? '' : 's'} hasta fin de mes`} action={<span className="card-header-actions">{data.overdueCount > 0 && <Link to={path('billing?tab=vencidos')} className="card-header-action">Ver vencidos</Link>}<Link to={path('billing?tab=pendientes')} className="card-header-action">Ver pendientes</Link></span>} className="dashboard-payment-card medium-panel">
+                <ChartCard title="Cobros a gestionar" value={currency.format(data.pendingAmount)} subtitle={`${data.overdueCount} vencido${data.overdueCount === 1 ? '' : 's'} · ${data.pendingCount} pendiente${data.pendingCount === 1 ? '' : 's'} hasta fin de mes`} action={<Link to={path('billing?tab=pendientes')} className="card-header-action">Ver pendientes</Link>} className="dashboard-payment-card medium-panel">
                     <div className="dashboard-summary-icon warning"><CreditCard size={22} /></div>
                 </ChartCard>
 
