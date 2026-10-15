@@ -134,7 +134,7 @@ export function CommissionForm({
             <FormSection title="Estado" description="Controla el ciclo de la comisión.">
                 <FormGrid>
                     <FormField label="Estado inicial" info={<StatusHelp label="Qué significa cada estado" items={commissionStatusHelp} />}>
-                        <SearchableSelect value={formValue.status} onChange={(status) => update({ status: status as CommissionFormValue['status'] })} options={[{ value: 'Programada', label: 'Programada' }, { value: 'Activa', label: 'Activa' }, { value: 'Cerrada', label: 'Cerrada' }]} />
+                        <SearchableSelect value={formValue.status} onChange={(status) => update({ status: status as CommissionFormValue['status'] })} options={[{ value: 'Programada', label: 'Programada' }, { value: 'Activa', label: 'Activa' }]} />
                     </FormField>
                 </FormGrid>
             </FormSection>

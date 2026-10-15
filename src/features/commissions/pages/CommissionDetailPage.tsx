@@ -1,4 +1,4 @@
-import { Activity, ArrowLeft, Award, Gauge, GraduationCap, Mail, MessageCircle, Send, Users } from 'lucide-react'
+import { Activity, ArrowLeft, Award, Gauge, GraduationCap, Lock, Mail, MessageCircle, RotateCcw, Send, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
@@ -312,7 +312,7 @@ export function CommissionDetailPage() {
             <DeleteConfirmationModal
                 open={isCloseCommissionOpen}
                 title="Cerrar comisión"
-                description={`La comisión ${commission.name} dejará de estar activa. Las inscripciones ya creadas se conservarán para consulta.`}
+                description={`Al cerrar ${commission.name} no se podrán asignar alumnos nuevos ni reactivar inscripciones, y no se generarán cuotas nuevas. Los alumnos, las cuotas ya generadas, la asistencia y los exámenes se conservan. Podés reabrirla cuando quieras.`}
                 confirmLabel="Cerrar comisión"
                 onClose={() => setIsCloseCommissionOpen(false)}
                 onConfirm={() => {
@@ -337,6 +337,14 @@ export function CommissionDetailPage() {
                         <span>{commission.name}</span>
                     </div>
                     <h1 style={{ marginTop: 16 }}>{commission.name}</h1>
+                </div>
+                <div className="page-header-actions">
+                    {commission.status === 'Cerrada'
+                        ? <button type="button" className="secondary-button compact-button" disabled={updateCommission.isPending} onClick={() => updateCommission.mutate({ courseId: course.id, commissionId: commission.id, changes: { status: 'Activa' } }, {
+                            onSuccess: () => showToast('success', 'Comisión reabierta: vuelve a estar Activa.'),
+                            onError: () => showToast('error', 'No se pudo reabrir la comisión. Intentá nuevamente.'),
+                        })}><RotateCcw size={15} />Reabrir comisión</button>
+                        : <button type="button" className="secondary-button compact-button" onClick={() => setIsCloseCommissionOpen(true)}><Lock size={15} />Cerrar comisión</button>}
                 </div>
             </div>
 
@@ -375,7 +383,6 @@ export function CommissionDetailPage() {
                                     return false
                                 }
                             }}
-                            onCloseCommission={() => setIsCloseCommissionOpen(true)}
                         />
                     )}
 

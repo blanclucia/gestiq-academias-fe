@@ -16,7 +16,9 @@ import { validateCommission } from '../model/commissionValidation'
 import type { CommissionFormValue } from './CommissionForm'
 import { TeacherMultiSelect } from './TeacherMultiSelect'
 
-const statusOptions = [{ value: 'Programada', label: 'Programada' }, { value: 'Activa', label: 'Activa' }, { value: 'Cerrada', label: 'Cerrada' }]
+// Closing/reopening is an explicit action in the page header (with a confirmation), not a field edit.
+const editableStatusOptions = [{ value: 'Programada', label: 'Programada' }, { value: 'Activa', label: 'Activa' }]
+const closedStatusOptions = [{ value: 'Cerrada', label: 'Cerrada' }]
 
 type Props = {
     commission: AcademicCommission
@@ -24,12 +26,11 @@ type Props = {
     siblingNames: string[]
     saving: boolean
     onSave: (changes: Partial<Omit<AcademicCommission, 'id' | 'studentsCount'>>) => Promise<boolean>
-    onCloseCommission: () => void
 }
 
 // Editable detail of a commission, same pattern as Mis sedes → Personalización: the data is the form,
 // saved from the footer. The parent remounts it (key) when the saved commission changes.
-export function CommissionSettingsCards({ commission, siblingNames, saving, onSave, onCloseCommission }: Props) {
+export function CommissionSettingsCards({ commission, siblingNames, saving, onSave }: Props) {
     const saved = toCommissionFormValue(commission)
     const [draft, setDraft] = useState<CommissionFormValue>(saved)
     const [error, setError] = useState('')
@@ -50,7 +51,7 @@ export function CommissionSettingsCards({ commission, siblingNames, saving, onSa
             <SectionHeading icon={<ClipboardList size={20} />} title="Datos de la comisión" description="Identificación, equipo docente y cupo." />
             <div className="form-grid academy-settings-grid">
                 <Field label="Nombre" required><input name="commissionName" className="form-input" value={draft.name} onChange={(event) => update({ name: event.target.value })} placeholder="Ej: Grupo A" /></Field>
-                <Field label="Estado" info={<StatusHelp label="Qué significa cada estado" items={commissionStatusHelp} />}><SearchableSelect value={draft.status} onChange={(status) => update({ status: status as CommissionFormValue['status'] })} options={statusOptions} /></Field>
+                <Field label="Estado" hint={commission.status === 'Cerrada' ? 'Reabrila desde el botón de arriba.' : undefined} info={<StatusHelp label="Qué significa cada estado" items={commissionStatusHelp} />}><SearchableSelect value={draft.status} disabled={commission.status === 'Cerrada'} onChange={(status) => update({ status: status as CommissionFormValue['status'] })} options={commission.status === 'Cerrada' ? closedStatusOptions : editableStatusOptions} /></Field>
                 <Field label="Profesores asignados"><TeacherMultiSelect options={teacherOptions} value={draft.teachers} onChange={(teachers) => update({ teachers })} /></Field>
                 <Field label="Cupo máximo" required><input name="commissionCapacity" className="form-input" type="number" min={1} value={draft.capacity} onChange={(event) => update({ capacity: Number(event.target.value || 1) })} /></Field>
             </div>
@@ -74,7 +75,6 @@ export function CommissionSettingsCards({ commission, siblingNames, saving, onSa
         </Card>
         {error && <p className="form-error-message" role="alert">{error}</p>}
         <div className="academy-form-actions">
-            {commission.status !== 'Cerrada' && <button type="button" className="secondary-button" onClick={onCloseCommission}>Cerrar comisión</button>}
             {dirty && <button type="button" className="secondary-button" onClick={() => { setDraft(saved); setError(''); markInvalidFields(containerRef.current, { valid: true }) }}>Descartar cambios</button>}
             <button type="button" className="primary-button academy-save-button" disabled={!dirty || saving} onClick={() => { void save() }}><Save size={16} />{saving ? 'Guardando…' : 'Guardar cambios'}</button>
         </div>
