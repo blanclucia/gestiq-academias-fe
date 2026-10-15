@@ -15,6 +15,7 @@ import {
 } from "@/services/academyRepository";
 import { usePublicEnrollmentSettings } from "@/services/organization/publicSettingsApi";
 import { paymentMethodsFromApi, requiredFieldsFromApi } from "@/services/organization/settingsMapping";
+import { getPublicPaymentOptions, requiresPaymentStep } from "../model/publicPaymentOptions";
 import type { ApiPublicRegistrationResult } from "@/services/organization/enrollmentsApi";
 import { calculateAge } from "@/domain/students/studentRules";
 
@@ -94,10 +95,11 @@ export function PublicEnrollmentPage() {
     };
     const requiredFields = new Set(requiredFieldsFromApi(settings.enrollments.requiredFields));
     const enabledMethods = paymentMethodsFromApi(settings.payments.enabledMethods);
-    const canUseMercadoPago = enabledMethods.includes("Mercado Pago");
-    const canUseTransferencia = enabledMethods.includes("Transferencia");
-    const canUseEfectivo = enabledMethods.includes("Efectivo");
-    const hasAnyPaymentMethod = canUseMercadoPago || canUseTransferencia || canUseEfectivo;
+    const paymentOptions = getPublicPaymentOptions({ enabledMethods, paymentLink: settings.payments.paymentLink, transferAlias: settings.payments.transferAlias, transferCbu: settings.payments.transferCbu });
+    const canUseMercadoPago = paymentOptions.mercadoPago;
+    const canUseTransferencia = paymentOptions.transfer;
+    const canUseEfectivo = paymentOptions.inPerson;
+    const showPaymentStep = requiresPaymentStep(offer.amount);
     const age = form.birthDate ? calculateAge(form.birthDate) : null;
     const isMinor = age !== null && age < 18;
     const performRegistration = () => {
@@ -138,6 +140,10 @@ export function PublicEnrollmentPage() {
     };
     const submit = (event: React.FormEvent) => {
         event.preventDefault();
+        if (showPaymentStep && !paymentOption) {
+            setFormError("Elegí cómo vas a pagar la inscripción.");
+            return;
+        }
         performRegistration();
     };
 
@@ -166,8 +172,8 @@ export function PublicEnrollmentPage() {
             return;
         }
         setFormError("");
-        // requirePayment=false: no tiene sentido pedir un método de pago que la organización no exige.
-        if (settings.enrollments.requirePayment) {
+        // A free enrollment has nothing to pay: confirm right away.
+        if (showPaymentStep) {
             setFormStep(3);
         } else {
             performRegistration();
@@ -302,7 +308,7 @@ export function PublicEnrollmentPage() {
                                     >
                                         2 Contacto
                                     </button>
-                                    {settings.enrollments.requirePayment && (
+                                    {showPaymentStep && (
                                         <button
                                             type="button"
                                             className={
@@ -500,7 +506,7 @@ export function PublicEnrollmentPage() {
                                                 type="button"
                                                 onClick={goToContactValidationStep}
                                             >
-                                                {settings.enrollments.requirePayment ? "Continuar" : "Confirmar inscripción"}
+                                                {showPaymentStep ? "Continuar" : "Confirmar inscripción"}
                                             </button>
                                         </div>
                                     </>
@@ -511,7 +517,7 @@ export function PublicEnrollmentPage() {
                                             <strong>Elegí el método de pago</strong>
                                             <span>Seleccioná cómo querés abonar la inscripción.</span>
                                         </div>
-                                        {hasAnyPaymentMethod ? (
+                                        {/* Never empty: getPublicPaymentOptions falls back to paying in person. */}
                                             <div className="payment-method-options">
                                                 {canUseMercadoPago && (
                                                     <button
@@ -581,9 +587,6 @@ export function PublicEnrollmentPage() {
                                                     </button>
                                                 )}
                                             </div>
-                                        ) : (
-                                            <p className="form-error-message">No hay medios de pago habilitados. Contactá a la academia para coordinar el pago.</p>
-                                        )}
                                         <div className="public-enrollment-step-actions">
                                             <button
                                                 className="secondary-button"

@@ -636,6 +636,14 @@
   border-top: 1px solid var(--border);
 }
 
+/* Inline warning inside a settings section (the base banner is page-wide, with only a bottom border). */
+.inline-warning-banner.academy-options-warning {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
+  border-radius: 10px;
+}
+
 .academy-options-section h3 {
   margin: 0 0 12px;
   font-size: .88rem;

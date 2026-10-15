@@ -1,4 +1,4 @@
-import { Ban, Building2, CalendarDays, Check, CheckCircle2, CreditCard, FileCheck2, GraduationCap, Palette, RotateCcw, Save, Settings2, Users } from 'lucide-react'
+import { AlertTriangle, Ban, Building2, CalendarDays, Check, CheckCircle2, CreditCard, FileCheck2, GraduationCap, Palette, RotateCcw, Save, Settings2, Users } from 'lucide-react'
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EntityFormModal, FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
@@ -243,7 +243,11 @@ export function AcademySettingsPage() {
                         <Field label="Link de pago Mercado Pago"><input className="form-input" type="url" value={settings.payments.paymentLink} onChange={(event) => update('payments', { paymentLink: event.target.value })} placeholder="https://mpago.la/..." /></Field>
                         <Field label="CUIT / CUIL del titular"><input className="form-input" value={settings.payments.accountTaxId} onChange={(event) => update('payments', { accountTaxId: event.target.value })} /></Field>
                         <Field label="Mensaje para enlaces de pago" full><textarea className="form-textarea academy-textarea-compact" value={settings.payments.paymentMessage} onChange={(event) => update('payments', { paymentMessage: event.target.value })} /></Field>
-                    </div><div className="academy-options-section"><h3>Medios de pago habilitados</h3><div className="academy-options-grid">{paymentMethods.map((method) => <ToggleOption key={method} label={method} checked={settings.payments.enabledMethods.includes(method)} onChange={(checked) => toggleListValue('payments', method, checked)} />)}</div></div>
+                    </div><div className="academy-options-section"><h3>Medios de pago habilitados</h3><div className="academy-options-grid">{paymentMethods.map((method) => <ToggleOption key={method} label={method} checked={settings.payments.enabledMethods.includes(method)} onChange={(checked) => toggleListValue('payments', method, checked)} />)}</div>
+                        {/* The public enrollment form only offers methods it can actually explain (see getPublicPaymentOptions). */}
+                        {settings.payments.enabledMethods.includes('Transferencia') && !settings.payments.transferAlias.trim() && !settings.payments.transferCbu.trim() && <div className="inline-warning-banner academy-options-warning" role="status"><AlertTriangle size={16} /><span>Transferencia no se ofrece en el formulario de inscripción hasta que cargues un alias o CBU / CVU.</span></div>}
+                        {settings.payments.enabledMethods.includes('Mercado Pago') && !settings.payments.paymentLink.trim() && <div className="inline-warning-banner academy-options-warning" role="status"><AlertTriangle size={16} /><span>Mercado Pago no se ofrece en el formulario de inscripción hasta que cargues el link de pago.</span></div>}
+                    </div>
                 </Card>}
                 {activeTab === 'inscripciones' && <Card>
                     <SectionHeading icon={<Check size={20} />} title="Configuración de inscripciones" description="Reglas aplicadas al crear nuevas aperturas de inscripción." />
@@ -251,7 +255,6 @@ export function AcademySettingsPage() {
                         <Field label="Confirmación"><SearchableSelect value={settings.enrollments.confirmationMode} onChange={(confirmationMode) => update('enrollments', { confirmationMode: confirmationMode as 'Automática' | 'Manual' })} options={[{ value: 'Manual', label: 'Manual' }, { value: 'Automática', label: 'Automática' }]} /></Field>
                         <Field label="Cupo predeterminado" hint="Se usa al crear una comisión nueva"><input className="form-input" type="number" min={1} value={settings.enrollments.defaultCapacity} onChange={(event) => update('enrollments', { defaultCapacity: Number(event.target.value) })} /></Field>
                     </div>
-                    <div className="academy-options-section"><ToggleOption label="Requerir pago para confirmar" description="El formulario público de inscripción incluye el paso de pago; si está desactivado, se lo salteamos." checked={settings.enrollments.requirePayment} onChange={(checked) => update('enrollments', { requirePayment: checked })} /></div>
                     <div className="academy-options-section"><h3>Campos obligatorios</h3><div className="academy-options-grid">{enrollmentFields.map((field) => <ToggleOption key={field} label={field} checked={settings.enrollments.requiredFields.includes(field)} onChange={(checked) => toggleListValue('enrollments', field, checked)} />)}</div></div>
                 </Card>}
                 {activeTab !== 'resumen' && <div className="academy-form-actions">
