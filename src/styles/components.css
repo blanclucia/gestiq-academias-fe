@@ -26,10 +26,16 @@
 
 .kpi-card,
 .chart-card {
-    background: rgba(255, 255, 255, 0.52);
+    background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 18px;
     box-shadow: none;
+}
+
+/* Nested inside a page container (Cobros and Finanzas summaries): a subtle tint so they stand apart. */
+.data-table-card .kpi-card,
+.data-table-card .chart-card {
+    background: var(--surface-subtle);
 }
 
 .kpi-card {

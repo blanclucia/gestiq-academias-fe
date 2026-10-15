@@ -441,8 +441,6 @@ html.dark .user-panel-item:hover {
   background: var(--primary-soft);
 }
 
-html.dark .kpi-card,
-html.dark .chart-card,
 html.dark .topbar {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(148, 163, 184, 0.15);
