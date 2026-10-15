@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { SearchableSelectOption } from './SearchableSelect'
 
 type MultiSearchableSelectProps = {
@@ -7,12 +7,15 @@ type MultiSearchableSelectProps = {
     onChange: (values: string[]) => void
     placeholder?: string
     emptyLabel?: string
+    name?: string
+    // Optional action pinned below the options (e.g. "Crear profesor nuevo"); closes the list on click.
+    footerAction?: { label: string; icon?: ReactNode; onClick: () => void }
 }
 
 // Same searchable combobox as SearchableSelect, but picking an option toggles it into/out of a set
 // instead of replacing the current value and closing — for filters, where "Inglés y Francés" is a
 // valid thing to ask for, not just one or the other.
-export function MultiSearchableSelect({ values, options, onChange, placeholder = 'Buscar...', emptyLabel = 'No hay opciones disponibles.' }: MultiSearchableSelectProps) {
+export function MultiSearchableSelect({ values, options, onChange, placeholder = 'Buscar...', emptyLabel = 'No hay opciones disponibles.', name, footerAction }: MultiSearchableSelectProps) {
     const containerRef = useRef<HTMLDivElement>(null)
     const listboxId = `multi-searchable-select-options-${useId()}`
     const [query, setQuery] = useState('')
@@ -58,6 +61,7 @@ export function MultiSearchableSelect({ values, options, onChange, placeholder =
 
     return <div className="student-picker" ref={containerRef}>
         <input
+            name={name}
             className="form-input"
             value={displayValue}
             onChange={(event) => { setQuery(event.target.value); setOpen(true); setHighlightedIndex(0) }}
@@ -83,6 +87,7 @@ export function MultiSearchableSelect({ values, options, onChange, placeholder =
                     {option.label}
                 </button>
             )) : <span className="student-picker-empty">{emptyLabel}</span>}
+            {footerAction && <button type="button" className="student-picker-footer-action" onClick={() => { setOpen(false); setQuery(''); footerAction.onClick() }}>{footerAction.icon}{footerAction.label}</button>}
         </div>}
     </div>
 }

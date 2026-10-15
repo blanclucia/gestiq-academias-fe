@@ -72,7 +72,7 @@ export function CommissionSettingsCards({ commission, siblingNames, saving, onSa
         </Card>
         {error && <p className="form-error-message" role="alert">{error}</p>}
         <div className="academy-form-actions">
-            {commission.status !== 'Cerrada' && <button type="button" className="secondary-button commission-close-button" onClick={onCloseCommission}>Cerrar comisión</button>}
+            {commission.status !== 'Cerrada' && <button type="button" className="secondary-button" onClick={onCloseCommission}>Cerrar comisión</button>}
             {dirty && <button type="button" className="secondary-button" onClick={() => { setDraft(saved); setError(''); markInvalidFields(containerRef.current, { valid: true }) }}>Descartar cambios</button>}
             <button type="button" className="primary-button academy-save-button" disabled={!dirty || saving} onClick={() => { void save() }}><Save size={16} />{saving ? 'Guardando…' : 'Guardar cambios'}</button>
         </div>

@@ -12,8 +12,6 @@
 .offer-detail-stack { display: grid; gap: 16px; }
 /* The gap owns the spacing here — without this, consecutive cards add their sibling margin on top of it. */
 .offer-detail-stack > .academy-settings-card + .academy-settings-card { margin-top: 0; }
-/* Inline-edit footers: the destructive "Cerrar" action sits apart, on the left. */
-.academy-form-actions .commission-close-button { margin-right: auto; }
 
 .offer-overview-columns {
   display: grid;
@@ -1233,6 +1231,27 @@
   padding: 10px;
   color: var(--muted);
   font-size: .76rem;
+}
+
+/* Optional action pinned under the options of a MultiSearchableSelect (e.g. "Crear profesor nuevo"). */
+.student-picker-options .student-picker-footer-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 9px 10px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--primary);
+  font-size: .78rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.student-picker-options .student-picker-footer-action:hover {
+  background: var(--primary-soft);
 }
 
 .form-field-full {

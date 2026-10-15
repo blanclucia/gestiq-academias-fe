@@ -427,7 +427,6 @@ export function AcademicOfferDetailPage() {
                             onView={(commission) => navigate(path(`oferta/${course.id}/comisiones/${commission.id}`))}
                             onViewStudents={(commission) => navigate(path(`oferta/${course.id}/comisiones/${commission.id}?tab=students`))}
                             onDuplicate={handleDuplicateCommission}
-                            onEdit={(commission) => navigate(path(`oferta/${course.id}/comisiones/${commission.id}`))}
                             onDelete={setDeleteCommissionTarget}
                         />
                     )}
