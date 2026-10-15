@@ -327,7 +327,7 @@ export function CommissionDetailPage() {
             <div className="page-header compact">
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: 'var(--muted)', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                        <Link to={path(`oferta/${course.id}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--muted)', textDecoration: 'none' }}>
+                        <Link to={path(`oferta/${course.id}?tab=commissions`)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--muted)', textDecoration: 'none' }}>
                             <ArrowLeft size={14} />
                             {course.name}
                         </Link>

@@ -37,16 +37,21 @@ function emptyCommissionForm(startDate = '2026-03-01', endDate = '2026-12-15', c
     return { name: '', teachers: [], capacity, amount: 48000, startDate, endDate, dueDay: 10, status: 'Programada', days: [], fromTime: '18:30', toTime: '20:00' }
 }
 
+type OfferTab = 'overview' | 'commissions' | 'enrollments'
+
 export function AcademicOfferDetailPage() {
     useAcademyRepositoryVersion()
     const { courseId } = useParams()
-    const [searchParams] = useSearchParams()
+    const [searchParams, setSearchParams] = useSearchParams()
     const navigate = useNavigate()
     const { path } = useWorkspace()
     const courses = listCourses()
     const { settings: academySettings } = useAcademySettings()
     const defaultCommissionCapacity = academySettings?.enrollments.defaultCapacity ?? 20
-    const [activeTab, setActiveTab] = useState<'overview' | 'enrollments'>('overview')
+    // The active tab lives in the URL (?tab=commissions) so a commission's breadcrumb can return to it.
+    const requestedTab = searchParams.get('tab')
+    const activeTab: OfferTab = requestedTab === 'commissions' || requestedTab === 'enrollments' ? requestedTab : 'overview'
+    const setActiveTab = (tab: OfferTab) => setSearchParams(tab === 'overview' ? {} : { tab }, { replace: true })
     const [isCreateCommissionOpen, setIsCreateCommissionOpen] = useState(false)
     const [commissionNameError, setCommissionNameError] = useState('')
     const [isCreateEnrollmentOpen, setIsCreateEnrollmentOpen] = useState(false)
@@ -376,9 +381,10 @@ export function AcademicOfferDetailPage() {
             <FilterModal open={isEnrollmentFilterOpen} title="Filtros de inscripciones" fields={enrollmentFilterFields} values={enrollmentFilters} onChange={setEnrollmentFilters} onClose={() => setIsEnrollmentFilterOpen(false)} />
 
             <div className="academy-tabs-wrap">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'enrollments')}>
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as OfferTab)}>
                     <TabsList variant="line" aria-label="Detalle del curso">
                         <TabsTrigger value="overview">Resumen</TabsTrigger>
+                        <TabsTrigger value="commissions">Comisiones</TabsTrigger>
                         <TabsTrigger value="enrollments">Inscripciones</TabsTrigger>
                     </TabsList>
                 </Tabs>
@@ -411,7 +417,7 @@ export function AcademicOfferDetailPage() {
                         />
                     )}
 
-                    {activeTab === 'overview' && (
+                    {activeTab === 'commissions' && (
                         <OfferCommissionsCard
                             rows={filteredCommissions}
                             search={commissionSearch}
