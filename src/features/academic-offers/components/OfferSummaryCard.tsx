@@ -19,7 +19,8 @@ type OfferSummaryCardProps = {
 const statusOptions = [{ value: 'Borrador', label: 'Borrador' }, { value: 'Activo', label: 'Activo' }, { value: 'Cerrado', label: 'Cerrado' }]
 
 // Editable general info of an offer, same pattern as Mis sedes: the data is the form, saved from the
-// footer. The parent remounts it (key) when the saved offer changes, so the draft restarts from it.
+// footer (always visible; Guardar enables once there are changes). The parent remounts it (key)
+// when the saved offer changes, so the draft restarts from it.
 export function OfferSummaryCard({ course, saving, onSave }: OfferSummaryCardProps) {
     const saved: OfferChanges = { name: course.name, description: course.description ?? '', status: course.status }
     const [draft, setDraft] = useState<OfferChanges>(saved)
@@ -45,9 +46,9 @@ export function OfferSummaryCard({ course, saving, onSave }: OfferSummaryCardPro
             </div>
         </Card>
         {error && <p className="form-error-message" role="alert">{error}</p>}
-        {dirty && <div className="academy-form-actions">
-            <button type="button" className="secondary-button" onClick={() => { setDraft(saved); setError(''); markInvalidFields(containerRef.current, { valid: true }) }}>Descartar cambios</button>
-            <button type="button" className="primary-button academy-save-button" disabled={saving} onClick={() => { void save() }}><Save size={16} />{saving ? 'Guardando…' : 'Guardar cambios'}</button>
-        </div>}
+        <div className="academy-form-actions">
+            {dirty && <button type="button" className="secondary-button" onClick={() => { setDraft(saved); setError(''); markInvalidFields(containerRef.current, { valid: true }) }}>Descartar cambios</button>}
+            <button type="button" className="primary-button academy-save-button" disabled={!dirty || saving} onClick={() => { void save() }}><Save size={16} />{saving ? 'Guardando…' : 'Guardar cambios'}</button>
+        </div>
     </div>
 }
