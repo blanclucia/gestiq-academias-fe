@@ -5,8 +5,8 @@ import { Card } from '@/components/ui/Card'
 import { SectionHeading } from '@/components/ui/SectionHeading'
 import { useToast } from '@/components/ui/ToastContext'
 
-// `compact` stacks the QR above the link and actions, for a narrow column next to another card.
-export function EnrollmentSharePanel({ publicLink, fileName, compact = false }: { publicLink: string; fileName: string; compact?: boolean }) {
+// QR + public link with copy/download actions, as a Card.
+export function EnrollmentSharePanel({ publicLink, fileName }: { publicLink: string; fileName: string }) {
     const [qrDataUrl, setQrDataUrl] = useState('')
     const { showToast } = useToast()
 
@@ -53,10 +53,8 @@ export function EnrollmentSharePanel({ publicLink, fileName, compact = false }: 
 
     if (!publicLink) return <Card>{heading}<p className="table-secondary-text">Esta inscripción todavía no tiene un enlace público configurado.</p></Card>
 
-    return (
-        <Card>
-            {heading}
-            <div className={compact ? 'share-enrollment-body compact' : 'share-enrollment-body'}>
+    const body = (
+            <div className="share-enrollment-body">
             <div className="share-enrollment-qr">
                 {qrDataUrl ? <img src={qrDataUrl} alt="Código QR de la inscripción pública" /> : <QrCode size={54} aria-hidden="true" />}
             </div>
@@ -70,6 +68,7 @@ export function EnrollmentSharePanel({ publicLink, fileName, compact = false }: 
                 </div>
             </div>
             </div>
-        </Card>
     )
+
+    return <Card>{heading}{body}</Card>
 }

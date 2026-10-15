@@ -24,13 +24,13 @@ type Props = {
     commissions: AcademicCommission[]
     saving: boolean
     onSave: (changes: EnrollmentDraft) => Promise<boolean>
-    // Shown next to Datos de la inscripción (the share card), so the save footer stays at the end of the tab.
-    aside?: ReactNode
+    // Rendered right after Datos de la inscripción (the share card), so the save footer still closes the tab.
+    afterData?: ReactNode
 }
 
 // Editable detail of an enrollment, same pattern as the commission detail: the data is the form, saved
 // from the footer. The parent remounts it (key) when the saved enrollment changes.
-export function EnrollmentSettingsCards({ opening, commissions, saving, onSave, aside }: Props) {
+export function EnrollmentSettingsCards({ opening, commissions, saving, onSave, afterData }: Props) {
     const saved: EnrollmentDraft = {
         // Only the still-eligible commissions are editable; a closed or finished one drops out on save.
         commissionIds: getEligibleCommissions(commissions, opening.startDate, opening.commissionIds).map((commission) => commission.id),
@@ -56,7 +56,6 @@ export function EnrollmentSettingsCards({ opening, commissions, saving, onSave, 
     }
 
     return <div className="offer-detail-stack" ref={containerRef}>
-        <div className={aside ? 'enrollment-overview-row' : undefined}>
         <Card>
             <SectionHeading icon={<ClipboardList size={20} />} title="Datos de la inscripción" description="Período en el que el link acepta inscripciones, costo y estado." />
             <div className="form-grid academy-settings-grid">
@@ -66,8 +65,7 @@ export function EnrollmentSettingsCards({ opening, commissions, saving, onSave, 
                 <Field label="Estado" hint={closed ? 'Reabrila desde el botón de arriba.' : undefined} info={<StatusHelp label="Qué significa cada estado" items={enrollmentStatusHelp} />}><SearchableSelect value={draft.status} disabled={closed} onChange={(status) => update({ status: status as EnrollmentDraft['status'] })} options={closed ? closedStatusOptions : editableStatusOptions} /></Field>
             </div>
         </Card>
-        {aside}
-        </div>
+        {afterData}
         <Card>
             <SectionHeading icon={<CalendarDays size={20} />} title="Comisiones incluidas" description={`${selectedCount} de ${eligibleCount} seleccionadas · Abiertas y que no terminaron antes del inicio de la inscripción.`} />
             <EligibleCommissionsPicker commissions={commissions} startDate={draft.startDate} value={draft.commissionIds} onChange={(commissionIds) => update({ commissionIds })} showHeader={false} />
