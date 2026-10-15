@@ -1,13 +1,12 @@
 import { GraduationCap, LockKeyhole, UserRound } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useAppBrand } from '@/theme/AppBrandContext'
+import { PlatformCredit } from '@/components/layout/PlatformCredit'
 import { useAuth } from './AuthContext'
 import { authErrorMessage } from './authErrors'
 import { loginSchema, passwordSchema } from './loginValidation'
 
 export function LoginPage() {
-    const { config } = useAppBrand()
     const { client, phase, logoutMessage } = useAuth()
     const [message, setMessage] = useState('')
     return <main className="login-page"><section className="login-card">
@@ -18,7 +17,7 @@ export function LoginPage() {
             {logoutMessage && <p role="status">{logoutMessage}</p>}
             <LoginForm />
         </>}
-        <div className="login-platform-link"><span>Plataforma desarrollada por</span><a href={config.websiteUrl} target="_blank" rel="noreferrer">{config.platformName} →</a></div>
+        <PlatformCredit />
         {phase === 'password-change' && <button className="secondary-button" onClick={() => client.clear()}>Volver al ingreso</button>}
     </section></main>
 }

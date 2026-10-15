@@ -18,6 +18,7 @@ import { paymentMethodsFromApi, requiredFieldsFromApi } from "@/services/organiz
 import { getPublicPaymentOptions, requiresPaymentStep } from "../model/publicPaymentOptions";
 import type { ApiPublicRegistrationResult } from "@/services/organization/enrollmentsApi";
 import { calculateAge } from "@/domain/students/studentRules";
+import { PlatformCredit } from "@/components/layout/PlatformCredit";
 
 export function PublicEnrollmentPage() {
     const { organizationSlug, slug } = useParams();
@@ -76,6 +77,7 @@ export function PublicEnrollmentPage() {
                 <div className="public-enrollment-card">
                     <h1>Inscripción no disponible</h1>
                     <p>{availability.reason || "Este link no existe o ya no está vigente."}</p>
+                    <PlatformCredit />
                 </div>
             </main>
         );
@@ -620,6 +622,7 @@ export function PublicEnrollmentPage() {
                         {paymentOption === "efectivo" && <p>Quedó pendiente de pago en sede. Acercate a {settings.general.address || "la sede"} para completar el pago.</p>}
                     </div>
                 )}
+                <PlatformCredit />
             </section>
         </main>
     );

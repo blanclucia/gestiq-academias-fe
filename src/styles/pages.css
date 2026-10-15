@@ -1081,7 +1081,7 @@ html.dark .donut-chart {
   font-size: 0.76rem;
 }
 
-.login-platform-link {
+.platform-credit {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1094,13 +1094,13 @@ html.dark .donut-chart {
   font-size: 0.7rem;
 }
 
-.login-platform-link a {
+.platform-credit a {
   color: var(--muted);
   font-weight: 800;
   text-decoration: none;
 }
 
-.login-platform-link a:hover {
+.platform-credit a:hover {
   text-decoration: underline;
 }
 
