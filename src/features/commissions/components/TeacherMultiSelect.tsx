@@ -4,7 +4,7 @@ import { MultiSearchableSelect } from '@/components/ui/MultiSearchableSelect'
 import { QuickCreateTeacherModal } from '@/features/staff'
 
 // Same multi-select as the rest of the app, plus a shortcut to create a teacher without leaving the form.
-export function TeacherMultiSelect({ options, value, onChange }: { options: Array<{ id: string; fullName: string }>; value: string[]; onChange: (value: string[]) => void }) {
+export function TeacherMultiSelect({ options, value, onChange, branchId }: { options: Array<{ id: string; fullName: string }>; value: string[]; onChange: (value: string[]) => void; branchId?: string }) {
     const [isCreateTeacherOpen, setIsCreateTeacherOpen] = useState(false)
 
     return <>
@@ -19,6 +19,7 @@ export function TeacherMultiSelect({ options, value, onChange }: { options: Arra
         />
         <QuickCreateTeacherModal
             open={isCreateTeacherOpen}
+            branchId={branchId}
             onClose={() => setIsCreateTeacherOpen(false)}
             onCreated={(fullName) => {
                 onChange([...value, fullName])

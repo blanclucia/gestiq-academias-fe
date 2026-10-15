@@ -41,7 +41,10 @@ export function CommissionForm({
     initialValues,
     value,
     onValueChange,
+    branchId,
 }: {
+    // Branch of the offer: a teacher created from here is assigned to it.
+    branchId?: string
     initialValues?: {
         name?: string
         course?: string
@@ -92,7 +95,7 @@ export function CommissionForm({
                     </FormField>
 
                     <FormField label="Profesores asignados">
-                        <TeacherMultiSelect options={teacherOptions} value={formValue.teachers} onChange={(teachers) => update({ teachers })} />
+                        <TeacherMultiSelect options={teacherOptions} value={formValue.teachers} onChange={(teachers) => update({ teachers })} branchId={branchId} />
                     </FormField>
 
                     <FormField label="Cupo máximo" required>

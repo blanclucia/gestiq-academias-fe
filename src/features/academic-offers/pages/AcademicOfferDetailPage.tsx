@@ -251,7 +251,7 @@ export function AcademicOfferDetailPage() {
                 }}
             >
                 <>
-                    <CommissionForm initialValues={{ course: course.name }} value={newCommissionForm} onValueChange={(value) => { setNewCommissionForm(value); setCommissionNameError('') }} />
+                    <CommissionForm branchId={course.branchId} initialValues={{ course: course.name }} value={newCommissionForm} onValueChange={(value) => { setNewCommissionForm(value); setCommissionNameError('') }} />
                     {commissionNameError && <p className="form-error-message" role="alert">{commissionNameError}</p>}
                 </>
             </EntityFormModal>

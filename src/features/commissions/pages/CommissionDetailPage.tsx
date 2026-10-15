@@ -372,6 +372,7 @@ export function CommissionDetailPage() {
                             // Remount on every saved change (own save, closing the commission) so the draft restarts from it.
                             key={`${commission.id}:${JSON.stringify(toCommissionFormValue(commission))}`}
                             commission={commission}
+                            branchId={course.branchId}
                             siblingNames={course.commissions.filter((item) => item.id !== commission.id).map((item) => item.name)}
                             saving={updateCommission.isPending}
                             onSave={async (changes) => {

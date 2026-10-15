@@ -22,6 +22,8 @@ const closedStatusOptions = [{ value: 'Cerrada', label: 'Cerrada' }]
 
 type Props = {
     commission: AcademicCommission
+    // Branch of the offer: a teacher created from the picker is assigned to it.
+    branchId: string
     // Other commissions of the same offer, to reject a duplicate name before hitting the API.
     siblingNames: string[]
     saving: boolean
@@ -30,7 +32,7 @@ type Props = {
 
 // Editable detail of a commission, same pattern as Mis sedes → Personalización: the data is the form,
 // saved from the footer. The parent remounts it (key) when the saved commission changes.
-export function CommissionSettingsCards({ commission, siblingNames, saving, onSave }: Props) {
+export function CommissionSettingsCards({ commission, branchId, siblingNames, saving, onSave }: Props) {
     const saved = toCommissionFormValue(commission)
     const [draft, setDraft] = useState<CommissionFormValue>(saved)
     const [error, setError] = useState('')
@@ -52,7 +54,7 @@ export function CommissionSettingsCards({ commission, siblingNames, saving, onSa
             <div className="form-grid academy-settings-grid">
                 <Field label="Nombre" required><input name="commissionName" className="form-input" value={draft.name} onChange={(event) => update({ name: event.target.value })} placeholder="Ej: Grupo A" /></Field>
                 <Field label="Estado" hint={commission.status === 'Cerrada' ? 'Reabrila desde el botón de arriba.' : undefined} info={<StatusHelp label="Qué significa cada estado" items={commissionStatusHelp} />}><SearchableSelect value={draft.status} disabled={commission.status === 'Cerrada'} onChange={(status) => update({ status: status as CommissionFormValue['status'] })} options={commission.status === 'Cerrada' ? closedStatusOptions : editableStatusOptions} /></Field>
-                <Field label="Profesores asignados"><TeacherMultiSelect options={teacherOptions} value={draft.teachers} onChange={(teachers) => update({ teachers })} /></Field>
+                <Field label="Profesores asignados"><TeacherMultiSelect options={teacherOptions} value={draft.teachers} onChange={(teachers) => update({ teachers })} branchId={branchId} /></Field>
                 <Field label="Cupo máximo" required><input name="commissionCapacity" className="form-input" type="number" min={1} value={draft.capacity} onChange={(event) => update({ capacity: Number(event.target.value || 1) })} /></Field>
             </div>
         </Card>
