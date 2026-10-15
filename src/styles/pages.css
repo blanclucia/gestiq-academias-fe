@@ -669,6 +669,7 @@ html.dark .ghost-button {
 
 .card-header-action { color: var(--primary); font-size: .78rem; font-weight: 750; text-decoration: none; white-space: nowrap; }
 .card-header-action:hover { text-decoration: underline; }
+.card-header-actions { display: flex; align-items: center; gap: 12px; }
 
 .revenue-bars {
   display: flex;

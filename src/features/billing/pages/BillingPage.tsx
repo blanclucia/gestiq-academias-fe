@@ -1,4 +1,4 @@
-import { endOfMonth, format, isWithinInterval, parseISO, startOfDay, startOfMonth } from 'date-fns'
+import { endOfMonth, format, isAfter, isWithinInterval, parseISO, startOfDay, startOfMonth } from 'date-fns'
 import { useSearchParams } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { CrudListPage } from '@/components/crud/CrudListPage'
@@ -110,6 +110,9 @@ export function BillingPage() {
             }
 
             const referenceDate = getReferenceDate(payment, payment.statusView)
+            // Vencidos/Pendientes are work queues: a charge left unpaid from an earlier month still needs
+            // managing, so for them the range only caps the end date (same as the dashboard card).
+            if (activeTab === 'vencidos' || activeTab === 'pendientes') return !isAfter(parseISO(referenceDate), rangeEnd)
             return isWithinInterval(parseISO(referenceDate), { start: rangeStart, end: rangeEnd })
         })
     }, [activeFilters.student, activeTab, dateRange.from, dateRange.to, paymentRows, today])

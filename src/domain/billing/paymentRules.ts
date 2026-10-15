@@ -50,3 +50,14 @@ export function getPaymentReminderLabel(payment: Pick<Payment, 'dueDate'>, statu
     if (daysToDue <= 3) return `Vence en ${daysToDue} día${daysToDue === 1 ? '' : 's'}`
     return 'Sin urgencia'
 }
+
+// "Cobros a gestionar": every unpaid, non-voided charge due by the end of the given month — including
+// overdue ones from earlier months, which are the most urgent. Split like the Cobros tabs: Vencidos
+// (status already accounts for the grace days) and Pendientes (pending, under review, rejected, partial).
+export function summarizeChargesToManage<T extends Pick<Payment, 'status' | 'dueDate'>>(payments: T[], monthEndKey: string) {
+    const toManage = payments.filter((payment) => payment.status !== 'Pagado' && payment.status !== 'Anulado' && payment.dueDate <= monthEndKey)
+    return {
+        overdue: toManage.filter((payment) => payment.status === 'Vencido'),
+        pending: toManage.filter((payment) => payment.status !== 'Vencido'),
+    }
+}

@@ -6,6 +6,8 @@ import { getActiveAcademicCycleId, listAcademicCycles, listCourses, listPayments
 import { getExpenseDisplayStatus, listExpenses, useFinanceRepositoryVersion } from '@/services/financeRepository'
 import { listUpcomingAgendaEvents, useAgendaRepositoryVersion } from '@/services/agendaRepository'
 import { calculateOccupancy } from '@/domain/commissions/commissionRules'
+import { resolveChargeCollectionStatus, summarizeChargesToManage } from '@/domain/billing/paymentRules'
+import { useAcademySettings } from '@/services/academySettingsRepository'
 import { formatCurrencyARS, formatShortDate } from '@/domain/shared/formattingRules'
 import { useBranchRoster, useBranches, useSelectedBranchId } from '@/services/branchRepository'
 import { useWorkspace } from '@/workspace/useWorkspace'
@@ -21,10 +23,12 @@ export function AdminDashboardPage() {
     const { branches } = useBranches()
     const selectedBranch = branches.find((branch) => branch.id === selectedBranchId)
     const { roster } = useBranchRoster(selectedBranchId || undefined)
+    const { settings: academySettings } = useAcademySettings()
     const activeCycleId = getActiveAcademicCycleId()
     const activeCycle = listAcademicCycles().find((cycle) => cycle.id === activeCycleId)
     const today = new Date()
     const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+    const currentMonthEndKey = `${currentMonthKey}-${String(new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()).padStart(2, '0')}`
     // With a cycle shown next to it the year is redundant; keep it only when there's no cycle to anchor the month.
     const currentMonthLabel = new Intl.DateTimeFormat('es-AR', activeCycle ? { month: 'long' } : { month: 'long', year: 'numeric' }).format(today)
     const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -38,13 +42,18 @@ export function AdminDashboardPage() {
         const students = listStudents().filter((student) => student.branchId === selectedBranchId)
         const studentIdsInBranch = new Set(students.map((student) => student.id))
         const courses = listCourses().filter((course) => course.cycleId === activeCycleId && course.branchId === selectedBranchId)
-        const payments = listPayments().filter((payment) => {
-            const referenceDate = payment.status === 'Pagado' ? payment.date : payment.dueDate
-            return referenceDate.startsWith(currentMonthKey) && payment.studentId !== undefined && studentIdsInBranch.has(payment.studentId)
-        })
+        // Same status as Cobros: "Vencido" only after the grace days configured in Mi academia → Cobros.
+        const graceDays = academySettings?.payments.graceDays ?? 0
+        // Midnight, like Cobros: a charge due today is still Pendiente, not Vencido.
+        const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+        const branchPayments = listPayments()
+            .filter((payment) => payment.studentId !== undefined && studentIdsInBranch.has(payment.studentId))
+            .map((payment) => ({ ...payment, status: resolveChargeCollectionStatus(payment.chargeSnapshot, startOfToday, graceDays) }))
+        const payments = branchPayments.filter((payment) => (payment.status === 'Pagado' ? payment.date : payment.dueDate).startsWith(currentMonthKey))
         const commissions = courses.flatMap((course) => course.commissions.map((commission) => ({ ...commission, courseName: course.name })))
         const confirmedPayments = payments.filter((payment) => payment.status === 'Pagado')
-        const pendingPayments = payments.filter((payment) => payment.status !== 'Pagado')
+        const chargesToManage = summarizeChargesToManage(branchPayments, currentMonthEndKey)
+        const pendingPayments = [...chargesToManage.overdue, ...chargesToManage.pending]
 
         return {
             students,
@@ -55,6 +64,8 @@ export function AdminDashboardPage() {
             commissions,
             confirmedPayments,
             pendingPayments,
+            overdueCount: chargesToManage.overdue.length,
+            pendingCount: chargesToManage.pending.length,
             receivedAmount: confirmedPayments.reduce((total, payment) => total + payment.amount, 0),
             pendingAmount: pendingPayments.reduce((total, payment) => total + payment.amount, 0),
             registrations: payments.filter((payment) => payment.concept.startsWith('Matrícula') || payment.concept.startsWith('Inscripción')).length,
@@ -98,11 +109,11 @@ export function AdminDashboardPage() {
                     </div>
                 </ChartCard>
 
-                <ChartCard title="Cobros confirmados" value={currency.format(data.receivedAmount)} subtitle={`${data.confirmedPayments.length} pagos registrados`} action={<Link to={path('billing?tab=recibidos')} className="card-header-action">Ver recibidos</Link>} className="dashboard-payment-card small-panel">
+                <ChartCard title="Cobros confirmados" value={currency.format(data.receivedAmount)} subtitle={`${data.confirmedPayments.length} pago${data.confirmedPayments.length === 1 ? '' : 's'} registrado${data.confirmedPayments.length === 1 ? '' : 's'} este mes`} action={<Link to={path('billing?tab=recibidos')} className="card-header-action">Ver recibidos</Link>} className="dashboard-payment-card small-panel">
                     <div className="dashboard-summary-icon positive"><CreditCard size={22} /></div>
                 </ChartCard>
 
-                <ChartCard title="Cobros a gestionar" value={currency.format(data.pendingAmount)} subtitle={`${data.pendingPayments.length} pagos pendientes o rechazados`} action={<Link to={path('billing?tab=pendientes')} className="card-header-action">Ver pendientes</Link>} className="dashboard-payment-card medium-panel">
+                <ChartCard title="Cobros a gestionar" value={currency.format(data.pendingAmount)} subtitle={`${data.overdueCount} vencido${data.overdueCount === 1 ? '' : 's'} · ${data.pendingCount} pendiente${data.pendingCount === 1 ? '' : 's'} hasta fin de mes`} action={<span className="card-header-actions">{data.overdueCount > 0 && <Link to={path('billing?tab=vencidos')} className="card-header-action">Ver vencidos</Link>}<Link to={path('billing?tab=pendientes')} className="card-header-action">Ver pendientes</Link></span>} className="dashboard-payment-card medium-panel">
                     <div className="dashboard-summary-icon warning"><CreditCard size={22} /></div>
                 </ChartCard>
 
