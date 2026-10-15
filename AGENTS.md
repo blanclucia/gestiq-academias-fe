@@ -67,6 +67,7 @@ Este proyecto debe seguir la estrategia definida en `estrategia-frontend-platafo
 ### Contenido de tabs
 
 - En páginas de detalle (oferta, comisión, inscripción, alumno, configuración), el contenido de cada tab va dentro de `Card` con un `SectionHeading`: ícono, título y, si aplica, descripción y acciones. Nunca tablas o listas sueltas sobre el fondo de la página.
+- La tab activa vive en la URL (`?tab=...`, sin parámetro para la primera), así se puede enlazar a una sección y volver atrás a la misma tab (ej. `academy?tab=cobros`, `oferta/:id?tab=commissions`).
 - El título es obligatorio aunque la tab tenga una sola card y repita su nombre (ej. tab "Alumnos" → card "Alumnos"). Preferir un título más específico cuando aporte información (ej. tab "Cobros" → "Configuración de cobros").
 - El contador de registros va como `description` del `SectionHeading` (ej. "2 alumnos asignados") y la acción principal de la card en `actions`, no en una barra aparte.
 - Las cards de una tab se apilan dentro de `.offer-detail-stack`: el `gap` del contenedor define la separación, sin márgenes propios.
