@@ -7,6 +7,15 @@ export function getExpenseDisplayStatus(expense: ExpenseDisplayInput, today: str
     return expense.dueDate && expense.dueDate < today ? 'Vencido' : 'Pendiente'
 }
 
+// One date decides which period an expense belongs to, in the list and in the summary alike: when it
+// was paid, or when it is due. A pending expense with no due date is an open commitment, so it shows
+// in every period until it is paid.
+export function isExpenseInPeriod(expense: ExpenseDisplayInput & { paidDate?: string }, from: string, to: string) {
+    const date = expense.status === 'Pagado' ? expense.paidDate : expense.dueDate
+    if (!date) return expense.status !== 'Pagado'
+    return (!from || date >= from) && (!to || date <= to)
+}
+
 type ProjectedIncome = { amount: number; status: BillingDisplayStatus }
 type PlannedExpense = { amount: number }
 

@@ -18,7 +18,7 @@ import { useBranches, useSelectedBranchId } from '@/services/branchRepository'
 import { validateConditions } from '@/components/forms/formValidation'
 import { formatCurrencyARS, formatShortDate as formatDate } from '@/domain/shared/formattingRules'
 import { DateRangeControl } from '@/components/ui/DateRangeControl'
-import { calculateFinancialProjection } from '@/domain/finance/expenseRules'
+import { calculateFinancialProjection, isExpenseInPeriod } from '@/domain/finance/expenseRules'
 import { useToast } from '@/components/ui/ToastContext'
 import { paymentMethods } from '@/domain/billing/paymentMethods'
 
@@ -75,7 +75,7 @@ export function FinancePage() {
     const isInDateRange = (date?: string) => Boolean(date)
         && (!dateRange.from || date! >= dateRange.from)
         && (!dateRange.to || date! <= dateRange.to)
-    const periodExpenses = expenses.filter((expense) => isInDateRange(expense.status === 'Pagado' ? expense.paidDate : expense.dueDate))
+    const periodExpenses = expenses.filter((expense) => isExpenseInPeriod(expense, dateRange.from, dateRange.to))
     const periodPayments = payments.filter((payment) => isInDateRange(payment.status === 'Pagado' ? payment.date : payment.dueDate))
     const received = periodPayments.filter((payment) => payment.status === 'Pagado').reduce((total, payment) => total + payment.amount, 0)
     const paid = periodExpenses.filter((expense) => expense.status === 'Pagado').reduce((total, expense) => total + expense.amount, 0)
@@ -87,8 +87,7 @@ export function FinancePage() {
         const statuses = splitFilterValue(filters.status)
         const selectedCategories = splitFilterValue(filters.category)
         const recurrences = splitFilterValue(filters.recurrence)
-        return (!expense.dueDate || !dateRange.from || expense.dueDate >= dateRange.from)
-            && (!expense.dueDate || !dateRange.to || expense.dueDate <= dateRange.to)
+        return isExpenseInPeriod(expense, dateRange.from, dateRange.to)
             && (statuses.length === 0 || statuses.includes(status))
             && (selectedCategories.length === 0 || selectedCategories.includes(expense.category))
             && (recurrences.length === 0 || recurrences.includes(expense.recurrence))
