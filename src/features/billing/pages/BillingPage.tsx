@@ -196,7 +196,10 @@ export function BillingPage() {
                 .reduce((acc, payment) => acc + payment.amount, 0),
             overdueCount: monthPayments.filter((payment) => payment.statusView === 'Vencido').length,
             remindersSent: monthPayments.filter((payment) => Boolean(payment.lastReminderAt)).length,
-            receivedByMethod: paymentMethods.map((method) => {
+            // Only the methods enabled in Mi academia → Cobros, plus any disabled one that still collected
+            // money in the period (hiding it would hide real income).
+            receivedByMethod: paymentMethods.filter((method) => availablePaymentMethods.includes(method)
+                || monthPayments.some((payment) => payment.statusView === 'Pagado' && payment.method === method)).map((method) => {
                 const methodPayments = monthPayments.filter(
                     (payment) => payment.statusView === 'Pagado' && payment.method === method,
                 )
@@ -208,7 +211,7 @@ export function BillingPage() {
                 }
             }),
         }
-    }, [paymentRows, summaryInterval.end, summaryInterval.start])
+    }, [availablePaymentMethods, paymentRows, summaryInterval.end, summaryInterval.start])
 
     const paymentById = useMemo(() => new Map(paymentRows.map((payment) => [payment.id, payment])), [paymentRows])
 

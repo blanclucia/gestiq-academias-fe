@@ -34,7 +34,7 @@ export function ManualChargeModal({ open, value, students, paymentMethods, onCha
         <EntityFormModal
             open={open}
             title="Nuevo cobro"
-            subtitle="Registrá un concepto extraordinario, asociado o no a un alumno."
+            subtitle="Registrá un concepto extraordinario de un alumno: examen, material, certificado u otro."
             submitLabel={value.status === 'Pagado' ? 'Registrar ingreso' : 'Crear cobro pendiente'}
             validate={() => validateManualCharge(value)}
             onClose={onClose}
@@ -57,10 +57,12 @@ export function ManualChargeModal({ open, value, students, paymentMethods, onCha
                         </FormField>
                     </FormGrid>
                 </FormSection>
-                <FormSection title="Estado y fecha">
+                <FormSection title="Cobro" description="Si ya te pagaron, indicá cuándo y con qué medio; si no, queda pendiente con su vencimiento.">
                     <FormGrid>
-                        <FormField label="Estado">
-                            <SearchableSelect value={value.status} onChange={(status) => update({ status: status as ManualChargeValue['status'] })} options={[{ value: 'Pendiente', label: 'Pendiente' }, { value: 'Pagado', label: 'Pagado' }]} />
+                        {/* An explicit question instead of a "Status" select: the payment method only applies once
+                            it was collected, and hiding it behind "Pagado" made it look missing. */}
+                        <FormField label="¿Ya se cobró?">
+                            <SearchableSelect value={value.status} onChange={(status) => update({ status: status as ManualChargeValue['status'] })} options={[{ value: 'Pendiente', label: 'No, queda pendiente' }, { value: 'Pagado', label: 'Sí, ya se cobró' }]} />
                         </FormField>
                         {value.status === 'Pendiente' ? (
                             <FormField label="Vencimiento" required><input name="dueDate" className="form-input" type="date" value={value.dueDate} onChange={(event) => update({ dueDate: event.target.value })} /></FormField>
