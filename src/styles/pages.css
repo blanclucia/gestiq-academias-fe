@@ -1612,11 +1612,6 @@ html.dark .donut-chart {
   accent-color: var(--primary);
 }
 
-.eligible-commission-row>svg {
-  flex: 0 0 auto;
-  color: var(--primary);
-}
-
 .eligible-commission-row>span {
   display: grid;
   gap: 3px;
