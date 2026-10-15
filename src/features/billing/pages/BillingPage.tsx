@@ -545,13 +545,15 @@ export function BillingPage() {
                 ) : undefined}
                 selectedCount={activeTab === 'resumen' ? 0 : selectedCount}
                 bulkActionItems={[
-                    { label: 'Registrar cobro', onClick: openBulkCollect },
-                    {
-                        label: selectedPendingCount > 0 ? `Recordar (${selectedPendingCount})` : 'Recordar',
-                        onClick: () => {
-                            selectedIds.forEach((id) => updatePaymentRecord(id, { lastReminderAt: format(today, 'yyyy-MM-dd') }))
-                        },
-                    },
+                    { label: selectedPendingCount > 0 ? `Registrar cobro (${selectedPendingCount})` : 'Registrar cobro', onClick: openBulkCollect },
+                    // Próximamente, con Comunicaciones: hoy "Recordar" solo anotaba una fecha en este navegador,
+                    // sin avisarle nada al alumno.
+                    // {
+                    //     label: selectedPendingCount > 0 ? `Recordar (${selectedPendingCount})` : 'Recordar',
+                    //     onClick: () => {
+                    //         selectedIds.forEach((id) => updatePaymentRecord(id, { lastReminderAt: format(today, 'yyyy-MM-dd') }))
+                    //     },
+                    // },
                     { label: 'Exportar', onClick: exportPayments },
                 ]}
                 postHeaderContent={<BillingContextHeader activeTab={activeTab} onTabChange={setActiveTab} onNewCharge={() => setIsManualChargeOpen(true)} />}

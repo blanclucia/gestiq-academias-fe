@@ -1,4 +1,4 @@
-import { BellRing, CreditCard, Link2, PencilLine, RotateCcw, Trash2, XCircle } from 'lucide-react'
+import { CreditCard, Link2, PencilLine, RotateCcw, Trash2, XCircle } from 'lucide-react'
 import { DataTable } from '@/components/ui/DataTable'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
 import { StatusBadge, type StatusBadgeTone } from '@/components/ui/StatusBadge'
@@ -103,7 +103,8 @@ export function BillingTable(props: BillingTableProps) {
                     ] : []),
                     ...(props.canAdjust ? [{ label: 'Ajustar pago', icon: <PencilLine size={15} />, onClick: () => props.onAdjust(payment) }] : []),
                     ...(status === 'En verificación' ? [{ label: 'Rechazar transferencia', icon: <XCircle size={15} />, onClick: () => props.onRejectTransfer(payment) }] : []),
-                    ...(status === 'Pendiente' || status === 'Vencido' ? [{ label: status === 'Vencido' ? 'Recordar vencido' : 'Recordar próximo vencimiento', icon: <BellRing size={15} />, onClick: () => props.onRemind(payment) }] : []),
+                    // Próximamente, con Comunicaciones: recordar hoy no le envía nada al alumno.
+                    // ...(status === 'Pendiente' || status === 'Vencido' ? [{ label: status === 'Vencido' ? 'Recordar vencido' : 'Recordar próximo vencimiento', icon: <BellRing size={15} />, onClick: () => props.onRemind(payment) }] : []),
                     // A paid charge is the record of money received: it can't be deleted (the backend refuses
                     // too). Reverting it to pending is the deliberate step that makes it editable or removable.
                     ...(status === 'Pagado'
