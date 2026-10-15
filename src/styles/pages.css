@@ -1176,7 +1176,7 @@ html.dark .donut-chart {
     grid-row: 1;
   }
 
-  .share-enrollment-panel {
+  .share-enrollment-body {
     grid-template-columns: 1fr;
   }
 
@@ -1568,6 +1568,13 @@ html.dark .donut-chart {
   margin-top: 18px;
   padding-top: 18px;
   border-top: 1px solid var(--border);
+}
+
+/* In its own card (enrollment detail) the SectionHeading already separates it. */
+.eligible-commissions.standalone {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .eligible-commissions>div:first-child {

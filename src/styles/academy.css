@@ -235,15 +235,11 @@
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.2fr) minmax(140px, 0.8fr) minmax(130px, 0.7fr) auto;
 }
 
-.share-enrollment-panel {
+/* QR + link/actions inside the "Compartir inscripción" Card. */
+.share-enrollment-body {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
   gap: 22px;
-  margin-top: 16px;
-  padding: 20px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--panel);
 }
 
 .share-enrollment-qr {
@@ -270,27 +266,6 @@
   min-width: 0;
 }
 
-.share-enrollment-content h3 {
-  margin: 2px 0 0;
-  font-size: 1.05rem;
-}
-
-.share-enrollment-content p {
-  margin: 5px 0 0;
-  max-width: 650px;
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
-
-.share-enrollment-eyebrow {
-  color: var(--primary) !important;
-  font-size: 0.7rem !important;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .share-enrollment-link {
   display: block;
   padding: 10px 12px;
@@ -314,20 +289,6 @@
 
 .share-enrollment-actions a {
   text-decoration: none;
-}
-
-.share-enrollment-feedback {
-  min-height: 18px;
-  color: var(--muted);
-  font-size: 0.76rem;
-}
-
-.share-enrollment-empty {
-  margin-top: 16px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  color: var(--muted);
 }
 
 .academy-tab-panel {

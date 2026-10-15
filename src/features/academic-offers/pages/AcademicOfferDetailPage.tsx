@@ -7,7 +7,7 @@ import { DeleteConfirmationModal, EntityFormModal } from '@/components/crud/Enti
 import { FilterChips } from '@/components/crud/FilterChips'
 import { splitFilterValue } from '@/components/crud/filterValues'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { type AcademicCommission, getActiveAcademicCycleId, listAcademicCycles, listCourses, listEnrollmentOpenings, useAcademyRepositoryVersion, useCreateCommission, useCreateEnrollmentOpening, useDeleteCommission, useDeleteEnrollmentOpening, useUpdateCourse, useUpdateEnrollmentOpening } from '@/services/academyRepository'
+import { type AcademicCommission, getActiveAcademicCycleId, listAcademicCycles, listCourses, listEnrollmentOpenings, useAcademyRepositoryVersion, useCreateCommission, useCreateEnrollmentOpening, useDeleteCommission, useDeleteEnrollmentOpening, useUpdateCourse } from '@/services/academyRepository'
 import { isCommissionNameConflict, isCourseClosed } from '@/services/organization/academicOffersApi'
 import { isCourseNotActive } from '@/services/organization/enrollmentsApi'
 import { formatCommissionSchedule, validateCommission } from '@/features/commissions'
@@ -55,12 +55,9 @@ export function AcademicOfferDetailPage() {
     const [isCreateCommissionOpen, setIsCreateCommissionOpen] = useState(false)
     const [commissionNameError, setCommissionNameError] = useState('')
     const [isCreateEnrollmentOpen, setIsCreateEnrollmentOpen] = useState(false)
-    const [isEditEnrollmentOpen, setIsEditEnrollmentOpen] = useState(false)
     const [newCommissionForm, setNewCommissionForm] = useState<CommissionFormValue>(() => emptyCommissionForm(undefined, undefined, defaultCommissionCapacity))
     const [deleteCommissionTarget, setDeleteCommissionTarget] = useState<CourseCommission | null>(null)
-    const [editingEnrollment, setEditingEnrollment] = useState<OfferEnrollmentRow | null>(null)
     const [enrollmentForm, setEnrollmentForm] = useState<EnrollmentFormValue>({ courseId: courseId ?? '', commissionIds: [], amount: 48000, ...defaultEnrollmentWindow(), status: 'Abierta' })
-    const [viewEnrollment, setViewEnrollment] = useState<OfferEnrollmentRow | null>(null)
     const [deleteEnrollmentTarget, setDeleteEnrollmentTarget] = useState<OfferEnrollmentRow | null>(null)
     const [openMenuId, setOpenMenuId] = useState<string | null>(null)
     const [commissionSearch, setCommissionSearch] = useState('')
@@ -74,7 +71,6 @@ export function AcademicOfferDetailPage() {
     const createCommission = useCreateCommission()
     const deleteCommission = useDeleteCommission()
     const createEnrollmentOpening = useCreateEnrollmentOpening()
-    const updateEnrollmentOpening = useUpdateEnrollmentOpening()
     const deleteEnrollmentOpening = useDeleteEnrollmentOpening()
     const { showToast } = useToast()
     // Editing moved into the commission detail; old links that opened the edit modal land there.
@@ -181,12 +177,6 @@ export function AcademicOfferDetailPage() {
             onSuccess: () => showToast('success', 'Comisión duplicada correctamente.'),
             onError: (error) => showToast('error', isCourseClosed(error) ? 'El curso está cerrado: no admite comisiones nuevas.' : 'No se pudo duplicar la comisión. Intentá nuevamente.'),
         })
-    }
-
-    const openEditEnrollmentModal = (enrollment: OfferEnrollmentRow) => {
-        setEditingEnrollment(enrollment)
-        setEnrollmentForm({ courseId: enrollment.courseId, commissionIds: enrollment.commissionIds, amount: enrollment.amount, startDate: enrollment.startDate, endDate: enrollment.endDate, status: enrollment.status })
-        setIsEditEnrollmentOpen(true)
     }
 
     if (!course) {
@@ -308,58 +298,6 @@ export function AcademicOfferDetailPage() {
                 />
             </EntityFormModal>
 
-            <EntityFormModal
-                open={isEditEnrollmentOpen}
-                title="Editar inscripción"
-                subtitle="Actualizá la inscripción seleccionada."
-                validate={() => validateEnrollment(enrollmentForm, course.commissions)}
-                onClose={() => {
-                    setIsEditEnrollmentOpen(false)
-                    setEditingEnrollment(null)
-                }}
-                onSubmit={() => {
-                    if (editingEnrollment && enrollmentForm.commissionIds.length > 0) {
-                        updateEnrollmentOpening.mutate({ id: editingEnrollment.id, changes: enrollmentForm }, {
-                            onSuccess: () => showToast('success', 'Inscripción actualizada correctamente.'),
-                            onError: () => showToast('error', 'No se pudo actualizar la inscripción. Intentá nuevamente.'),
-                        })
-                    }
-                    setIsEditEnrollmentOpen(false)
-                    setEditingEnrollment(null)
-                }}
-            >
-                <EnrollmentForm
-                    courseName={course.name}
-                    commissions={course.commissions}
-                    value={enrollmentForm}
-                    onValueChange={setEnrollmentForm}
-                />
-            </EntityFormModal>
-
-            <EntityFormModal
-                open={Boolean(viewEnrollment)}
-                title="Detalle de inscripción"
-                subtitle="Resumen de la inscripción seleccionada."
-                submitLabel="Cerrar"
-                onClose={() => setViewEnrollment(null)}
-                onSubmit={() => setViewEnrollment(null)}
-            >
-                {viewEnrollment && (
-                    <EnrollmentForm
-                        courseName={course.name}
-                        commissions={course.commissions}
-                        initialValues={{
-                            courseId: course.id,
-                            commissionIds: viewEnrollment.commissionIds,
-                            amount: viewEnrollment.amount,
-                            startDate: viewEnrollment.startDate,
-                            endDate: viewEnrollment.endDate,
-                            status: viewEnrollment.status,
-                        }}
-                    />
-                )}
-            </EntityFormModal>
-
             <DeleteConfirmationModal
                 open={Boolean(deleteEnrollmentTarget)}
                 title="Cancelar inscripción"
@@ -459,11 +397,6 @@ export function AcademicOfferDetailPage() {
                             }}
                             onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)}
                             onView={(enrollment) => navigate(path(`oferta/${course.id}/inscripciones/${enrollment.id}`))}
-                            onEdit={openEditEnrollmentModal}
-                            onCloseEnrollment={(enrollment) => updateEnrollmentOpening.mutate({ id: enrollment.id, changes: { status: 'Cerrada' } }, {
-                                onSuccess: () => showToast('success', 'Inscripción cerrada correctamente.'),
-                                onError: () => showToast('error', 'No se pudo cerrar la inscripción. Intentá nuevamente.'),
-                            })}
                             onDelete={setDeleteEnrollmentTarget}
                         />
                     )}

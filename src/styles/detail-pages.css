@@ -4,7 +4,6 @@
 .detail-breadcrumb-link { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); text-decoration: none; }
 .detail-page-title { margin-top: 16px; }
 .detail-status { margin-top: 8px; }
-.detail-header-actions { display: flex; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .detail-card { padding: 20px; }
 .detail-section { margin-top: 20px; }
 .detail-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 20px; }
@@ -18,5 +17,4 @@
 
 @media (max-width: 640px) {
     .detail-page-header { flex-direction: column; }
-    .detail-header-actions { width: 100%; justify-content: flex-start; }
 }

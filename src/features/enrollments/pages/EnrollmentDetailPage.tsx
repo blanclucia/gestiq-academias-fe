@@ -1,6 +1,6 @@
-import { ArrowLeft, CalendarDays, CheckCircle2, CreditCard, ExternalLink, StickyNote, Users } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CheckCircle2, CreditCard, ExternalLink, Lock, RotateCcw, StickyNote, Users, Wallet } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
@@ -13,29 +13,32 @@ import {
 } from '@/services/academyRepository'
 import { chargeMethodToApi } from '@/services/organization/chargesMapping'
 import { DeleteConfirmationModal, EntityFormModal, FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
-import { EnrollmentForm, type EnrollmentFormValue } from '../components/EnrollmentForm'
+import { EnrollmentSettingsCards } from '../components/EnrollmentSettingsCards'
 import { EnrollmentSharePanel } from '../components/EnrollmentSharePanel'
 import type { Payment } from '@/types/domain'
-import { validateEnrollment } from '../model/enrollmentValidation'
 import { validateConditions } from '@/components/forms/formValidation'
 import { useToast } from '@/components/ui/ToastContext'
 import { useWorkspace } from '@/workspace/useWorkspace'
 import { getEligibleCommissions } from '@/domain/commissions/commissionRules'
+import { formatCurrencyARS, formatShortDate } from '@/domain/shared/formattingRules'
 
 function getTodayString() {
     const date = new Date()
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
+type EnrollmentTab = 'overview' | 'students'
+
 export function EnrollmentDetailPage() {
     const { organization, path } = useWorkspace()
     useAcademyRepositoryVersion()
     const { courseId, enrollmentId } = useParams()
     const { showToast } = useToast()
-    const [activeTab, setActiveTab] = useState<'overview' | 'students'>('overview')
-    const [isEditOpen, setIsEditOpen] = useState(false)
+    // The active tab lives in the URL (?tab=students), like the offer and commission details.
+    const [searchParams, setSearchParams] = useSearchParams()
+    const activeTab: EnrollmentTab = searchParams.get('tab') === 'students' ? 'students' : 'overview'
+    const setActiveTab = (tab: EnrollmentTab) => setSearchParams(tab === 'overview' ? {} : { tab }, { replace: true })
     const [isCloseOpen, setIsCloseOpen] = useState(false)
-    const [formValue, setFormValue] = useState<EnrollmentFormValue | null>(null)
     const [collectTarget, setCollectTarget] = useState<EnrollmentRegistrationRow | null>(null)
     const [collectForm, setCollectForm] = useState<{ date: string; method: Payment['method'] }>({ date: getTodayString(), method: 'Transferencia' })
     const [noteTarget, setNoteTarget] = useState<EnrollmentRegistrationRow | null>(null)
@@ -81,8 +84,10 @@ export function EnrollmentDetailPage() {
         }))
         .filter((commission) => enrollment.commissions.some((eligible) => eligible.id === commission.id) || commission.students.length > 0)
     const unassignedStudents = registrations.filter((registration) => !course.commissions.some((commission) => commission.id === registration.commissionId))
-    const paidCount = registrations.filter((registration) => registration.payment === 'Pagado').length
-    const pendingCount = registrations.length - paidCount
+    const paidRegistrations = registrations.filter((registration) => registration.payment === 'Pagado')
+    const collectedAmount = paidRegistrations.reduce((total, registration) => total + registration.chargeAmount, 0)
+    const periodLabel = `${formatShortDate(enrollment.startDate)} al ${formatShortDate(enrollment.endDate)}`
+    const shortPeriodLabel = `${formatShortDate(enrollment.startDate).slice(0, 5)} al ${formatShortDate(enrollment.endDate).slice(0, 5)}`
     const saveRegistrationNote = () => {
         if (!noteTarget) return
         updateNotes.mutate({ id: noteTarget.id, notes: noteDraft.trim() }, {
@@ -107,33 +112,10 @@ export function EnrollmentDetailPage() {
                 </FormField>
             </EntityFormModal>
 
-            <EntityFormModal
-                open={isEditOpen}
-                title="Editar inscripción"
-                subtitle="Actualizá el período, costo o estado de esta inscripción."
-                validate={() => formValue ? validateEnrollment(formValue, course.commissions) : { valid: false, message: 'No hay datos de inscripción para guardar.' }}
-                onClose={() => setIsEditOpen(false)}
-                onSubmit={() => {
-                    if (formValue) updateOpening.mutate({ id: enrollment.id, changes: formValue }, {
-                        onSuccess: () => showToast('success', 'Inscripción actualizada correctamente.'),
-                        onError: () => showToast('error', 'No se pudo actualizar la inscripción. Intentá nuevamente.'),
-                    })
-                    setIsEditOpen(false)
-                }}
-            >
-                {formValue && <EnrollmentForm
-                    courseName={course.name}
-                    commissions={course.commissions}
-                    value={formValue}
-                    onValueChange={setFormValue}
-                    publicLink={publicEnrollmentLink}
-                />}
-            </EntityFormModal>
-
             <DeleteConfirmationModal
                 open={isCloseOpen}
                 title="Cerrar inscripción"
-                description="El link público dejará de aceptar nuevas inscripciones. Los registros y pagos ya realizados se conservarán."
+                description="El link público dejará de aceptar inscripciones nuevas. Los inscriptos, sus notas y los pagos ya registrados se conservan. Podés reabrirla cuando quieras."
                 confirmLabel="Cerrar inscripción"
                 onClose={() => setIsCloseOpen(false)}
                 onConfirm={() => {
@@ -172,71 +154,70 @@ export function EnrollmentDetailPage() {
                 </div>
             </EntityFormModal>
 
-            <div className="page-header compact detail-page-header">
-                <div className="detail-page-heading">
-                    <div className="detail-breadcrumb">
-                        <Link to={path(`oferta/${course.id}`)} className="detail-breadcrumb-link">
+            <div className="page-header compact">
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: 'var(--muted)', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                        <Link to={path(`oferta/${course.id}?tab=enrollments`)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--muted)', textDecoration: 'none' }}>
                             <ArrowLeft size={14} />
                             {course.name}
                         </Link>
                         <span>›</span>
                         <span>Inscripción</span>
                     </div>
-                    <h1 className="detail-page-title">Inscripción · {course.name}</h1>
+                    {/* The period tells apart several enrollments of the same offer. */}
+                    <h1 style={{ marginTop: 16 }}>Inscripción del {periodLabel}</h1>
                 </div>
-
-                <div className="detail-header-actions">
-                    <button type="button" className="secondary-button compact-button" onClick={() => {
-                        setFormValue({ courseId: course.id, commissionIds: enrollment.commissions.map((commission) => commission.id), amount: enrollment.amount, startDate: enrollment.startDate, endDate: enrollment.endDate, status: enrollment.status })
-                        setIsEditOpen(true)
-                    }}>Editar inscripción</button>
-                    {enrollment.status !== 'Cerrada' && <button type="button" className="secondary-button compact-button" onClick={() => setIsCloseOpen(true)}>Cerrar</button>}
+                <div className="page-header-actions">
+                    {enrollment.status === 'Cerrada'
+                        ? <button type="button" className="secondary-button compact-button" disabled={updateOpening.isPending} onClick={() => updateOpening.mutate({ id: enrollment.id, changes: { status: 'Abierta' } }, {
+                            onSuccess: () => showToast('success', 'Inscripción reabierta: vuelve a estar Abierta.'),
+                            onError: () => showToast('error', 'No se pudo reabrir la inscripción. Intentá nuevamente.'),
+                        })}><RotateCcw size={15} />Reabrir inscripción</button>
+                        : <button type="button" className="secondary-button compact-button" onClick={() => setIsCloseOpen(true)}><Lock size={15} />Cerrar inscripción</button>}
                 </div>
             </div>
 
-            <div className="data-table-card detail-card">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'students')}>
+            <div className="academy-tabs-wrap">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as EnrollmentTab)}>
                     <TabsList variant="line" aria-label="Detalle de inscripción">
                         <TabsTrigger value="overview">Resumen</TabsTrigger>
                         <TabsTrigger value="students">Inscriptos</TabsTrigger>
                     </TabsList>
                 </Tabs>
 
+                <div className="offer-detail-stack">
                 {activeTab === 'overview' && (
-                    <div className="detail-section">
-                        <MetricTileGrid>
-                            <MetricTile icon={<Users size={20} />} label="Inscriptos" value={enrollment.studentsCount} />
-                            <MetricTile icon={<CreditCard size={20} />} label="Costo" value={`$${enrollment.amount.toLocaleString('es-AR')}`} />
-                            <MetricTile icon={<CalendarDays size={20} />} label="Periodo" value={`${enrollment.startDate} → ${enrollment.endDate}`} />
-                            <MetricTile icon={<CheckCircle2 size={20} />} label="Estado" value={<StatusBadge label={enrollment.status} tone={statusTone} />} />
-                        </MetricTileGrid>
-
-                        <div className="detail-info-grid">
-                            <div className="detail-info-card">
-                                <h3 className="detail-info-title">Datos de inscripción</h3>
-                                <ul className="detail-info-list">
-                                    <li>Oferta académica: {course.name}</li>
-                                    <li>Comisiones disponibles: {enrollment.commissions.map((commission) => commission.name).join(', ') || 'Ninguna'}</li>
-                                    <li>Inicio: {enrollment.startDate}</li>
-                                    <li>Cierre: {enrollment.endDate}</li>
-                                    <li>Estado: {enrollment.status}</li>
-                                </ul>
-                            </div>
-
-                            <div className="detail-info-card">
-                                <h3 className="detail-info-title">Cobranzas</h3>
-                                <ul className="detail-info-list">
-                                    <li>Monto base: ${enrollment.amount.toLocaleString('es-AR')}</li>
-                                    <li>Pagos realizados: {paidCount}</li>
-                                    <li>Pagos pendientes: {pendingCount}</li>
-                                    <li>Ingresos estimados: ${(enrollment.amount * paidCount).toLocaleString('es-AR')}</li>
-                                </ul>
-                            </div>
-                        </div>
-
-                        <EnrollmentSharePanel publicLink={publicEnrollmentLink} fileName={`inscripcion-${course.name}`.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')} />
-                    </div>
+                    <MetricTileGrid>
+                        <MetricTile icon={<Users size={20} />} label="Inscriptos" value={enrollment.studentsCount} caption={`a ${formatCurrencyARS(enrollment.amount)} cada uno`} />
+                        <MetricTile icon={<CheckCircle2 size={20} />} label="Pagos" value={`${paidRegistrations.length} de ${registrations.length}`} caption="inscripciones pagadas" />
+                        <MetricTile icon={<Wallet size={20} />} label="Cobrado" value={formatCurrencyARS(collectedAmount)} caption={`${registrations.length - paidRegistrations.length} pago${registrations.length - paidRegistrations.length === 1 ? '' : 's'} pendiente${registrations.length - paidRegistrations.length === 1 ? '' : 's'}`} />
+                        <MetricTile icon={<CalendarDays size={20} />} label="Período" value={shortPeriodLabel} caption={<StatusBadge label={enrollment.status} tone={statusTone} />} />
+                    </MetricTileGrid>
                 )}
+
+                {activeTab === 'overview' && (
+                    <EnrollmentSharePanel publicLink={publicEnrollmentLink} fileName={`inscripcion-${course.name}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')} />
+                )}
+
+                {activeTab === 'overview' && (
+                    <EnrollmentSettingsCards
+                        // Remount on every saved change (own save, closing/reopening) so the draft restarts from it.
+                        key={`${opening.id}:${opening.status}:${opening.startDate}:${opening.endDate}:${opening.amount}:${opening.commissionIds.join(',')}`}
+                        opening={opening}
+                        commissions={course.commissions}
+                        saving={updateOpening.isPending}
+                        onSave={async (changes) => {
+                            try {
+                                await updateOpening.mutateAsync({ id: enrollment.id, changes })
+                                showToast('success', 'Inscripción actualizada correctamente.')
+                                return true
+                            } catch {
+                                return false
+                            }
+                        }}
+                    />
+                )}
+
 
                 {activeTab === 'students' && (
                     <Card className="enrollment-students-view">
@@ -248,7 +229,7 @@ export function EnrollmentDetailPage() {
                                     <header className="enrollment-commission-header">
                                         <div>
                                             <h3>{commission.name}</h3>
-                                            <p>{commission.schedule}</p>
+                                            <p>{commission.schedule}{'startDate' in commission && commission.startDate ? ` · Cursada del ${formatShortDate(commission.startDate)} al ${formatShortDate(commission.endDate)}` : ''}</p>
                                         </div>
                                         <span>{commission.students.length} de {commission.capacity} lugares</span>
                                     </header>
@@ -282,7 +263,7 @@ export function EnrollmentDetailPage() {
                         </div>
                     </Card>
                 )}
-
+                </div>
             </div>
         </div>
     )
