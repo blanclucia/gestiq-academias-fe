@@ -201,6 +201,7 @@ export function EnrollmentDetailPage() {
                         key={`${opening.id}:${opening.status}:${opening.startDate}:${opening.endDate}:${opening.amount}:${opening.commissionIds.join(',')}`}
                         opening={opening}
                         commissions={course.commissions}
+                        branchId={course.branchId}
                         afterData={<EnrollmentSharePanel publicLink={publicEnrollmentLink} fileName={`inscripcion-${course.name}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')} />}
                         saving={updateOpening.isPending}
                         onSave={async (changes) => {

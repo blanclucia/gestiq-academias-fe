@@ -1570,6 +1570,46 @@ html.dark .donut-chart {
   border-top: 1px solid var(--border);
 }
 
+/* Read-only preview of the payment methods the public enrollment form will offer. */
+.payment-methods-notice {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--field);
+  font-size: .78rem;
+}
+
+.payment-methods-notice>strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .8rem;
+}
+
+.payment-methods-notice>strong svg {
+  color: var(--primary);
+}
+
+.payment-methods-notice ul {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.payment-methods-notice p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.payment-methods-notice a {
+  color: var(--primary);
+  font-weight: 700;
+}
+
 /* In its own card (enrollment detail) the SectionHeading already separates it, and the commissions
    flow as a grid of tiles instead of full-width rows that get long with several commissions. */
 .eligible-commissions.standalone {

@@ -5,6 +5,7 @@ import { useState } from 'react'
 import type { AcademicCommission } from '@/services/academyRepository'
 import { enrollmentStatusHelp } from '../model/enrollmentStatusHelp'
 import { EligibleCommissionsPicker } from './EligibleCommissionsPicker'
+import { EnrollmentPaymentMethodsNotice } from './EnrollmentPaymentMethodsNotice'
 
 export type EnrollmentFormValue = {
     courseId: string
@@ -15,8 +16,10 @@ export type EnrollmentFormValue = {
     status: 'Abierta' | 'Programada' | 'Cerrada'
 }
 
-export function EnrollmentForm({ courseName, commissions = [], initialValues, value, onValueChange, publicLink }: {
+export function EnrollmentForm({ courseName, branchId, commissions = [], initialValues, value, onValueChange, publicLink }: {
     courseName: string
+    // Branch of the offer: shows the payment methods the public form will offer.
+    branchId?: string
     commissions?: AcademicCommission[]
     initialValues?: Partial<EnrollmentFormValue>
     value?: EnrollmentFormValue
@@ -47,6 +50,7 @@ export function EnrollmentForm({ courseName, commissions = [], initialValues, va
                 <FormField label="Fecha de cierre" required><input name="enrollmentEndDate" className="form-input" type="date" value={formValue.endDate} onChange={(event) => update({ endDate: event.target.value })} /></FormField>
                 <FormField label="Link de autoinscripción">{publicLink ? <div className="enrollment-link-field"><input className="form-input" value={publicLink} readOnly /><button type="button" className="secondary-button compact-button" onClick={() => void copyLink()}>{copyFeedback}</button></div> : <div className="form-field-note">Se genera al guardar la inscripción.</div>}</FormField>
             </FormGrid>
+            {branchId && <EnrollmentPaymentMethodsNotice branchId={branchId} amount={formValue.amount} />}
             <EligibleCommissionsPicker commissions={commissions} startDate={formValue.startDate} value={formValue.commissionIds} onChange={(commissionIds) => update({ commissionIds })} />
         </FormSection>
     </div>

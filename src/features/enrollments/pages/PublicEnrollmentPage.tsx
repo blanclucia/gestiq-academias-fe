@@ -102,6 +102,8 @@ export function PublicEnrollmentPage() {
     const canUseTransferencia = paymentOptions.transfer;
     const canUseEfectivo = paymentOptions.inPerson;
     const showPaymentStep = requiresPaymentStep(offer.amount);
+    // Pay where the course is taught; the academy's general address is only a fallback for branches without one.
+    const inPersonAddress = offer.branchAddress || settings.general.address;
     const age = form.birthDate ? calculateAge(form.birthDate) : null;
     const isMinor = age !== null && age < 18;
     const performRegistration = () => {
@@ -582,7 +584,7 @@ export function PublicEnrollmentPage() {
                                                         {paymentOption === "efectivo" && (
                                                             <span className="payment-method-inline-details">
                                                                 <strong>Dirección de la sede</strong>
-                                                                <span>{settings.general.address || "Dirección no configurada"}</span>
+                                                                <span>{inPersonAddress || "Consultá la dirección con la academia."}</span>
                                                                 <span>Indicá el nombre del alumno y presentá su DNI.</span>
                                                             </span>
                                                         )}
@@ -619,7 +621,7 @@ export function PublicEnrollmentPage() {
                         </p>
                         {paymentOption === "mercadopago" && <><p>Completá el pago para confirmar tu vacante.</p><a className="mercadopago-button" href={settings.payments.paymentLink} target="_blank" rel="noreferrer">Abrir link de pago</a></>}
                         {paymentOption === "transferencia" && <><p>Realizá la transferencia con estos datos y aguardá la verificación.</p><div className="transfer-details public-final-transfer-details"><div><dt>Alias</dt><dd>{settings.payments.transferAlias || "Sin configurar"}<button type="button" aria-label="Copiar alias" onClick={() => void copyPaymentValue("Alias", settings.payments.transferAlias)}><Copy size={14} /></button></dd></div><div><dt>CBU / CVU</dt><dd>{settings.payments.transferCbu || "Sin configurar"}<button type="button" aria-label="Copiar CBU o CVU" onClick={() => void copyPaymentValue("CBU / CVU", settings.payments.transferCbu)}><Copy size={14} /></button></dd></div><div><dt>Titular</dt><dd>{settings.payments.accountHolder}</dd></div><div><dt>CUIT</dt><dd>{settings.payments.accountTaxId}</dd></div></div>{copyFeedback && <small className="payment-copy-feedback">{copyFeedback}</small>}</>}
-                        {paymentOption === "efectivo" && <p>Quedó pendiente de pago en sede. Acercate a {settings.general.address || "la sede"} para completar el pago.</p>}
+                        {paymentOption === "efectivo" && <p>Quedó pendiente de pago en sede. Acercate a {inPersonAddress || "la sede"} para completar el pago.</p>}
                     </div>
                 )}
                 <PlatformCredit />

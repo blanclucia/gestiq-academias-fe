@@ -18,9 +18,11 @@ import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { SectionHeading } from '@/components/ui/SectionHeading'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { formatCurrencyARS } from '@/domain/shared/formattingRules'
 import { validateConditions } from '@/components/forms/formValidation'
+import { markInvalidFields } from '@/components/forms/markInvalidFields'
+import { validatePaymentSettings } from '../model/paymentSettingsValidation'
 import { SettingsField as Field, SettingsToggleOption as ToggleOption } from '@/components/forms/SettingsControls'
 import { WeekDaysCheckboxGroup } from '@/components/forms/WeekDaysCheckboxGroup'
 import { useToast } from '@/components/ui/ToastContext'
@@ -34,6 +36,8 @@ const tabs = [
     { id: 'cobros', label: 'Cobros' },
     { id: 'inscripciones', label: 'Inscripciones' },
 ] as const
+
+type SettingsTab = (typeof tabs)[number]['id']
 const paymentMethods = ['Transferencia', 'Efectivo', 'Mercado Pago', 'Tarjeta']
 const enrollmentFields = ['Documento', 'Email', 'Teléfono', 'Fecha de nacimiento', 'Dirección']
 
@@ -63,7 +67,11 @@ export function AcademySettingsPage() {
     useAcademyRepositoryVersion()
     const navigate = useNavigate()
     const { path } = useWorkspace()
-    const [activeTab, setActiveTab] = useState<(typeof tabs)[number]['id']>('resumen')
+    // The active tab lives in the URL (?tab=cobros) so other screens can link straight to a section.
+    const [searchParams, setSearchParams] = useSearchParams()
+    const activeTab: SettingsTab = tabs.find((tab) => tab.id === searchParams.get('tab'))?.id ?? 'resumen'
+    const setActiveTab = (tab: SettingsTab) => setSearchParams(tab === 'resumen' ? {} : { tab }, { replace: true })
+    const tabPanelRef = useRef<HTMLDivElement>(null)
     const { settings: remoteSettings, isLoading: isSettingsLoading } = useAcademySettings()
     const saveSettings = useSaveAcademySettings()
     const [settings, setSettings] = useState<AcademySettings | null>(null)
@@ -131,6 +139,15 @@ export function AcademySettingsPage() {
     const save = () => {
         if (!settings.general.commercialName.trim()) { setActiveTab('general'); showToast('error', 'El nombre comercial es obligatorio.'); return }
         if (!settings.general.email.includes('@')) { setActiveTab('general'); showToast('error', 'Ingresá un email institucional válido.'); return }
+        const paymentCheck = validatePaymentSettings(settings.payments)
+        if (!paymentCheck.valid) {
+            setActiveTab('cobros')
+            // The Cobros fields may only exist after the tab switch renders.
+            requestAnimationFrame(() => markInvalidFields(tabPanelRef.current, paymentCheck))
+            showToast('error', Object.values(paymentCheck.fieldErrors ?? {}).join(' ') || paymentCheck.message || 'Revisá los medios de pago.')
+            return
+        }
+        markInvalidFields(tabPanelRef.current, paymentCheck)
         const normalized: AcademySettings = { ...settings, general: { ...settings.general, commercialName: settings.general.commercialName.trim(), email: settings.general.email.trim() }, brand: { ...settings.brand, name: settings.general.commercialName.trim() } }
         saveSettings.mutate(normalized, {
             onSuccess: (saved) => {
@@ -183,8 +200,8 @@ export function AcademySettingsPage() {
             <div><div className="academy-title-row"><h1>{savedGeneral.commercialName || 'Mi academia'}</h1><span className={`academy-status ${savedGeneral.status === 'Activa' ? 'active' : ''}`}>{savedGeneral.status}</span></div><p>Administrá los datos y reglas generales de tu academia.</p></div>
         </div>
         <div className="academy-tabs-wrap">
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as (typeof tabs)[number]['id'])}><TabsList variant="line" aria-label="Configuración de la academia">{tabs.map((tab) => <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>)}</TabsList></Tabs>
-            <div className="academy-tab-panel">
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTab)}><TabsList variant="line" aria-label="Configuración de la academia">{tabs.map((tab) => <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>)}</TabsList></Tabs>
+            <div className="academy-tab-panel" ref={tabPanelRef}>
                 {activeTab === 'resumen' && <div className="academy-overview-content"><MetricTileGrid>
                     <MetricTile icon={<Building2 size={20} />} label="Sedes activas" value={branches.filter((branch) => branch.status === 'Activa').length} caption={`de ${branches.length} sedes registradas`} />
                     <MetricTile icon={<GraduationCap size={20} />} label="Alumnos" value={students.length} caption="en toda la academia" />
@@ -237,16 +254,16 @@ export function AcademySettingsPage() {
                         <Field label="Día de vencimiento"><input className="form-input" type="number" min={1} max={28} value={settings.payments.defaultDueDay} onChange={(event) => update('payments', { defaultDueDay: Number(event.target.value) })} /></Field>
                         <Field label="Días de tolerancia"><input className="form-input" type="number" min={0} value={settings.payments.graceDays} onChange={(event) => update('payments', { graceDays: Number(event.target.value) })} /></Field>
                         <Field label="Recargo por mora (%)"><input className="form-input" type="number" min={0} step="0.5" value={settings.payments.lateFeePercent} onChange={(event) => update('payments', { lateFeePercent: Number(event.target.value) })} /></Field>
-                        <Field label="Alias"><input className="form-input" value={settings.payments.transferAlias} onChange={(event) => update('payments', { transferAlias: event.target.value.toUpperCase() })} placeholder="Ej. ACADEMIA.PUENTES" /></Field>
+                        <Field label="Alias"><input name="paymentsTransferAlias" className="form-input" value={settings.payments.transferAlias} onChange={(event) => update('payments', { transferAlias: event.target.value.toUpperCase() })} placeholder="Ej. ACADEMIA.PUENTES" /></Field>
                         <Field label="CBU / CVU"><input className="form-input" inputMode="numeric" value={settings.payments.transferCbu} onChange={(event) => update('payments', { transferCbu: event.target.value.replace(/\D/g, '').slice(0, 22) })} placeholder="22 dígitos" /></Field>
-                        <Field label="Titular de la cuenta"><input className="form-input" value={settings.payments.accountHolder} onChange={(event) => update('payments', { accountHolder: event.target.value })} /></Field>
-                        <Field label="Link de pago Mercado Pago"><input className="form-input" type="url" value={settings.payments.paymentLink} onChange={(event) => update('payments', { paymentLink: event.target.value })} placeholder="https://mpago.la/..." /></Field>
+                        <Field label="Titular de la cuenta"><input name="paymentsAccountHolder" className="form-input" value={settings.payments.accountHolder} onChange={(event) => update('payments', { accountHolder: event.target.value })} /></Field>
+                        <Field label="Link de pago Mercado Pago"><input name="paymentsPaymentLink" className="form-input" type="url" value={settings.payments.paymentLink} onChange={(event) => update('payments', { paymentLink: event.target.value })} placeholder="https://mpago.la/..." /></Field>
                         <Field label="CUIT / CUIL del titular"><input className="form-input" value={settings.payments.accountTaxId} onChange={(event) => update('payments', { accountTaxId: event.target.value })} /></Field>
                         <Field label="Mensaje para enlaces de pago" full><textarea className="form-textarea academy-textarea-compact" value={settings.payments.paymentMessage} onChange={(event) => update('payments', { paymentMessage: event.target.value })} /></Field>
                     </div><div className="academy-options-section"><h3>Medios de pago habilitados</h3><div className="academy-options-grid">{paymentMethods.map((method) => <ToggleOption key={method} label={method} checked={settings.payments.enabledMethods.includes(method)} onChange={(checked) => toggleListValue('payments', method, checked)} />)}</div>
-                        {/* The public enrollment form only offers methods it can actually explain (see getPublicPaymentOptions). */}
-                        {settings.payments.enabledMethods.includes('Transferencia') && !settings.payments.transferAlias.trim() && !settings.payments.transferCbu.trim() && <div className="inline-warning-banner academy-options-warning" role="status"><AlertTriangle size={16} /><span>Transferencia no se ofrece en el formulario de inscripción hasta que cargues un alias o CBU / CVU.</span></div>}
-                        {settings.payments.enabledMethods.includes('Mercado Pago') && !settings.payments.paymentLink.trim() && <div className="inline-warning-banner academy-options-warning" role="status"><AlertTriangle size={16} /><span>Mercado Pago no se ofrece en el formulario de inscripción hasta que cargues el link de pago.</span></div>}
+                        {/* An enabled method needs the data the public enrollment form shows for it (validatePaymentSettings). */}
+                        {settings.payments.enabledMethods.includes('Transferencia') && ((!settings.payments.transferAlias.trim() && !settings.payments.transferCbu.trim()) || !settings.payments.accountHolder.trim()) && <div className="inline-warning-banner academy-options-warning" role="status"><AlertTriangle size={16} /><span>Para habilitar Transferencia cargá el alias o el CBU / CVU y el titular de la cuenta.</span></div>}
+                        {settings.payments.enabledMethods.includes('Mercado Pago') && !settings.payments.paymentLink.trim() && <div className="inline-warning-banner academy-options-warning" role="status"><AlertTriangle size={16} /><span>Para habilitar Mercado Pago cargá el link de pago.</span></div>}
                     </div>
                 </Card>}
                 {activeTab === 'inscripciones' && <Card>

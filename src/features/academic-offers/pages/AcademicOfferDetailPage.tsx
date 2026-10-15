@@ -292,6 +292,7 @@ export function AcademicOfferDetailPage() {
             >
                 <EnrollmentForm
                     courseName={course.name}
+                    branchId={course.branchId}
                     commissions={course.commissions}
                     value={enrollmentForm}
                     onValueChange={setEnrollmentForm}

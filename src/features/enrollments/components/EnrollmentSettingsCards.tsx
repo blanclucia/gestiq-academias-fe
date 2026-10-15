@@ -12,6 +12,7 @@ import { enrollmentStatusHelp } from '../model/enrollmentStatusHelp'
 import { validateEnrollment } from '../model/enrollmentValidation'
 import type { EnrollmentFormValue } from './EnrollmentForm'
 import { EligibleCommissionsPicker } from './EligibleCommissionsPicker'
+import { EnrollmentPaymentMethodsNotice } from './EnrollmentPaymentMethodsNotice'
 
 type EnrollmentDraft = Omit<EnrollmentFormValue, 'courseId'>
 
@@ -22,6 +23,8 @@ const closedStatusOptions = [{ value: 'Cerrada', label: 'Cerrada' }]
 type Props = {
     opening: EnrollmentOpening
     commissions: AcademicCommission[]
+    // Branch of the offer: shows the payment methods the public form will offer.
+    branchId: string
     saving: boolean
     onSave: (changes: EnrollmentDraft) => Promise<boolean>
     // Rendered right after Datos de la inscripción (the share card), so the save footer still closes the tab.
@@ -30,7 +33,7 @@ type Props = {
 
 // Editable detail of an enrollment, same pattern as the commission detail: the data is the form, saved
 // from the footer. The parent remounts it (key) when the saved enrollment changes.
-export function EnrollmentSettingsCards({ opening, commissions, saving, onSave, afterData }: Props) {
+export function EnrollmentSettingsCards({ opening, commissions, branchId, saving, onSave, afterData }: Props) {
     const saved: EnrollmentDraft = {
         // Only the still-eligible commissions are editable; a closed or finished one drops out on save.
         commissionIds: getEligibleCommissions(commissions, opening.startDate, opening.commissionIds).map((commission) => commission.id),
@@ -64,6 +67,7 @@ export function EnrollmentSettingsCards({ opening, commissions, saving, onSave, 
                 <Field label="Costo de la inscripción" required><input name="enrollmentAmount" className="form-input" type="number" min={0} step={1000} value={draft.amount} onChange={(event) => update({ amount: Number(event.target.value || 0) })} /></Field>
                 <Field label="Estado" hint={closed ? 'Reabrila desde el botón de arriba.' : undefined} info={<StatusHelp label="Qué significa cada estado" items={enrollmentStatusHelp} />}><SearchableSelect value={draft.status} disabled={closed} onChange={(status) => update({ status: status as EnrollmentDraft['status'] })} options={closed ? closedStatusOptions : editableStatusOptions} /></Field>
             </div>
+            <EnrollmentPaymentMethodsNotice branchId={branchId} amount={draft.amount} />
         </Card>
         {afterData}
         <Card>
