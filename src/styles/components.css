@@ -60,34 +60,13 @@
 
 .dashboard-progress-list { margin-top: 18px; }
 
-.dashboard-summary-icon {
-    display: grid;
-    width: 42px;
-    height: 42px;
-    place-items: center;
-    margin-top: 24px;
-    border-radius: 12px;
-}
-
-.dashboard-summary-icon.positive { color: var(--green); background: var(--green-soft); }
-.dashboard-summary-icon.warning { color: var(--red); background: var(--red-soft); }
-
 .chart-card.dashboard-payment-card {
-    position: relative;
     min-height: 98px;
-    padding: 18px 20px 18px 78px;
 }
 
 .dashboard-payment-card .card-header-row {
     align-items: flex-start;
     margin-bottom: 0;
-}
-
-.dashboard-payment-card .dashboard-summary-icon {
-    position: absolute;
-    top: 18px;
-    left: 20px;
-    margin-top: 0;
 }
 
 .dashboard-commission-list { display: grid; gap: 14px; margin-top: 18px; }

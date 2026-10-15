@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarClock, CreditCard } from 'lucide-react'
+import { AlertTriangle, CalendarClock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ChartCard } from '@/components/layout/ChartCard'
 import { KpiCard } from '@/components/layout/KpiCard'
@@ -109,13 +109,9 @@ export function AdminDashboardPage() {
                     </div>
                 </ChartCard>
 
-                <ChartCard title="Cobros confirmados" value={currency.format(data.receivedAmount)} subtitle={`${data.confirmedPayments.length} pago${data.confirmedPayments.length === 1 ? '' : 's'} registrado${data.confirmedPayments.length === 1 ? '' : 's'} este mes`} action={<Link to={path('billing?tab=recibidos')} className="card-header-action">Ver recibidos</Link>} className="dashboard-payment-card small-panel">
-                    <div className="dashboard-summary-icon positive"><CreditCard size={22} /></div>
-                </ChartCard>
+                <ChartCard title="Cobros confirmados" value={currency.format(data.receivedAmount)} subtitle={`${data.confirmedPayments.length} pago${data.confirmedPayments.length === 1 ? '' : 's'} registrado${data.confirmedPayments.length === 1 ? '' : 's'} este mes`} action={<Link to={path('billing?tab=recibidos')} className="card-header-action">Ver recibidos</Link>} className="dashboard-payment-card small-panel" />
 
-                <ChartCard title="Cobros a gestionar" value={currency.format(data.pendingAmount)} subtitle={`${data.overdueCount} vencido${data.overdueCount === 1 ? '' : 's'} · ${data.pendingCount} pendiente${data.pendingCount === 1 ? '' : 's'} hasta fin de mes`} action={<Link to={path('billing?tab=pendientes')} className="card-header-action">Ver pendientes</Link>} className="dashboard-payment-card medium-panel">
-                    <div className="dashboard-summary-icon warning"><CreditCard size={22} /></div>
-                </ChartCard>
+                <ChartCard title="Cobros a gestionar" value={currency.format(data.pendingAmount)} subtitle={`${data.overdueCount} vencido${data.overdueCount === 1 ? '' : 's'} · ${data.pendingCount} pendiente${data.pendingCount === 1 ? '' : 's'} hasta fin de mes`} action={<Link to={path('billing?tab=pendientes')} className="card-header-action">Ver pendientes</Link>} className="dashboard-payment-card medium-panel" />
 
                 <ChartCard title="Recordatorios financieros" subtitle="Próximos vencimientos de egresos" action={<Link to={path('finances?tab=expenses')} className="card-header-action">Ver finanzas</Link>} className="large-panel">
                     <div className="dashboard-finance-reminders">
