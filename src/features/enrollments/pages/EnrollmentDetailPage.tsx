@@ -44,6 +44,7 @@ export function EnrollmentDetailPage() {
     const [isCloseOpen, setIsCloseOpen] = useState(false)
     const [collectTarget, setCollectTarget] = useState<EnrollmentRegistrationRow | null>(null)
     const [collectForm, setCollectForm] = useState<{ date: string; method: Payment['method'] }>({ date: getTodayString(), method: 'Transferencia' })
+    const [confirmTarget, setConfirmTarget] = useState<EnrollmentRegistrationRow | null>(null)
     const [noteTarget, setNoteTarget] = useState<EnrollmentRegistrationRow | null>(null)
     const [noteDraft, setNoteDraft] = useState('')
     const updateOpening = useUpdateEnrollmentOpening()
@@ -130,16 +131,33 @@ export function EnrollmentDetailPage() {
                 }}
             />
 
+            {/* Paying the fee is what formalizes a registration; this is the exception for a scholarship
+                or a fee paid later, so it asks first. */}
+            <DeleteConfirmationModal
+                open={Boolean(confirmTarget)}
+                title="Confirmar sin pago"
+                description={`${confirmTarget?.name ?? 'El alumno'} pasará a ser alumno activo de la comisión sin haber pagado la inscripción. El cobro queda pendiente y podés registrarlo más adelante.`}
+                confirmLabel="Confirmar sin pago"
+                onClose={() => setConfirmTarget(null)}
+                onConfirm={() => {
+                    if (confirmTarget) confirmRegistration.mutate(confirmTarget.id, {
+                        onSuccess: () => showToast('success', 'Inscripción confirmada correctamente.'),
+                        onError: () => showToast('error', 'No se pudo confirmar la inscripción. Intentá nuevamente.'),
+                    })
+                    setConfirmTarget(null)
+                }}
+            />
+
             <EntityFormModal
                 open={Boolean(collectTarget)}
                 title="Registrar cobro"
-                subtitle="Confirmá fecha y medio de pago del cargo real de esta inscripción."
+                subtitle="Al registrar el pago, el alumno queda confirmado en la comisión."
                 submitLabel="Confirmar pago"
                 validate={() => validateConditions({ collectionTarget: !collectTarget && 'No hay una inscripción seleccionada.', collectionDate: !collectForm.date && 'Ingresá la fecha del cobro.' }, 'Revisá los datos del cobro.')}
                 onClose={() => setCollectTarget(null)}
                 onSubmit={() => {
                     if (collectTarget) updateCharge.mutate({ id: collectTarget.chargeId, changes: { status: 'paid', method: chargeMethodToApi(collectForm.method), paidAt: collectForm.date, paidAmount: collectTarget.chargeAmount } }, {
-                        onSuccess: () => showToast('success', 'Cobro registrado correctamente.'),
+                        onSuccess: () => showToast('success', 'Pago registrado: el alumno quedó confirmado en la comisión.'),
                         onError: () => showToast('error', 'No se pudo registrar el cobro. Intentá nuevamente.'),
                     })
                     setCollectTarget(null)
@@ -240,16 +258,13 @@ export function EnrollmentDetailPage() {
                                             <div className="enrollment-student-row" key={student.id}>
                                                 <div>
                                                     <div className="detail-row-title">{student.name}</div>
-                                                    <div className="detail-row-meta">{student.rosterConfirmed ? 'Alumno activo' : 'Inscripción recibida'}</div>
+                                                    <div className="detail-row-meta">{student.rosterConfirmed ? 'Alumno activo' : student.payment === 'Pagado' ? 'Pago registrado, sin confirmar' : 'Se confirma al registrar el pago'}</div>
                                                     {student.notes && <div className="enrollment-student-note-preview"><StickyNote size={13} />{student.notes}</div>}
                                                 </div>
                                                 <div className="detail-row-actions">
                                                     <StatusBadge label={student.payment} tone={student.payment === 'Pagado' ? 'success' : student.payment === 'En verificación' ? 'warning' : 'neutral'} />
                                                     <button type="button" className="secondary-button compact-button" onClick={() => { setNoteTarget(student); setNoteDraft(student.notes) }}><StickyNote size={15} />{student.notes ? 'Editar nota' : 'Agregar nota'}</button>
-                                                    {!student.rosterConfirmed && <button type="button" className="secondary-button compact-button" onClick={() => confirmRegistration.mutate(student.id, {
-                                                        onSuccess: () => showToast('success', 'Inscripción confirmada correctamente.'),
-                                                        onError: () => showToast('error', 'No se pudo confirmar la inscripción. Intentá nuevamente.'),
-                                                    })}><CheckCircle2 size={15} /> Confirmar</button>}
+                                                    {!student.rosterConfirmed && <button type="button" className="secondary-button compact-button" onClick={() => setConfirmTarget(student)}><CheckCircle2 size={15} /> {student.payment === 'Pagado' ? 'Confirmar' : 'Confirmar sin pago'}</button>}
                                                     {student.payment !== 'Pagado' && <button type="button" className="primary-button compact-button" onClick={() => {
                                                         setCollectForm({ date: getTodayString(), method: 'Transferencia' })
                                                         setCollectTarget(student)

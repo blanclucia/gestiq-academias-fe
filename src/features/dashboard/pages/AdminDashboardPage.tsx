@@ -53,6 +53,9 @@ export function AdminDashboardPage() {
         const commissions = courses.flatMap((course) => course.commissions.map((commission) => ({ ...commission, courseName: course.name })))
         const confirmedPayments = payments.filter((payment) => payment.status === 'Pagado')
         const chargesToManage = summarizeChargesToManage(branchPayments, currentMonthEndKey)
+        // A registration is confirmed when its enrollment fee is paid, so the unpaid fees are the
+        // registrations still waiting.
+        const registrationFees = payments.filter((payment) => payment.status !== 'Anulado' && (payment.concept.startsWith('Matrícula') || payment.concept.startsWith('Inscripción')))
         const pendingPayments = [...chargesToManage.overdue, ...chargesToManage.pending]
 
         return {
@@ -68,7 +71,8 @@ export function AdminDashboardPage() {
             pendingCount: chargesToManage.pending.length,
             receivedAmount: confirmedPayments.reduce((total, payment) => total + payment.amount, 0),
             pendingAmount: pendingPayments.reduce((total, payment) => total + payment.amount, 0),
-            registrations: payments.filter((payment) => payment.concept.startsWith('Matrícula') || payment.concept.startsWith('Inscripción')).length,
+            registrations: registrationFees.length,
+            unpaidRegistrations: registrationFees.filter((payment) => payment.status !== 'Pagado').length,
         }
     })()
 
@@ -82,10 +86,10 @@ export function AdminDashboardPage() {
             </div>
 
             <div className="kpi-grid">
-                <KpiCard title="Alumnos activos" value={String(data.activeStudents)} change={`${data.pendingStudents} pendientes de activación`} positive={false} />
-                <KpiCard title="Docentes activos" value={String(data.activeTeachers)} change={`Asignados a ${data.commissions.length} comisiones`} />
-                <KpiCard title="Cursos vigentes" value={String(data.courses.length)} change={`${data.commissions.length} comisiones configuradas`} />
-                <KpiCard title="Inscripciones registradas" value={String(data.registrations)} change="Con pago pendiente de confirmar" positive={false} />
+                <KpiCard title="Alumnos activos" value={String(data.activeStudents)} change={`${data.pendingStudents} pendiente${data.pendingStudents === 1 ? '' : 's'} de activación`} positive={data.pendingStudents === 0} />
+                <KpiCard title="Docentes activos" value={String(data.activeTeachers)} change={`Asignados a ${data.commissions.length} comisi${data.commissions.length === 1 ? 'ón' : 'ones'}`} />
+                <KpiCard title="Cursos vigentes" value={String(data.courses.length)} change={`${data.commissions.length} comisi${data.commissions.length === 1 ? 'ón configurada' : 'ones configuradas'}`} />
+                <KpiCard title="Inscripciones registradas" value={String(data.registrations)} change={data.unpaidRegistrations === 0 ? 'Todas con pago registrado' : `${data.unpaidRegistrations} esperando el pago para confirmarse`} positive={data.unpaidRegistrations === 0} />
             </div>
 
             <div className="content-grid">

@@ -269,7 +269,7 @@ export function AcademySettingsPage() {
                 {activeTab === 'inscripciones' && <Card>
                     <SectionHeading icon={<Check size={20} />} title="Configuración de inscripciones" description="Reglas aplicadas al crear nuevas aperturas de inscripción." />
                     <div className="form-grid academy-settings-grid">
-                        <Field label="Confirmación"><SearchableSelect value={settings.enrollments.confirmationMode} onChange={(confirmationMode) => update('enrollments', { confirmationMode: confirmationMode as 'Automática' | 'Manual' })} options={[{ value: 'Manual', label: 'Manual' }, { value: 'Automática', label: 'Automática' }]} /></Field>
+                        {/* No confirmation setting: a registration is confirmed when its fee is paid (free ones at once). */}
                         <Field label="Cupo predeterminado" hint="Se usa al crear una comisión nueva"><input className="form-input" type="number" min={1} value={settings.enrollments.defaultCapacity} onChange={(event) => update('enrollments', { defaultCapacity: Number(event.target.value) })} /></Field>
                     </div>
                     <div className="academy-options-section"><h3>Campos obligatorios</h3><div className="academy-options-grid">{enrollmentFields.map((field) => <ToggleOption key={field} label={field} checked={settings.enrollments.requiredFields.includes(field)} onChange={(checked) => toggleListValue('enrollments', field, checked)} />)}</div></div>
