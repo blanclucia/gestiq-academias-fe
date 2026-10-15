@@ -24,7 +24,7 @@ type ManualChargeModalProps = {
     paymentMethods: Payment['method'][]
     onChange: (value: ManualChargeValue) => void
     onClose: () => void
-    onSubmit: () => void
+    onSubmit: () => void | Promise<unknown>
 }
 
 export function ManualChargeModal({ open, value, students, paymentMethods, onChange, onClose, onSubmit }: ManualChargeModalProps) {

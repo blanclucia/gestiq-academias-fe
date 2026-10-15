@@ -6,7 +6,7 @@ import type { Payment } from '@/types/domain'
 type CollectionTarget = Pick<Payment, 'student' | 'concept'>
 export type PaymentCollectionValue = { date: string; method: Payment['method'] }
 
-export function PaymentCollectionModal({ target, value, paymentMethods, onChange, onClose, onSubmit }: { target: CollectionTarget | null; value: PaymentCollectionValue; paymentMethods: Payment['method'][]; onChange: (value: PaymentCollectionValue) => void; onClose: () => void; onSubmit: () => void }) {
+export function PaymentCollectionModal({ target, value, paymentMethods, onChange, onClose, onSubmit }: { target: CollectionTarget | null; value: PaymentCollectionValue; paymentMethods: Payment['method'][]; onChange: (value: PaymentCollectionValue) => void; onClose: () => void; onSubmit: () => void | Promise<unknown> }) {
     return <EntityFormModal open={Boolean(target)} title="Registrar cobro" subtitle="Confirmá fecha y medio de pago para impactar la cobranza." submitLabel="Registrar" validate={() => validatePaymentCollection(value)} onClose={onClose} onSubmit={onSubmit}>
         <div className="form-stack"><FormSection title="Confirmación del cobro"><FormGrid>
             <FormField label="Alumno"><input className="form-input" type="text" value={target?.student ?? ''} readOnly /></FormField>

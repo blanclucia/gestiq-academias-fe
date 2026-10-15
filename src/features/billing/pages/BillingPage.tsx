@@ -236,11 +236,11 @@ export function BillingPage() {
     })
 
     // One payment, recorded with the date and method from the collection modal (single row or bulk).
-    const recordPayment = (target: BillingPaymentRecord) => {
+    // The modals await these saves: they stay open and show the error if the backend refuses (see
+    // EntityFormModal), instead of closing as if the change had been saved.
+    const recordPayment = async (target: BillingPaymentRecord) => {
         if (target.isReal) {
-            updateCharge.mutate({ id: target.id, changes: { status: 'paid', method: chargeMethodToApi(collectForm.method), paidAt: collectForm.date, paidAmount: target.amount } }, {
-                onError: () => showToast('error', `No se pudo registrar el cobro de ${target.student}. Intentá nuevamente.`),
-            })
+            await updateCharge.mutateAsync({ id: target.id, changes: { status: 'paid', method: chargeMethodToApi(collectForm.method), paidAt: collectForm.date, paidAmount: target.amount } })
         } else {
             confirmPaymentRecord(target.id, collectForm.method, collectForm.date)
         }
@@ -300,15 +300,13 @@ export function BillingPage() {
         return Math.max(0, originalAmount - numericValue)
     }, [adjustTarget, adjustmentForm.mode, adjustmentForm.type, adjustmentForm.value])
 
-    const submitAdjustment = () => {
+    const submitAdjustment = async () => {
         if (!adjustTarget) {
             return
         }
 
         if (adjustTarget.isReal) {
-            updateCharge.mutate({ id: adjustTarget.id, changes: { amount: adjustedAmountPreview, notes: adjustmentForm.reason.trim() } }, {
-                onError: () => showToast('error', 'No se pudo ajustar el cargo. Intentá nuevamente.'),
-            })
+            await updateCharge.mutateAsync({ id: adjustTarget.id, changes: { amount: adjustedAmountPreview, notes: adjustmentForm.reason.trim() } })
         } else {
             updatePaymentRecord(adjustTarget.id, { amount: adjustedAmountPreview })
         }
@@ -317,16 +315,19 @@ export function BillingPage() {
         setAdjustmentForm(defaultAdjustmentForm)
     }
 
-    const submitCollection = () => {
+    const submitCollection = async () => {
         if (!collectForm.date) return
         if (isBulkCollectOpen) {
-            bulkCollectTargets.forEach(recordPayment)
-            showToast('success', `${bulkCollectTargets.length} cobro${bulkCollectTargets.length === 1 ? '' : 's'} registrado${bulkCollectTargets.length === 1 ? '' : 's'}.`)
+            const results = await Promise.allSettled(bulkCollectTargets.map(recordPayment))
+            const recorded = results.filter((result) => result.status === 'fulfilled').length
+            if (recorded > 0) showToast('success', `${recorded} cobro${recorded === 1 ? '' : 's'} registrado${recorded === 1 ? '' : 's'}.`)
+            // The ones recorded drop out of the selection once paid; retrying only touches the rest.
+            if (recorded < results.length) throw new Error('bulk collection partially failed')
             setIsBulkCollectOpen(false)
             resetSelection()
             return
         }
-        if (collectTarget) recordPayment(collectTarget)
+        if (collectTarget) await recordPayment(collectTarget)
         setCollectTarget(null)
     }
 
@@ -343,10 +344,10 @@ export function BillingPage() {
         setManualChargeForm({ studentId: '', category: 'Examen', detail: '', amount: '', status: 'Pendiente', method: 'Transferencia', dueDate: suggestedDueDate, date: format(today, 'yyyy-MM-dd'), notes: '' })
     }
 
-    const submitManualCharge = () => {
+    const submitManualCharge = async () => {
         const amount = Number(manualChargeForm.amount)
         const concept = `${manualChargeForm.category}${manualChargeForm.detail.trim() ? ` · ${manualChargeForm.detail.trim()}` : ''}`
-        createCharge.mutate({
+        await createCharge.mutateAsync({
             studentId: manualChargeForm.studentId,
             concept,
             amount,
@@ -356,10 +357,8 @@ export function BillingPage() {
             paidAt: manualChargeForm.status === 'Pagado' ? manualChargeForm.date : undefined,
             paidAmount: manualChargeForm.status === 'Pagado' ? amount : undefined,
             notes: manualChargeForm.notes.trim(),
-        }, {
-            onSuccess: () => showToast('success', 'Cobro creado correctamente.'),
-            onError: () => showToast('error', 'No se pudo crear el cobro. Intentá nuevamente.'),
         })
+        showToast('success', 'Cobro creado correctamente.')
         resetManualChargeForm()
         setIsManualChargeOpen(false)
     }
@@ -422,12 +421,10 @@ export function BillingPage() {
                 description={`El cobro de "${revertTarget?.student ?? ''}" vuelve a quedar pendiente y se borran la fecha y el medio de pago registrados. Usalo para corregir un pago registrado por error.`}
                 confirmLabel="Revertir a pendiente"
                 onClose={() => setRevertTarget(null)}
-                onConfirm={() => {
+                onConfirm={async () => {
                     if (revertTarget?.isReal) {
-                        updateCharge.mutate({ id: revertTarget.id, changes: { status: 'pending' } }, {
-                            onSuccess: () => showToast('success', 'El cobro volvió a pendiente.'),
-                            onError: () => showToast('error', 'No se pudo revertir el cobro. Intentá nuevamente.'),
-                        })
+                        await updateCharge.mutateAsync({ id: revertTarget.id, changes: { status: 'pending' } })
+                        showToast('success', 'El cobro volvió a pendiente.')
                     } else if (revertTarget) {
                         updatePaymentRecord(revertTarget.id, { status: 'Pendiente', date: '-' })
                     }
@@ -440,12 +437,10 @@ export function BillingPage() {
                 description={`La transferencia informada por "${rejectTarget?.student ?? ''}" se marca como rechazada y el cobro sigue sin pagar.`}
                 confirmLabel="Rechazar transferencia"
                 onClose={() => setRejectTarget(null)}
-                onConfirm={() => {
+                onConfirm={async () => {
                     if (rejectTarget?.isReal) {
-                        updateCharge.mutate({ id: rejectTarget.id, changes: { status: 'rejected' } }, {
-                            onSuccess: () => showToast('success', 'Transferencia rechazada.'),
-                            onError: () => showToast('error', 'No se pudo rechazar la transferencia. Intentá nuevamente.'),
-                        })
+                        await updateCharge.mutateAsync({ id: rejectTarget.id, changes: { status: 'rejected' } })
+                        showToast('success', 'Transferencia rechazada.')
                     } else if (rejectTarget) {
                         updatePaymentRecord(rejectTarget.id, { status: 'Rechazado' })
                     }
@@ -463,15 +458,15 @@ export function BillingPage() {
                     setIsEditModalOpen(false)
                     setEditingPayment(null)
                 }}
-                onSubmit={() => {
+                onSubmit={async () => {
                     if (editingPayment) {
                         if (editingPayment.isReal) {
-                            updateCharge.mutate({
+                            await updateCharge.mutateAsync({
                                 id: editingPayment.id,
                                 changes: editingPaymentPaid
                                     ? { amount: editingPaymentForm.amount, paidAmount: editingPaymentForm.amount, method: chargeMethodToApi(editingPaymentForm.method) }
                                     : { amount: editingPaymentForm.amount, dueDate: editingPaymentForm.dueDate },
-                            }, { onError: () => showToast('error', 'No se pudo actualizar el cobro. Intentá nuevamente.') })
+                            })
                         } else {
                             updatePaymentRecord(editingPayment.id, editingPaymentPaid
                                 ? { amount: editingPaymentForm.amount, method: editingPaymentForm.method }
@@ -502,10 +497,10 @@ export function BillingPage() {
                 description={paymentRemovalBlocker ?? `¿Estás seguro que querés eliminar el pago de "${deleteTarget?.student}"? Esta acción no se puede deshacer.`}
                 confirmLabel={paymentRemovalBlocker ? 'Entendido' : undefined}
                 onClose={() => setDeleteTarget(null)}
-                onConfirm={() => {
+                onConfirm={async () => {
                     if (deleteTarget && !paymentRemovalBlocker) {
                         if (deleteTarget.isReal) {
-                            deleteCharge.mutate(deleteTarget.id, { onError: () => showToast('error', 'No se pudo eliminar el pago. Intentá nuevamente.') })
+                            await deleteCharge.mutateAsync(deleteTarget.id)
                         } else {
                             updatePaymentRecord(deleteTarget.id, { deleted: true })
                         }

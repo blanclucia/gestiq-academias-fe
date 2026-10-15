@@ -23,7 +23,7 @@ type PaymentAdjustmentModalProps = {
     lateFeePercent: number
     onChange: (value: PaymentAdjustmentValue) => void
     onClose: () => void
-    onSubmit: () => void
+    onSubmit: () => void | Promise<unknown>
 }
 
 export function PaymentAdjustmentModal({ target, value, adjustedAmount, lateFeePercent, onChange, onClose, onSubmit }: PaymentAdjustmentModalProps) {

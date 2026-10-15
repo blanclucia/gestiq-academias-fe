@@ -9,7 +9,7 @@ export type PaymentEditValue = { method: Payment['method']; amount: number; dueD
 // Edits the data of a charge, not its status: collecting, confirming or rejecting a transfer and
 // reverting a payment are explicit row actions, so a status change never skips its own data
 // (payment date, method) or confirmation. The due date only matters while unpaid; the method once paid.
-export function PaymentEditModal({ open, target, paid, value, paymentMethods, onChange, onClose, onSubmit }: { open: boolean; target: EditTarget | null; paid: boolean; value: PaymentEditValue; paymentMethods: Payment['method'][]; onChange: (value: PaymentEditValue) => void; onClose: () => void; onSubmit: () => void }) {
+export function PaymentEditModal({ open, target, paid, value, paymentMethods, onChange, onClose, onSubmit }: { open: boolean; target: EditTarget | null; paid: boolean; value: PaymentEditValue; paymentMethods: Payment['method'][]; onChange: (value: PaymentEditValue) => void; onClose: () => void; onSubmit: () => void | Promise<unknown> }) {
     return <EntityFormModal open={open} title="Editar cobro" subtitle="Actualizá el importe y los datos del cobro." validate={() => validatePaymentEdit({ ...value, paid })} onClose={onClose} onSubmit={onSubmit}>
         <div className="form-stack"><FormSection title="Datos del cobro"><FormGrid>
             <FormField label="Alumno"><input className="form-input" type="text" value={target?.student ?? ''} readOnly /></FormField>

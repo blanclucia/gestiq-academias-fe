@@ -98,17 +98,14 @@ export function FinancePage() {
     const openEdit = (expense: Expense) => { setEditingExpense(expense); setEditScope(expense.seriesId ? 'future' : 'single'); setExpenseForm({ ...expense, repeatUntil: '' }); setIsExpenseOpen(true) }
 
     return <div className="dashboard-page finance-page">
-        <EntityFormModal open={isExpenseOpen} title={editingExpense ? 'Editar egreso' : 'Nuevo egreso'} subtitle={editingExpense ? 'Actualizá este vencimiento o los pendientes de la serie.' : 'Registrá un gasto único o calendarizá sus próximos vencimientos.'} submitLabel={editingExpense ? 'Guardar cambios' : 'Crear egreso'} validate={() => validateConditions({ expenseConcept: !expenseForm.concept.trim() && 'Ingresá el concepto.', expenseAmount: expenseForm.amount <= 0 && 'Ingresá un importe válido.', expenseDueDate: expenseForm.recurrence === 'Mensual' && !expenseForm.dueDate && 'Ingresá el primer vencimiento.', expensePaidDate: expenseForm.recurrence === 'Único' && expenseForm.status === 'Pagado' && !expenseForm.paidDate && 'Ingresá la fecha de pago.' }, 'Revisá los datos del egreso.')} onClose={() => setIsExpenseOpen(false)} onSubmit={() => {
+        <EntityFormModal open={isExpenseOpen} title={editingExpense ? 'Editar egreso' : 'Nuevo egreso'} subtitle={editingExpense ? 'Actualizá este vencimiento o los pendientes de la serie.' : 'Registrá un gasto único o calendarizá sus próximos vencimientos.'} submitLabel={editingExpense ? 'Guardar cambios' : 'Crear egreso'} validate={() => validateConditions({ expenseConcept: !expenseForm.concept.trim() && 'Ingresá el concepto.', expenseAmount: expenseForm.amount <= 0 && 'Ingresá un importe válido.', expenseDueDate: expenseForm.recurrence === 'Mensual' && !expenseForm.dueDate && 'Ingresá el primer vencimiento.', expensePaidDate: expenseForm.recurrence === 'Único' && expenseForm.status === 'Pagado' && !expenseForm.paidDate && 'Ingresá la fecha de pago.' }, 'Revisá los datos del egreso.')} onClose={() => setIsExpenseOpen(false)} onSubmit={async () => {
+            // Awaited: on failure the modal stays open with the error (EntityFormModal) and keeps the data.
             if (editingExpense) {
-                updateExpense.mutate({ id: editingExpense.id, changes: expenseForm, scope: editScope }, {
-                    onSuccess: () => showToast('success', 'Egreso actualizado correctamente.'),
-                    onError: () => showToast('error', 'No se pudo actualizar el egreso. Intentá nuevamente.'),
-                })
+                await updateExpense.mutateAsync({ id: editingExpense.id, changes: expenseForm, scope: editScope })
+                showToast('success', 'Egreso actualizado correctamente.')
             } else {
-                createExpense.mutate(expenseForm, {
-                    onSuccess: () => showToast('success', 'Egreso creado correctamente.'),
-                    onError: () => showToast('error', 'No se pudo crear el egreso. Intentá nuevamente.'),
-                })
+                await createExpense.mutateAsync(expenseForm)
+                showToast('success', 'Egreso creado correctamente.')
             }
             setActiveTab('expenses')
             setIsExpenseOpen(false)
@@ -129,17 +126,15 @@ export function FinancePage() {
             </FormGrid></FormSection>}</div>
         </EntityFormModal>
 
-        <EntityFormModal open={Boolean(payTarget)} title="Registrar pago" subtitle={payTarget ? `${payTarget.concept} · ${currency.format(payTarget.amount)}` : ''} submitLabel="Confirmar pago" onClose={() => setPayTarget(null)} onSubmit={() => {
+        <EntityFormModal open={Boolean(payTarget)} title="Registrar pago" subtitle={payTarget ? `${payTarget.concept} · ${currency.format(payTarget.amount)}` : ''} submitLabel="Confirmar pago" onClose={() => setPayTarget(null)} onSubmit={async () => {
             if (payTarget) {
-                updateExpense.mutate({ id: payTarget.id, changes: { status: 'Pagado', paidDate: paymentForm.paidDate, method: paymentForm.method } }, {
-                    onError: () => showToast('error', 'No se pudo registrar el pago. Intentá nuevamente.'),
-                })
+                await updateExpense.mutateAsync({ id: payTarget.id, changes: { status: 'Pagado', paidDate: paymentForm.paidDate, method: paymentForm.method } })
             }
             setPayTarget(null)
         }}><FormGrid><FormField label="Fecha de pago"><input className="form-input" type="date" value={paymentForm.paidDate} onChange={(event) => setPaymentForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio"><SearchableSelect value={paymentForm.method} onChange={(method) => setPaymentForm((current) => ({ ...current, method: method as PaymentMethod }))} options={paymentMethods.map((method) => ({ value: method, label: method }))} /></FormField></FormGrid></EntityFormModal>
-        <DeleteConfirmationModal open={Boolean(deleteTarget)} title="Eliminar egreso" description={`Se eliminará solamente el vencimiento de “${deleteTarget?.concept ?? ''}”.`} onClose={() => setDeleteTarget(null)} onConfirm={() => {
+        <DeleteConfirmationModal open={Boolean(deleteTarget)} title="Eliminar egreso" description={`Se eliminará solamente el vencimiento de “${deleteTarget?.concept ?? ''}”.`} onClose={() => setDeleteTarget(null)} onConfirm={async () => {
             if (deleteTarget) {
-                deleteExpense.mutate(deleteTarget.id, { onError: () => showToast('error', 'No se pudo eliminar el egreso. Intentá nuevamente.') })
+                await deleteExpense.mutateAsync(deleteTarget.id)
             }
             setDeleteTarget(null)
         }} />
