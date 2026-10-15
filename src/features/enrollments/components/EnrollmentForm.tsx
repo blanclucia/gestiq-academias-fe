@@ -34,7 +34,7 @@ export function EnrollmentForm({ courseName, commissions = [], initialValues, va
         const next = { ...formValue, ...changes }
         if (value) onValueChange?.(next); else setInternalValue(next)
     }
-    const eligibleCommissions = getEligibleCommissions(commissions, formValue.startDate, formValue.endDate)
+    const eligibleCommissions = getEligibleCommissions(commissions, formValue.startDate)
     const selectedEligibleCount = eligibleCommissions.filter((commission) => formValue.commissionIds.includes(commission.id)).length
     const copyLink = async () => {
         if (!publicLink) return

@@ -64,7 +64,7 @@ export function EnrollmentDetailPage() {
 
     const enrollment = {
         id: opening.id,
-        commissions: getEligibleCommissions(course.commissions, opening.startDate, opening.endDate, opening.commissionIds),
+        commissions: getEligibleCommissions(course.commissions, opening.startDate, opening.commissionIds),
         amount: opening.amount,
         startDate: opening.startDate,
         endDate: opening.endDate,

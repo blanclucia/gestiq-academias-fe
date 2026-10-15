@@ -9,7 +9,7 @@ export function validateEnrollment(value: EnrollmentFormValue, commissions: Acad
     if (!value.startDate) errors.enrollmentStartDate = 'Ingresá la fecha de inicio.'
     if (!value.endDate) errors.enrollmentEndDate = 'Ingresá la fecha de cierre.'
     else if (value.startDate && value.endDate < value.startDate) errors.enrollmentEndDate = 'La fecha de cierre debe ser posterior al inicio.'
-    const eligible = getEligibleCommissions(commissions, value.startDate, value.endDate, value.commissionIds).length > 0
-    if (!eligible) errors.enrollmentCommissions = 'Seleccioná al menos una comisión vigente para este período.'
+    const eligible = getEligibleCommissions(commissions, value.startDate, value.commissionIds).length > 0
+    if (!eligible) errors.enrollmentCommissions = 'Seleccioná al menos una comisión abierta que no haya terminado antes del inicio de la inscripción.'
     return Object.keys(errors).length ? invalidForm('Revisá los datos de la inscripción.', errors) : validForm
 }

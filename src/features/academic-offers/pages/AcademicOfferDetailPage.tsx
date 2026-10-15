@@ -87,7 +87,7 @@ export function AcademicOfferDetailPage() {
 
     const persistedEnrollmentRows = listEnrollmentOpenings(course.id)
         .map((opening) => {
-            const eligibleCommissions = getEligibleCommissions(course.commissions, opening.startDate, opening.endDate)
+            const eligibleCommissions = getEligibleCommissions(course.commissions, opening.startDate)
             const selectedCommissionIds = opening.commissionIds.length > 0 ? opening.commissionIds : eligibleCommissions.map((commission) => commission.id)
             const eligibleCount = eligibleCommissions.filter((commission) => selectedCommissionIds.includes(commission.id)).length
             return {
@@ -453,7 +453,7 @@ export function AcademicOfferDetailPage() {
                             filterChips={<FilterChips fields={enrollmentFilterFields} values={enrollmentFilters} onChange={setEnrollmentFilters} />}
                             onCreate={() => {
                                 const { startDate, endDate } = defaultEnrollmentWindow()
-                                const commissionIds = getEligibleCommissions(course.commissions, startDate, endDate).map((commission) => commission.id)
+                                const commissionIds = getEligibleCommissions(course.commissions, startDate).map((commission) => commission.id)
                                 setEnrollmentForm({ courseId: course.id, commissionIds, amount: course.commissions[0]?.amount ?? 48000, startDate, endDate, status: 'Abierta' })
                                 setIsCreateEnrollmentOpen(true)
                             }}
