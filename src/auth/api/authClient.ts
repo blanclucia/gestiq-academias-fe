@@ -4,6 +4,11 @@ import { loginResponseSchema, sessionSchema, tokenPairSchema, type LoginInput, t
 type AuthState = { phase: 'bootstrapping' | 'anonymous' | 'signed-in' | 'password-change'; generation: number; organizationSlug?: string; challengeExpiresAt?: number }
 type Request = ReturnType<typeof createHttpClient>
 
+// A 429 is rejected before the server reads the refresh cookie, so the cookie is still valid: retrying
+// is safe, and treating it as a failed refresh would sign a person out for reloading a few times.
+const isRateLimited = (error: unknown) => error instanceof ApiError && error.status === 429
+const bootstrapAttempts = 3
+
 // The access token lives only in this instance, never in browser storage or query keys. The
 // refresh token never reaches this instance at all — the server sets it as an httpOnly cookie
 // (see cmd/api/handlers/auth.go), so it survives a reload without ever being readable by
@@ -18,7 +23,8 @@ export class AuthClient {
     private refreshing: Promise<void> | null = null
 
     private readonly request: Request
-    constructor(request: Request = createHttpClient(apiBaseUrl)) { this.request = request }
+    private readonly retryDelayMs: number
+    constructor(request: Request = createHttpClient(apiBaseUrl), retryDelayMs = 1500) { this.request = request; this.retryDelayMs = retryDelayMs }
     getSnapshot = () => this.state
     subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
 
@@ -45,13 +51,19 @@ export class AuthClient {
     async bootstrap() {
         if (this.state.phase !== 'bootstrapping') return
         const generation = this.state.generation
-        try {
-            await this.refresh()
-            if (generation === this.state.generation && this.state.phase === 'bootstrapping') {
-                this.publish({ ...this.state, phase: 'signed-in' })
+        for (let attempt = 1; attempt <= bootstrapAttempts; attempt++) {
+            try {
+                await this.refresh()
+                if (generation === this.state.generation && this.state.phase === 'bootstrapping') {
+                    this.publish({ ...this.state, phase: 'signed-in' })
+                }
+                return
+            } catch (error) {
+                // Any other failure already moved to 'anonymous' via clear(); only a rate limit is retried.
+                if (!isRateLimited(error) || generation !== this.state.generation) return
+                if (attempt === bootstrapAttempts) { this.clear(); return }
+                await new Promise((resolve) => setTimeout(resolve, this.retryDelayMs * attempt))
             }
-        } catch {
-            // refresh() already moved to 'anonymous' via clear() on failure — nothing left to do.
         }
     }
     async login(input: LoginInput) {
@@ -100,8 +112,9 @@ export class AuthClient {
                 this.checkGeneration(generation)
                 this.storeTokens(pair)
             } catch (error) {
-                // A lost response may have consumed the refresh: never retry that token.
-                if (generation === this.state.generation) this.clear()
+                // A lost response may have consumed the refresh: never retry that token. A rate limit
+                // never reached it, so the session stays.
+                if (generation === this.state.generation && !isRateLimited(error)) this.clear()
                 throw error
             }
         })()
