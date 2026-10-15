@@ -13,7 +13,8 @@ import { DeleteConfirmationModal, EntityFormModal, FormField, FormGrid, FormSect
 import { getSelectedBranchId } from '@/services/branchRepository'
 import { listCommunicationTemplates } from '@/services/communicationTemplateRepository'
 import { validateConditions } from '@/components/forms/formValidation'
-import { CommissionSummary } from '../components/CommissionSummary'
+import { CommissionSettingsCards } from '../components/CommissionSettingsCards'
+import { toCommissionFormValue } from '../model/commissionFormValue'
 import { CommissionStudentsTable } from '../components/CommissionStudentsTable'
 import { CommissionExamsTab } from '../components/CommissionExamsTab'
 import { CommissionExamModal, type CommissionExamAudience, type CommissionExamFormValue } from '../components/CommissionExamModal'
@@ -359,10 +360,21 @@ export function CommissionDetailPage() {
                     )}
 
                     {activeTab === 'overview' && (
-                        <CommissionSummary
-                            courseName={course.name}
+                        <CommissionSettingsCards
+                            // Remount on every saved change (own save, closing the commission) so the draft restarts from it.
+                            key={`${commission.id}:${JSON.stringify(toCommissionFormValue(commission))}`}
                             commission={commission}
-                            onEdit={() => navigate(path(`oferta/${course.id}?editCommission=${commission.id}`))}
+                            siblingNames={course.commissions.filter((item) => item.id !== commission.id).map((item) => item.name)}
+                            saving={updateCommission.isPending}
+                            onSave={async (changes) => {
+                                try {
+                                    await updateCommission.mutateAsync({ courseId: course.id, commissionId: commission.id, changes })
+                                    showToast('success', 'Comisión actualizada correctamente.')
+                                    return true
+                                } catch {
+                                    return false
+                                }
+                            }}
                             onCloseCommission={() => setIsCloseCommissionOpen(true)}
                         />
                     )}

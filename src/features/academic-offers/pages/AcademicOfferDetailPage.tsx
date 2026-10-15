@@ -1,19 +1,17 @@
 import { ArrowLeft, CalendarDays, CheckCircle2, Gauge, Users } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { CommissionForm, type CommissionFormValue } from '@/features/commissions'
-import { CourseForm, type CourseFormValue } from '../components/CourseForm'
 import { EnrollmentForm, type EnrollmentFormValue } from '@/features/enrollments'
 import { DeleteConfirmationModal, EntityFormModal } from '@/components/crud/EntityFormModal'
 import { FilterChips } from '@/components/crud/FilterChips'
 import { splitFilterValue } from '@/components/crud/filterValues'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { type AcademicCommission, getActiveAcademicCycleId, listAcademicCycles, listCourses, listEnrollmentOpenings, useAcademyRepositoryVersion, useCreateCommission, useCreateEnrollmentOpening, useDeleteCommission, useDeleteEnrollmentOpening, useUpdateCommission, useUpdateCourse, useUpdateEnrollmentOpening } from '@/services/academyRepository'
+import { type AcademicCommission, getActiveAcademicCycleId, listAcademicCycles, listCourses, listEnrollmentOpenings, useAcademyRepositoryVersion, useCreateCommission, useCreateEnrollmentOpening, useDeleteCommission, useDeleteEnrollmentOpening, useUpdateCourse, useUpdateEnrollmentOpening } from '@/services/academyRepository'
 import { isCommissionNameConflict, isCourseClosed } from '@/services/organization/academicOffersApi'
 import { isCourseNotActive } from '@/services/organization/enrollmentsApi'
-import { formatCommissionSchedule, parseCommissionSchedule, validateCommission } from '@/features/commissions'
+import { formatCommissionSchedule, validateCommission } from '@/features/commissions'
 import { validateEnrollment } from '@/features/enrollments'
-import { validateConditions } from '@/components/forms/formValidation'
 import { OfferSummaryCard } from '../components/OfferSummaryCard'
 import { OfferCommissionsCard } from '../components/OfferCommissionsCard'
 import { OfferEnrollmentsCard, type OfferEnrollmentRow } from '../components/OfferEnrollmentsCard'
@@ -48,19 +46,12 @@ export function AcademicOfferDetailPage() {
     const courses = listCourses()
     const { settings: academySettings } = useAcademySettings()
     const defaultCommissionCapacity = academySettings?.enrollments.defaultCapacity ?? 20
-    const requestedCommission = courses.find((item) => item.id === courseId)?.commissions.find((commission) => commission.id === searchParams.get('editCommission')) ?? null
     const [activeTab, setActiveTab] = useState<'overview' | 'enrollments'>('overview')
     const [isCreateCommissionOpen, setIsCreateCommissionOpen] = useState(false)
-    const [isEditCourseOpen, setIsEditCourseOpen] = useState(false)
-    const [isEditCommissionOpen, setIsEditCommissionOpen] = useState(Boolean(requestedCommission))
     const [commissionNameError, setCommissionNameError] = useState('')
     const [isCreateEnrollmentOpen, setIsCreateEnrollmentOpen] = useState(false)
     const [isEditEnrollmentOpen, setIsEditEnrollmentOpen] = useState(false)
     const [newCommissionForm, setNewCommissionForm] = useState<CommissionFormValue>(() => emptyCommissionForm(undefined, undefined, defaultCommissionCapacity))
-    const [courseForm, setCourseForm] = useState<CourseFormValue>({ name: '', description: '', status: 'Borrador' })
-    const [editingCommissionForm, setEditingCommissionForm] = useState<CommissionFormValue>(() => ({ name: requestedCommission?.name ?? '', teachers: requestedCommission?.teachers ?? (requestedCommission?.teacher && requestedCommission.teacher !== 'Docente por asignar' ? [requestedCommission.teacher] : []), capacity: requestedCommission?.capacity ?? 20, amount: requestedCommission?.amount ?? 48000, startDate: requestedCommission?.startDate ?? '2026-03-01', endDate: requestedCommission?.endDate ?? '2026-12-15', dueDay: requestedCommission?.dueDay ?? 10, status: requestedCommission?.status ?? 'Programada', ...parseCommissionSchedule(requestedCommission?.schedule) }))
-    const [editingCommission, setEditingCommission] = useState<CourseCommission | null>(requestedCommission)
-    const [viewCommission, setViewCommission] = useState<CourseCommission | null>(null)
     const [deleteCommissionTarget, setDeleteCommissionTarget] = useState<CourseCommission | null>(null)
     const [editingEnrollment, setEditingEnrollment] = useState<OfferEnrollmentRow | null>(null)
     const [enrollmentForm, setEnrollmentForm] = useState<EnrollmentFormValue>({ courseId: courseId ?? '', commissionIds: [], amount: 48000, ...defaultEnrollmentWindow(), status: 'Abierta' })
@@ -76,12 +67,14 @@ export function AcademicOfferDetailPage() {
     const course = courses.find((entry) => entry.id === courseId)
     const updateCourse = useUpdateCourse()
     const createCommission = useCreateCommission()
-    const updateCommission = useUpdateCommission()
     const deleteCommission = useDeleteCommission()
     const createEnrollmentOpening = useCreateEnrollmentOpening()
     const updateEnrollmentOpening = useUpdateEnrollmentOpening()
     const deleteEnrollmentOpening = useDeleteEnrollmentOpening()
     const { showToast } = useToast()
+    // Editing moved into the commission detail; old links that opened the edit modal land there.
+    const legacyEditCommissionId = searchParams.get('editCommission')
+    if (course && legacyEditCommissionId) return <Navigate to={path(`oferta/${course.id}/comisiones/${legacyEditCommissionId}`)} replace />
 
     if (!course) {
         return <div className="dashboard-page"><div className="page-header"><div><h1>Oferta académica no encontrada</h1></div></div><div className="data-table-card"><p>La oferta académica solicitada no existe o fue eliminada.</p><Link to={path('offers')} className="primary-button" style={{ display: 'inline-flex', marginTop: 12 }}>Volver a oferta académica</Link></div></div>
@@ -185,12 +178,6 @@ export function AcademicOfferDetailPage() {
         })
     }
 
-    const openEditCommissionModal = (commission: (typeof course.commissions)[number]) => {
-        setEditingCommission(commission)
-        setEditingCommissionForm({ name: commission.name, teachers: commission.teachers, capacity: commission.capacity, amount: commission.amount, startDate: commission.startDate, endDate: commission.endDate, dueDay: commission.dueDay, status: commission.status, ...parseCommissionSchedule(commission.schedule) })
-        setIsEditCommissionOpen(true)
-    }
-
     const openEditEnrollmentModal = (enrollment: OfferEnrollmentRow) => {
         setEditingEnrollment(enrollment)
         setEnrollmentForm({ courseId: enrollment.courseId, commissionIds: enrollment.commissionIds, amount: enrollment.amount, startDate: enrollment.startDate, endDate: enrollment.endDate, status: enrollment.status })
@@ -235,25 +222,6 @@ export function AcademicOfferDetailPage() {
             </div>
 
             <EntityFormModal
-                open={isEditCourseOpen}
-                title="Editar oferta académica"
-                subtitle="Actualizá la información general de esta oferta."
-                validate={() => validateConditions({ courseName: !courseForm.name.trim() && 'Ingresá el nombre de la oferta.' })}
-                onClose={() => setIsEditCourseOpen(false)}
-                onSubmit={() => {
-                    if (courseForm.name.trim()) {
-                        updateCourse.mutate({ id: course.id, changes: { ...courseForm, name: courseForm.name.trim() } }, {
-                            onSuccess: () => showToast('success', 'Oferta académica actualizada correctamente.'),
-                            onError: () => showToast('error', 'No se pudo actualizar la oferta académica. Intentá nuevamente.'),
-                        })
-                    }
-                    setIsEditCourseOpen(false)
-                }}
-            >
-                <CourseForm value={courseForm} onValueChange={setCourseForm} />
-            </EntityFormModal>
-
-            <EntityFormModal
                 open={isCreateCommissionOpen}
                 title="Nueva comisión"
                 subtitle="Creá una nueva instancia de la oferta académica con su propio horario, docente y valor mensual."
@@ -291,86 +259,6 @@ export function AcademicOfferDetailPage() {
                     <CommissionForm initialValues={{ course: course.name }} value={newCommissionForm} onValueChange={(value) => { setNewCommissionForm(value); setCommissionNameError('') }} />
                     {commissionNameError && <p className="form-error-message" role="alert">{commissionNameError}</p>}
                 </>
-            </EntityFormModal>
-
-            <EntityFormModal
-                open={isEditCommissionOpen}
-                title="Editar comisión"
-                subtitle="Actualizá los datos de la comisión."
-                validate={() => validateCommission(editingCommissionForm, course.commissions.filter((commission) => commission.id !== editingCommission?.id).map((commission) => commission.name))}
-                onClose={() => {
-                    setIsEditCommissionOpen(false)
-                    setEditingCommission(null)
-                    setCommissionNameError('')
-                }}
-                onSubmit={() => {
-                    if (editingCommission) {
-                        const changes = { ...editingCommissionForm, name: editingCommissionForm.name.trim() || editingCommission.name, teacher: editingCommissionForm.teachers[0] || 'Docente por asignar', schedule: formatCommissionSchedule(editingCommissionForm) }
-                        updateCommission.mutate({ courseId: course.id, commissionId: editingCommission.id, changes }, {
-                            onSuccess: () => {
-                                setIsEditCommissionOpen(false)
-                                setEditingCommission(null)
-                                setCommissionNameError('')
-                                showToast('success', 'Comisión actualizada correctamente.')
-                            },
-                            onError: (error) => setCommissionNameError(isCommissionNameConflict(error) ? 'Ya existe otra comisión con ese nombre dentro de esta oferta académica.' : 'No se pudo actualizar la comisión. Intentá nuevamente.'),
-                        })
-                        return
-                    }
-                    setIsEditCommissionOpen(false)
-                    setEditingCommission(null)
-                    setCommissionNameError('')
-                }}
-            >
-                <>
-                    <CommissionForm
-                        value={editingCommissionForm}
-                        onValueChange={(value) => { setEditingCommissionForm(value); setCommissionNameError('') }}
-                        initialValues={
-                            editingCommission ? {
-                                name: editingCommission.name,
-                                course: course.name,
-                                teachers: editingCommission.teachers,
-                                capacity: editingCommission.capacity,
-                                amount: editingCommission.amount,
-                                startDate: editingCommission.startDate,
-                                endDate: editingCommission.endDate,
-                                dueDay: editingCommission.dueDay,
-                                status: editingCommission.status,
-                                schedule: editingCommission.schedule,
-                            } : undefined
-                        }
-                    />
-                    {commissionNameError && <p className="form-error-message" role="alert">{commissionNameError}</p>}
-                </>
-            </EntityFormModal>
-
-            <EntityFormModal
-                open={Boolean(viewCommission)}
-                title="Detalle de comisión"
-                subtitle="Información actual de la comisión seleccionada."
-                submitLabel="Cerrar"
-                onClose={() => setViewCommission(null)}
-                onSubmit={() => setViewCommission(null)}
-            >
-                {viewCommission && (
-                    <CommissionForm
-                        initialValues={
-                            viewCommission ? {
-                                name: viewCommission.name,
-                                course: course.name,
-                                teachers: viewCommission.teachers,
-                                capacity: viewCommission.capacity,
-                                amount: viewCommission.amount,
-                                startDate: viewCommission.startDate,
-                                endDate: viewCommission.endDate,
-                                dueDay: viewCommission.dueDay,
-                                status: viewCommission.status,
-                                schedule: viewCommission.schedule,
-                            } : undefined
-                        }
-                    />
-                )}
             </EntityFormModal>
 
             <DeleteConfirmationModal
@@ -507,10 +395,18 @@ export function AcademicOfferDetailPage() {
 
                     {activeTab === 'overview' && (
                         <OfferSummaryCard
+                            // Remount when the saved offer changes so the draft restarts from it.
+                            key={`${course.id}:${course.name}:${course.status}:${course.description ?? ''}`}
                             course={course}
-                            onEdit={() => {
-                                setCourseForm({ name: course.name, description: course.description ?? '', status: course.status })
-                                setIsEditCourseOpen(true)
+                            saving={updateCourse.isPending}
+                            onSave={async (changes) => {
+                                try {
+                                    await updateCourse.mutateAsync({ id: course.id, changes })
+                                    showToast('success', 'Oferta académica actualizada correctamente.')
+                                    return true
+                                } catch {
+                                    return false
+                                }
                             }}
                         />
                     )}
@@ -531,7 +427,7 @@ export function AcademicOfferDetailPage() {
                             onView={(commission) => navigate(path(`oferta/${course.id}/comisiones/${commission.id}`))}
                             onViewStudents={(commission) => navigate(path(`oferta/${course.id}/comisiones/${commission.id}?tab=students`))}
                             onDuplicate={handleDuplicateCommission}
-                            onEdit={openEditCommissionModal}
+                            onEdit={(commission) => navigate(path(`oferta/${course.id}/comisiones/${commission.id}`))}
                             onDelete={setDeleteCommissionTarget}
                         />
                     )}

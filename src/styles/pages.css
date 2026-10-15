@@ -1139,24 +1139,6 @@ html.dark .donut-chart {
 }
 
 @media (max-width: 640px) {
-  .offer-overview-hero {
-    flex-direction: column;
-    gap: 0;
-  }
-
-  .offer-overview-hero + .offer-detail-list {
-    margin-top: 18px;
-  }
-
-  .offer-overview-actions,
-  .offer-overview-actions button {
-    width: 100%;
-  }
-
-  .offer-detail-list {
-    grid-template-columns: 1fr;
-  }
-
   .offer-panel-heading {
     align-items: flex-start;
     flex-direction: column;
