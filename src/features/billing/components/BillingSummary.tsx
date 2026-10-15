@@ -25,8 +25,10 @@ type BillingSummaryProps = {
 
 export function BillingSummary({ dateRangeControl, metrics, periodLabel, totalPortfolio, collectionRate, riskRate }: BillingSummaryProps) {
     return (
-        <div style={{ display: 'grid', gap: 16, marginBottom: 16 }}>
-            <div className="billing-summary-date-range">{dateRangeControl}</div>
+        // Same structure as Finanzas → Resumen (date range, then kpi-grid in normal flow), so both summaries
+        // space identically; a grid container here added the kpi-grid margin on top of its gap.
+        <div style={{ marginBottom: 16 }}>
+            <div className="summary-date-range">{dateRangeControl}</div>
 
             {/* Same KpiCard and grid as Finanzas and the dashboards, so KPIs read alike across modules. */}
             <div className="kpi-grid">
@@ -36,7 +38,7 @@ export function BillingSummary({ dateRangeControl, metrics, periodLabel, totalPo
                 <KpiCard title="Eficiencia de cobranza" value={`${collectionRate.toFixed(1)}%`} change={`Riesgo vencido: ${riskRate.toFixed(1)}%`} positive={collectionRate >= riskRate} />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginTop: 16 }}>
                 <div className="kpi-card" style={{ minHeight: 0, padding: '16px 18px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                         <div><div className="kpi-title">Panorama del rango</div><div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 4 }}>{periodLabel}</div></div>

@@ -5,6 +5,25 @@
     margin-top: 12px;
 }
 
+/* Date range on top of a summary tab (Cobros and Finanzas), right-aligned above the KPIs. */
+.summary-date-range {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+    .summary-date-range,
+    .summary-date-range .toolbar-date-range {
+        width: 100%;
+    }
+
+    .summary-date-range .form-input {
+        flex: 1 1 140px;
+        width: auto;
+    }
+}
+
 .kpi-card,
 .chart-card {
     background: rgba(255, 255, 255, 0.52);
