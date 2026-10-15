@@ -56,7 +56,10 @@ export function BillingPage() {
     const [openMenuId, setOpenMenuId] = useState<string | null>(null)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [editingPayment, setEditingPayment] = useState<BillingPaymentRecord | null>(null)
-    const [editingPaymentForm, setEditingPaymentForm] = useState({ method: 'Transferencia' as Payment['method'], amount: 0, dueDate: '', status: 'Pendiente' as Payment['status'] })
+    const [editingPaymentForm, setEditingPaymentForm] = useState({ method: 'Transferencia' as Payment['method'], amount: 0, dueDate: '' })
+    const [revertTarget, setRevertTarget] = useState<BillingPaymentRecord | null>(null)
+    const [rejectTarget, setRejectTarget] = useState<BillingPaymentRecord | null>(null)
+    const [isBulkCollectOpen, setIsBulkCollectOpen] = useState(false)
     const [collectTarget, setCollectTarget] = useState<BillingPaymentRecord | null>(null)
     const [collectForm, setCollectForm] = useState<{ date: string; method: Payment['method'] }>({
         date: format(today, 'yyyy-MM-dd'),
@@ -222,6 +225,24 @@ export function BillingPage() {
         (payment) => selectedIds.includes(payment.id) && (payment.statusView === 'Pendiente' || payment.statusView === 'En verificación' || payment.statusView === 'Vencido'),
     ).length
 
+    const isCollectable = (payment: BillingPaymentRecord) => ['Pendiente', 'En verificación', 'Vencido', 'Rechazado'].includes(resolveChargeCollectionStatus(payment.chargeSnapshot, today, graceDays))
+    const editingPaymentPaid = editingPayment ? resolveChargeCollectionStatus(editingPayment.chargeSnapshot, today, graceDays) === 'Pagado' : false
+    const bulkCollectTargets: BillingPaymentRecord[] = selectedIds.flatMap((id) => {
+        const payment = paymentById.get(id)
+        return payment && isCollectable(payment) ? [payment] : []
+    })
+
+    // One payment, recorded with the date and method from the collection modal (single row or bulk).
+    const recordPayment = (target: BillingPaymentRecord) => {
+        if (target.isReal) {
+            updateCharge.mutate({ id: target.id, changes: { status: 'paid', method: chargeMethodToApi(collectForm.method), paidAt: collectForm.date, paidAmount: target.amount } }, {
+                onError: () => showToast('error', `No se pudo registrar el cobro de ${target.student}. Intentá nuevamente.`),
+            })
+        } else {
+            confirmPaymentRecord(target.id, collectForm.method, collectForm.date)
+        }
+    }
+
     const sendReminder = (target: BillingPaymentRecord) => {
         updatePaymentRecord(target.id, { lastReminderAt: format(today, 'yyyy-MM-dd') })
     }
@@ -294,19 +315,25 @@ export function BillingPage() {
     }
 
     const submitCollection = () => {
-        if (!collectTarget || !collectForm.date) {
+        if (!collectForm.date) return
+        if (isBulkCollectOpen) {
+            bulkCollectTargets.forEach(recordPayment)
+            showToast('success', `${bulkCollectTargets.length} cobro${bulkCollectTargets.length === 1 ? '' : 's'} registrado${bulkCollectTargets.length === 1 ? '' : 's'}.`)
+            setIsBulkCollectOpen(false)
+            resetSelection()
             return
         }
-
-        if (collectTarget.isReal) {
-            updateCharge.mutate({ id: collectTarget.id, changes: { status: 'paid', method: chargeMethodToApi(collectForm.method), paidAt: collectForm.date, paidAmount: collectTarget.amount } }, {
-                onError: () => showToast('error', 'No se pudo registrar el cobro. Intentá nuevamente.'),
-            })
-        } else {
-            confirmPaymentRecord(collectTarget.id, collectForm.method, collectForm.date)
-        }
-
+        if (collectTarget) recordPayment(collectTarget)
         setCollectTarget(null)
+    }
+
+    const openBulkCollect = () => {
+        if (bulkCollectTargets.length === 0) {
+            showToast('error', 'Los cobros seleccionados ya están pagados.')
+            return
+        }
+        setCollectForm({ date: format(today, 'yyyy-MM-dd'), method: availablePaymentMethods[0] })
+        setIsBulkCollectOpen(true)
     }
 
     const resetManualChargeForm = () => {
@@ -376,10 +403,56 @@ export function BillingPage() {
                 onCopy={copyPaymentLink}
             />
 
-            <PaymentCollectionModal target={collectTarget} value={collectForm} paymentMethods={availablePaymentMethods} onChange={setCollectForm} onClose={() => setCollectTarget(null)} onSubmit={submitCollection} />
+            <PaymentCollectionModal
+                target={isBulkCollectOpen
+                    ? { student: `${bulkCollectTargets.length} cobro${bulkCollectTargets.length === 1 ? '' : 's'} seleccionado${bulkCollectTargets.length === 1 ? '' : 's'}`, concept: `Total $${bulkCollectTargets.reduce((total, payment) => total + payment.amount, 0).toLocaleString('es-AR')}` }
+                    : collectTarget}
+                value={collectForm}
+                paymentMethods={availablePaymentMethods}
+                onChange={setCollectForm}
+                onClose={() => { setCollectTarget(null); setIsBulkCollectOpen(false) }}
+                onSubmit={submitCollection}
+            />
+            <DeleteConfirmationModal
+                open={Boolean(revertTarget)}
+                title="Revertir a pendiente"
+                description={`El cobro de "${revertTarget?.student ?? ''}" vuelve a quedar pendiente y se borran la fecha y el medio de pago registrados. Usalo para corregir un pago registrado por error.`}
+                confirmLabel="Revertir a pendiente"
+                onClose={() => setRevertTarget(null)}
+                onConfirm={() => {
+                    if (revertTarget?.isReal) {
+                        updateCharge.mutate({ id: revertTarget.id, changes: { status: 'pending' } }, {
+                            onSuccess: () => showToast('success', 'El cobro volvió a pendiente.'),
+                            onError: () => showToast('error', 'No se pudo revertir el cobro. Intentá nuevamente.'),
+                        })
+                    } else if (revertTarget) {
+                        updatePaymentRecord(revertTarget.id, { status: 'Pendiente', date: '-' })
+                    }
+                    setRevertTarget(null)
+                }}
+            />
+            <DeleteConfirmationModal
+                open={Boolean(rejectTarget)}
+                title="Rechazar transferencia"
+                description={`La transferencia informada por "${rejectTarget?.student ?? ''}" se marca como rechazada y el cobro sigue sin pagar.`}
+                confirmLabel="Rechazar transferencia"
+                onClose={() => setRejectTarget(null)}
+                onConfirm={() => {
+                    if (rejectTarget?.isReal) {
+                        updateCharge.mutate({ id: rejectTarget.id, changes: { status: 'rejected' } }, {
+                            onSuccess: () => showToast('success', 'Transferencia rechazada.'),
+                            onError: () => showToast('error', 'No se pudo rechazar la transferencia. Intentá nuevamente.'),
+                        })
+                    } else if (rejectTarget) {
+                        updatePaymentRecord(rejectTarget.id, { status: 'Rechazado' })
+                    }
+                    setRejectTarget(null)
+                }}
+            />
             <PaymentEditModal
                 open={isEditModalOpen}
                 target={editingPayment}
+                paid={editingPaymentPaid}
                 paymentMethods={availablePaymentMethods}
                 value={editingPaymentForm}
                 onChange={setEditingPaymentForm}
@@ -392,19 +465,14 @@ export function BillingPage() {
                         if (editingPayment.isReal) {
                             updateCharge.mutate({
                                 id: editingPayment.id,
-                                changes: {
-                                    amount: editingPaymentForm.amount,
-                                    dueDate: editingPaymentForm.dueDate,
-                                    status: chargeStatusToApi(editingPaymentForm.status as 'Pendiente' | 'Pagado' | 'En verificación' | 'Rechazado'),
-                                    method: chargeMethodToApi(editingPaymentForm.method),
-                                    ...(editingPaymentForm.status === 'Pagado' && editingPayment.date === '-' ? { paidAt: format(today, 'yyyy-MM-dd'), paidAmount: editingPaymentForm.amount } : {}),
-                                },
-                            }, { onError: () => showToast('error', 'No se pudo actualizar el pago. Intentá nuevamente.') })
+                                changes: editingPaymentPaid
+                                    ? { amount: editingPaymentForm.amount, paidAmount: editingPaymentForm.amount, method: chargeMethodToApi(editingPaymentForm.method) }
+                                    : { amount: editingPaymentForm.amount, dueDate: editingPaymentForm.dueDate },
+                            }, { onError: () => showToast('error', 'No se pudo actualizar el cobro. Intentá nuevamente.') })
                         } else {
-                            updatePaymentRecord(editingPayment.id, {
-                                ...editingPaymentForm,
-                                date: editingPaymentForm.status === 'Pagado' && editingPayment.date === '-' ? format(today, 'yyyy-MM-dd') : editingPayment.date,
-                            })
+                            updatePaymentRecord(editingPayment.id, editingPaymentPaid
+                                ? { amount: editingPaymentForm.amount, method: editingPaymentForm.method }
+                                : { amount: editingPaymentForm.amount, dueDate: editingPaymentForm.dueDate })
                         }
                     }
                     setIsEditModalOpen(false)
@@ -474,19 +542,7 @@ export function BillingPage() {
                 ) : undefined}
                 selectedCount={activeTab === 'resumen' ? 0 : selectedCount}
                 bulkActionItems={[
-                    {
-                        label: 'Marcar pagado',
-                        onClick: () => {
-                            selectedIds.forEach((id) => {
-                                const payment = paymentById.get(id)
-                                if (payment?.isReal) {
-                                    updateCharge.mutate({ id, changes: { status: 'paid', paidAt: format(today, 'yyyy-MM-dd'), paidAmount: payment.amount } })
-                                } else {
-                                    updatePaymentRecord(id, { status: 'Pagado', date: format(today, 'yyyy-MM-dd') })
-                                }
-                            })
-                        },
-                    },
+                    { label: 'Registrar cobro', onClick: openBulkCollect },
                     {
                         label: selectedPendingCount > 0 ? `Recordar (${selectedPendingCount})` : 'Recordar',
                         onClick: () => {
@@ -514,13 +570,15 @@ export function BillingPage() {
                         onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)}
                         onEdit={(payment) => {
                             setEditingPayment(payment)
-                            setEditingPaymentForm({ method: payment.method, amount: payment.amount, dueDate: payment.dueDate, status: payment.status })
+                            setEditingPaymentForm({ method: payment.method, amount: payment.amount, dueDate: payment.dueDate })
                             setIsEditModalOpen(true)
                         }}
                         onPaymentLink={setPaymentLinkTarget}
                         onCollect={openCollectModal}
                         onAdjust={openAdjustModal}
                         onRemind={sendReminder}
+                        onRejectTransfer={setRejectTarget}
+                        onRevertPayment={setRevertTarget}
                         onDelete={setDeleteTarget}
                     />
                 )}

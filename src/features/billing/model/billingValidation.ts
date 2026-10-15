@@ -18,10 +18,11 @@ export function validatePaymentCollection(value: { date: string }): FormValidati
     return value.date ? validForm : invalidForm('Ingresá la fecha del cobro.', { collectionDate: 'La fecha es obligatoria.' })
 }
 
-export function validatePaymentEdit(value: { amount: number; dueDate: string }): FormValidationResult {
+export function validatePaymentEdit(value: { amount: number; dueDate: string; paid?: boolean }): FormValidationResult {
     const fieldErrors: Record<string, string> = {}
     if (!Number.isFinite(value.amount) || value.amount < 0) fieldErrors.editAmount = 'El importe no puede ser negativo.'
-    if (!value.dueDate) fieldErrors.editDueDate = 'El vencimiento es obligatorio.'
+    // The due date is only edited while unpaid (a paid charge shows its payment method instead).
+    if (!value.paid && !value.dueDate) fieldErrors.editDueDate = 'El vencimiento es obligatorio.'
     return Object.keys(fieldErrors).length ? invalidForm('Revisá los datos del pago.', fieldErrors) : validForm
 }
 
