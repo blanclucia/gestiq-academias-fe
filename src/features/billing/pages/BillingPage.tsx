@@ -9,7 +9,7 @@ import { confirmPaymentRecord, getPaymentRemovalBlocker, listPayments, listStude
 import { chargeMethodToApi, chargeStatusToApi } from '@/services/organization/chargesMapping'
 import { getNextDueDateForDay } from '@/domain/billing/billingRules'
 import { getRecordablePaymentMethods, paymentMethods } from '@/domain/billing/paymentMethods'
-import { getPaymentReferenceDate as getReferenceDate, resolveChargeCollectionStatus } from '@/domain/billing/paymentRules'
+import { getPaymentReferenceDate as getReferenceDate, resolveChargeCollectionStatus, summarizeChargesToManage } from '@/domain/billing/paymentRules'
 import { useAcademySettings } from '@/services/academySettingsRepository'
 import { useToast } from '@/components/ui/ToastContext'
 import { ManualChargeModal } from '../components/ManualChargeModal'
@@ -176,25 +176,25 @@ export function BillingPage() {
         // Exam-fee installments (examinationsRepository.ts, still 100% mock) are rendered as table
         // rows like any other charge, but they have no backing row in the backend — they shouldn't
         // inflate the rolled-up KPI totals here the way a real charge does.
-        const monthPayments = paymentRows.filter((payment) => {
-            if (!payment.isReal) return false
+        const realPayments = paymentRows.filter((payment) => payment.isReal)
+        const monthPayments = realPayments.filter((payment) => {
             const referenceDate = parseISO(getReferenceDate(payment, payment.statusView))
             return isWithinInterval(referenceDate, { start: summaryInterval.start, end: summaryInterval.end })
         })
+        // Pendiente and Vencido count what is still to collect up to the end of the range — unpaid
+        // charges from earlier months included — with the same rule as the Pendientes/Vencidos tabs and
+        // the dashboard's "Cobros a gestionar" card, so the three show the same numbers.
+        const toManage = summarizeChargesToManage(realPayments.map((payment) => ({ ...payment, status: payment.statusView })), format(summaryInterval.end, 'yyyy-MM-dd'))
 
         return {
             totalReceived: monthPayments
                 .filter((payment) => payment.statusView === 'Pagado')
                 .reduce((acc, payment) => acc + payment.amount, 0),
             receivedCount: monthPayments.filter((payment) => payment.statusView === 'Pagado').length,
-            totalPending: monthPayments
-                .filter((payment) => payment.statusView === 'Pendiente' || payment.statusView === 'En verificación' || payment.statusView === 'Rechazado')
-                .reduce((acc, payment) => acc + payment.amount, 0),
-            pendingCount: monthPayments.filter((payment) => payment.statusView === 'Pendiente' || payment.statusView === 'Rechazado').length,
-            totalOverdue: monthPayments
-                .filter((payment) => payment.statusView === 'Vencido')
-                .reduce((acc, payment) => acc + payment.amount, 0),
-            overdueCount: monthPayments.filter((payment) => payment.statusView === 'Vencido').length,
+            totalPending: toManage.pending.reduce((acc, payment) => acc + payment.amount, 0),
+            pendingCount: toManage.pending.length,
+            totalOverdue: toManage.overdue.reduce((acc, payment) => acc + payment.amount, 0),
+            overdueCount: toManage.overdue.length,
             remindersSent: monthPayments.filter((payment) => Boolean(payment.lastReminderAt)).length,
             // Only the methods enabled in Mi academia → Cobros, plus any disabled one that still collected
             // money in the period (hiding it would hide real income).
