@@ -1570,11 +1570,17 @@ html.dark .donut-chart {
   border-top: 1px solid var(--border);
 }
 
-/* In its own card (enrollment detail) the SectionHeading already separates it. */
+/* In its own card (enrollment detail) the SectionHeading already separates it, and the commissions
+   flow as a grid of tiles instead of full-width rows that get long with several commissions. */
 .eligible-commissions.standalone {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
+}
+
+.eligible-commissions.standalone>p {
+  grid-column: 1 / -1;
 }
 
 .eligible-commissions>div:first-child {
