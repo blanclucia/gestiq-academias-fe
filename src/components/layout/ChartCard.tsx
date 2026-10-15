@@ -23,8 +23,10 @@ export function ChartCard({
                 <div>
                     <h3>{title}</h3>
                     {subtitle && <p>{subtitle}</p>}
+                    {/* With a metric, the metric keeps the right side and the action goes under the text. */}
+                    {value && action && <div className="card-inline-action">{action}</div>}
                 </div>
-                {action ?? (value ? <div className="card-metric">{value}</div> : null)}
+                {value ? <div className="card-metric">{value}</div> : action}
             </div>
             {children}
         </section>
