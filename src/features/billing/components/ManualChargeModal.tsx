@@ -53,7 +53,7 @@ export function ManualChargeModal({ open, value, students, paymentMethods, onCha
                             <input name="amount" className="form-input" type="number" min={1} step={1000} value={value.amount} onChange={(event) => update({ amount: event.target.value })} />
                         </FormField>
                         <FormField label="Alumno" required>
-                            <SearchableSelect name="studentId" value={value.studentId} options={students.map((student) => ({ value: student.id, label: `${student.fullName} · ${student.document}` }))} onChange={(studentId) => update({ studentId })} placeholder="Buscar alumno" emptyLabel="No encontramos alumnos." />
+                            <SearchableSelect name="studentId" value={value.studentId} options={students.map((student) => ({ value: student.id, label: `${student.fullName} · ${student.document}` }))} onChange={(studentId) => update({ studentId })} placeholder="Buscar alumno" emptyLabel="No encontramos alumnos." clearable clearLabel="Quitar alumno" />
                         </FormField>
                     </FormGrid>
                 </FormSection>

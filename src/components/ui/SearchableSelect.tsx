@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useFloatingPanel } from './useFloatingPanel'
 
@@ -22,9 +23,13 @@ type SearchableSelectProps = {
     // Extra class on the wrapper — used to carry layout rules (fixed width, etc.) that previously
     // targeted a plain <select> directly, since the real input now sits one level deeper.
     className?: string
+    // Shows a × to undo a pick (back to ''), for a value chosen by mistake. A required field still
+    // fails validation afterwards; the point is not being stuck with the wrong option.
+    clearable?: boolean
+    clearLabel?: string
 }
 
-export function SearchableSelect({ value, options, onChange, placeholder = 'Buscar...', emptyLabel = 'No hay opciones disponibles.', name, disabled = false, 'aria-label': ariaLabel, className = '' }: SearchableSelectProps) {
+export function SearchableSelect({ value, options, onChange, placeholder = 'Buscar...', emptyLabel = 'No hay opciones disponibles.', name, disabled = false, 'aria-label': ariaLabel, className = '', clearable = false, clearLabel = 'Quitar selección' }: SearchableSelectProps) {
     const containerRef = useRef<HTMLDivElement>(null)
     const panelRef = useRef<HTMLDivElement>(null)
     const listboxId = `searchable-select-options-${useId()}`
@@ -79,7 +84,8 @@ export function SearchableSelect({ value, options, onChange, placeholder = 'Busc
         }
     }
 
-    return <div className={`student-picker${disabled ? ' disabled' : ''}${className ? ` ${className}` : ''}`} ref={containerRef}>
+    const showClear = clearable && !disabled && Boolean(value)
+    return <div className={`student-picker${disabled ? ' disabled' : ''}${showClear ? ' clearable' : ''}${className ? ` ${className}` : ''}`} ref={containerRef}>
         <input
             name={name}
             aria-label={ariaLabel}
@@ -100,6 +106,7 @@ export function SearchableSelect({ value, options, onChange, placeholder = 'Busc
             aria-controls={listboxId}
             autoComplete="off"
         />
+        {showClear && <button type="button" className="student-picker-clear" aria-label={clearLabel} title={clearLabel} onClick={() => { onChange(''); setQuery(''); setOpen(false) }}><X size={15} /></button>}
         {open && !disabled && panelStyle && createPortal(<div className="student-picker-options" id={listboxId} role="listbox" ref={panelRef} style={panelStyle}>
             {filteredOptions.length > 0 ? filteredOptions.map((option, index) => <button key={option.value} type="button" role="option" aria-selected={option.value === value} disabled={option.disabled} className={index === highlightedIndex ? 'highlighted' : ''} onMouseEnter={() => setHighlightedIndex(index)} onClick={() => selectOption(option)}>{option.label}</button>) : <span className="student-picker-empty">{emptyLabel}</span>}
         </div>, document.body)}

@@ -1153,6 +1153,32 @@
   position: relative;
 }
 
+.student-picker.clearable .form-input {
+  padding-right: 36px;
+}
+
+.student-picker-clear {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.student-picker-clear:hover {
+  background: var(--surface-subtle);
+  color: var(--text);
+}
+
 .student-picker.disabled .form-input {
   opacity: 0.6;
   cursor: not-allowed;
