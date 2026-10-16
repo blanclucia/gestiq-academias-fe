@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { ChartCard } from '@/components/layout/ChartCard'
 import { KpiCard } from '@/components/layout/KpiCard'
 import { formatCurrencyARS } from '@/domain/shared/formattingRules'
 import type { Payment } from '@/types/domain'
@@ -38,21 +39,16 @@ export function BillingSummary({ dateRangeControl, metrics, periodLabel, totalPo
                 <KpiCard title="Eficiencia de cobranza" value={`${collectionRate.toFixed(1)}%`} change={`Riesgo vencido: ${riskRate.toFixed(1)}%`} positive={collectionRate >= riskRate} />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginTop: 16 }}>
-                <div className="kpi-card" style={{ minHeight: 0, padding: '16px 18px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                        <div><div className="kpi-title">Panorama del rango</div><div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 4 }}>{periodLabel}</div></div>
-                        <strong style={{ fontSize: 18 }}>{formatCurrencyARS(totalPortfolio)}</strong>
-                    </div>
-                    <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+            <div className="summary-panels">
+                <ChartCard title="Panorama del rango" subtitle={periodLabel} value={formatCurrencyARS(totalPortfolio)}>
+                    <div style={{ display: 'grid', gap: 10 }}>
                         <ProgressMetric label="Cobrado" rate={collectionRate} color="var(--green)" />
                         <ProgressMetric label="Riesgo vencido" rate={riskRate} color="var(--red)" />
                     </div>
-                </div>
+                </ChartCard>
 
-                <div className="kpi-card" style={{ minHeight: 0, padding: '16px 18px' }}>
-                    <div className="kpi-title">Cobrado por medio</div>
-                    <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+                <ChartCard title="Cobrado por medio" subtitle="Solo los medios habilitados o que registraron cobros.">
+                    <div style={{ display: 'grid', gap: 10 }}>
                         {metrics.receivedByMethod.map((metric) => {
                             const methodRate = metrics.totalReceived > 0 ? (metric.total / metrics.totalReceived) * 100 : 0
                             return (
@@ -64,7 +60,7 @@ export function BillingSummary({ dateRangeControl, metrics, periodLabel, totalPo
                             )
                         })}
                     </div>
-                </div>
+                </ChartCard>
             </div>
         </div>
     )

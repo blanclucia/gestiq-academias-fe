@@ -32,7 +32,7 @@ export function PaymentAdjustmentModal({ target, value, adjustedAmount, lateFeeP
     return (
         <EntityFormModal
             open={Boolean(target)}
-            title="Ajustar pago"
+            title="Ajustar importe"
             subtitle="Aplicá una bonificación, promoción o cambio de importe sobre esta cuota pendiente."
             submitLabel="Guardar ajuste"
             validate={() => validatePaymentAdjustment(value)}

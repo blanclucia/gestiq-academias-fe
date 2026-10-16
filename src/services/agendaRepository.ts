@@ -126,6 +126,11 @@ function holidayEvents(holidays: ApiAgendaList['holidays']): AgendaEvent[] {
     return holidays.map((holiday) => ({ id: `HOL-${holiday.date}-${holiday.title}`, title: holiday.title, type: 'feriado', scope: 'general', date: holiday.date, allDay: true, source: 'system', createdAt: '' }))
 }
 
+// Commission exams are managed from the commission; the agenda only shows their date.
+function examEvents(exams: ApiAgendaList['exams']): AgendaEvent[] {
+    return exams.map((exam) => ({ id: `EXAM-${exam.examId}`, title: `Examen · ${exam.title} · ${exam.courseName} ${exam.commissionName}`, type: 'academico', scope: 'commission', commissionId: exam.commissionId, branchId: exam.branchId, date: exam.date, allDay: true, source: 'system', createdAt: '' }))
+}
+
 const yearsBetween = (from: string, to: string) => {
     const years: number[] = []
     for (let year = Number(from.slice(0, 4)); year <= Number(to.slice(0, 4)); year += 1) years.push(year)
@@ -149,7 +154,7 @@ export function useAgendaEvents(range: { from: string; to: string }, branchScope
     const commissionBranchIds = new Map(listCourses().flatMap((course) => course.commissions.map((commission) => [commission.id, course.branchId] as const)))
     const derived = yearsBetween(range.from, range.to).flatMap((year) => [...derivedBirthdayEvents(year), ...derivedClassEvents(year), ...derivedEnrollmentEvents(year)])
         .filter((event) => !branchScope?.branchId || isAgendaEventInBranch(event, branchScope, commissionBranchIds))
-    const stored = query.data ? [...holidayEvents(query.data.holidays), ...query.data.items.map(fromApiEvent)] : []
+    const stored = query.data ? [...holidayEvents(query.data.holidays), ...examEvents(query.data.exams), ...query.data.items.map(fromApiEvent)] : []
     const events = [...stored, ...derived]
         .filter((event) => event.date <= range.to && (event.endDate ?? event.date) >= range.from)
         .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime ?? '').localeCompare(b.startTime ?? ''))

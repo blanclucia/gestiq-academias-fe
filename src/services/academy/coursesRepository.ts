@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/auth/AuthContext'
 import { getSelectedBranchId } from '@/services/branchRepository'
 import {
-    activateAcademicCycleApi, createAcademicCycleApi, createCourseApi, deleteCourseApi, fetchAcademicCycles, fetchCourses, updateCourseApi,
+    activateAcademicCycleApi, deleteAcademicCycleApi, updateAcademicCycleApi, createAcademicCycleApi, createCourseApi, deleteCourseApi, fetchAcademicCycles, fetchCourses, updateCourseApi,
     type ApiCommission, type ApiCourse, type ApiCourseInput, type ApiCoursePatch, type ApiCycle, type ApiCycleInput,
 } from '@/services/organization/academicOffersApi'
 import { commissionStatusFromApi, courseStatusFromApi, courseStatusToApi, cycleStatusFromApi, cycleStatusToApi } from '@/services/organization/academicOffersMapping'
@@ -113,6 +113,32 @@ export function useCreateCycle() {
             if (!organizationSlug) throw new Error('No hay organización activa.')
             const input: ApiCycleInput = { name: form.name, startDate: form.startDate, endDate: form.endDate, status: cycleStatusToApi(form.status) }
             return createAcademicCycleApi(organizationSlug, input)
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['academic-cycles', organizationSlug] }),
+    })
+}
+
+export function useUpdateCycle() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async ({ id, changes }: { id: string; changes: { name: string; startDate: string; endDate: string } }) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            return updateAcademicCycleApi(organizationSlug, id, changes)
+        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['academic-cycles', organizationSlug] }),
+    })
+}
+
+export function useDeleteCycle() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async (id: string) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            await deleteAcademicCycleApi(organizationSlug, id)
         },
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['academic-cycles', organizationSlug] }),
     })

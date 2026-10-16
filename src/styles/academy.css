@@ -1284,3 +1284,22 @@
 .academy-toggle-option.disabled input {
   opacity: 0.6;
 }
+
+/* "Eliminar ciclo" inside the cycle modal: separated from the form, in red like other destructive actions. */
+.cycle-danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.cycle-danger-zone .danger-button {
+  flex-shrink: 0;
+  color: var(--red);
+  border-color: var(--red-soft);
+}

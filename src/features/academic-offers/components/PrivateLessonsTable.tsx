@@ -1,4 +1,4 @@
-import { BookOpen, Eye, PencilLine, Trash2 } from 'lucide-react'
+import { BookOpen, Eye, PencilLine, Trash2, XCircle } from 'lucide-react'
 import { DataTable } from '@/components/ui/DataTable'
 import { EntityCell } from '@/components/ui/PersonCell'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
@@ -34,6 +34,7 @@ type Props = {
     onCollect: (row: PrivateStudentRow) => void
     onEdit: (row: PrivateStudentRow) => void
     onCancel: (row: PrivateStudentRow) => void
+    onDelete: (row: PrivateStudentRow) => void
 }
 
 const statusToneMap: Record<PrivateStudentRow['status'], StatusBadgeTone> = {
@@ -63,7 +64,8 @@ export function PrivateLessonsTable(props: Props) {
             { label: 'Ver alumno', icon: <Eye size={15} />, onClick: () => props.onView(item) },
             { label: 'Cobrar', icon: <BookOpen size={15} />, onClick: () => props.onCollect(item) },
             { label: 'Reprogramar', icon: <PencilLine size={15} />, onClick: () => props.onEdit(item) },
-            { label: 'Cancelar', icon: <Trash2 size={15} />, onClick: () => props.onCancel(item), variant: 'danger' },
+            { label: 'Cancelar clase', icon: <XCircle size={15} />, onClick: () => props.onCancel(item), variant: 'danger' },
+            { label: 'Eliminar', icon: <Trash2 size={15} />, onClick: () => props.onDelete(item), variant: 'danger' },
         ]} />}
         emptyLabel="No hay alumnos con clases particulares para esta oferta académica."
     />

@@ -79,9 +79,11 @@ export function AgendaPage() {
                 ? generalEventTypes.includes(event.type)
                 : event.type === selectedType),
     );
+    // Classes fill the list every week: like the dashboard, "Próximos eventos" leaves them to the calendar.
     const upcomingEvents = visibleEvents
         .filter(
             (event) =>
+                event.type !== "clase" &&
                 event.date >=
                 `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
         )

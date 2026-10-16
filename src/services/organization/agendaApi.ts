@@ -18,6 +18,7 @@ const apiAgendaEventSchema = z.object({
 const apiAgendaListSchema = z.object({
     items: z.array(apiAgendaEventSchema),
     holidays: z.array(z.object({ date: z.string(), title: z.string() })),
+    exams: z.array(z.object({ examId: z.string(), date: z.string(), title: z.string(), courseName: z.string(), commissionId: z.string(), commissionName: z.string(), branchId: z.string() })).default([]),
 })
 
 export type ApiAgendaEvent = z.infer<typeof apiAgendaEventSchema>

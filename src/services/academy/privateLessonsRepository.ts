@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/auth/AuthContext'
-import { createPrivateLessonApi, fetchPrivateLessons, updatePrivateLessonApi, type ApiPrivateLesson, type ApiPrivateLessonCreate, type ApiPrivateLessonPatch } from '@/services/organization/privateLessonsApi'
+import { createPrivateLessonApi, deletePrivateLessonApi, fetchPrivateLessons, updatePrivateLessonApi, type ApiPrivateLesson, type ApiPrivateLessonCreate, type ApiPrivateLessonPatch } from '@/services/organization/privateLessonsApi'
 import { privateLessonPlanFromApi, privateLessonPlanToApi, privateLessonStatusFromApi, privateLessonStatusToApi } from '@/services/organization/privateLessonsMapping'
 import { readAcademyState, updateAcademyState } from './academyState'
 import type { PrivateLesson } from './academyTypes'
@@ -76,9 +76,9 @@ export function useCreatePrivateLesson() {
     })
 }
 
-// Covers both "Reprogramar" (editing schedule/plan/price) and "Cancelar" (status:'Finalizada').
-// Does not regenerate or adjust the charge already created at lesson creation — same limitation
-// already accepted for editing a commission not retroactively rewriting already-generated tuition.
+// Covers both "Reprogramar" (editing schedule/plan/price) and "Cancelar" (status:'Finalizada'). The
+// backend adjusts the charges: cancelling removes the unpaid upcoming ones, rescheduling replaces
+// them with the new schedule's (the months already charged stay).
 export function useUpdatePrivateLesson() {
     const { session } = useAuth()
     const queryClient = useQueryClient()
@@ -98,6 +98,28 @@ export function useUpdatePrivateLesson() {
             if (changes.status !== undefined) patch.status = privateLessonStatusToApi(changes.status)
             return updatePrivateLessonApi(organizationSlug, id, patch)
         },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['private-lessons', organizationSlug] }),
+        // Cancelling or rescheduling changes the lesson's charges backend-side.
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: ['private-lessons', organizationSlug] })
+            void queryClient.invalidateQueries({ queryKey: ['charges', organizationSlug] })
+        },
+    })
+}
+
+// Removes a lesson created by mistake with its unpaid charges.
+export function useDeletePrivateLesson() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async (id: string) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            await deletePrivateLessonApi(organizationSlug, id)
+            updateAcademyState((current) => ({ ...current, privateLessons: current.privateLessons.filter((lesson) => lesson.id !== id) }))
+        },
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: ['private-lessons', organizationSlug] })
+            void queryClient.invalidateQueries({ queryKey: ['charges', organizationSlug] })
+        },
     })
 }

@@ -83,6 +83,15 @@ export async function createAcademicCycleApi(organizationSlug: string, input: Ap
     return apiCycleSchema.parse(await request(cyclesPath(organizationSlug), { method: 'POST', body: JSON.stringify(input) }))
 }
 
+export async function updateAcademicCycleApi(organizationSlug: string, cycleId: string, changes: { name?: string; startDate?: string; endDate?: string }, request: Requester = defaultRequest): Promise<ApiCycle> {
+    return apiCycleSchema.parse(await request(cyclesPath(organizationSlug, `/${cycleId}`), { method: 'PATCH', body: JSON.stringify(changes) }))
+}
+
+// Only for a cycle without academic offers (409 academic_cycle_has_courses otherwise).
+export async function deleteAcademicCycleApi(organizationSlug: string, cycleId: string, request: Requester = defaultRequest): Promise<void> {
+    await request(cyclesPath(organizationSlug, `/${cycleId}`), { method: 'DELETE' })
+}
+
 export async function activateAcademicCycleApi(organizationSlug: string, cycleId: string, request: Requester = defaultRequest): Promise<void> {
     await request(cyclesPath(organizationSlug, `/${cycleId}/activate`), { method: 'PUT' })
 }
@@ -136,6 +145,9 @@ export function isCommissionNameConflict(error: unknown): boolean {
 }
 export function isCycleOverlap(error: unknown): boolean {
     return error instanceof ApiError && error.code === 'academic_cycle_overlap'
+}
+export function isCycleWithCourses(error: unknown): boolean {
+    return error instanceof ApiError && error.code === 'academic_cycle_has_courses'
 }
 export function isCourseHasActiveCommissions(error: unknown): boolean {
     return error instanceof ApiError && error.code === 'course_has_active_commissions'

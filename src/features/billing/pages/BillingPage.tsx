@@ -493,8 +493,8 @@ export function BillingPage() {
 
             <DeleteConfirmationModal
                 open={Boolean(deleteTarget)}
-                title="Eliminar pago"
-                description={paymentRemovalBlocker ?? `¿Estás seguro que querés eliminar el pago de "${deleteTarget?.student}"? Esta acción no se puede deshacer.`}
+                title="Eliminar cobro"
+                description={paymentRemovalBlocker ?? `¿Estás seguro que querés eliminar el cobro de "${deleteTarget?.student}"? Esta acción no se puede deshacer.`}
                 confirmLabel={paymentRemovalBlocker ? 'Entendido' : undefined}
                 onClose={() => setDeleteTarget(null)}
                 onConfirm={async () => {
