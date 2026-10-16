@@ -48,13 +48,11 @@ export function CommissionAssignmentModal({
 }) {
     const [commissionId, setCommissionId] = useState(initialCommissionId || commissions[0]?.id || '')
     const [chosenStudentIds, setChosenStudentIds] = useState(selectedStudentIds)
-    const [step, setStep] = useState<'select' | 'confirm'>(allowStudentSelection ? 'select' : 'confirm')
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState<'Todos' | AssignmentStudent['status']>('Todos')
     const reset = () => {
         setCommissionId(initialCommissionId || commissions[0]?.id || '')
         setChosenStudentIds(selectedStudentIds)
-        setStep(allowStudentSelection ? 'select' : 'confirm')
         setSearch('')
         setStatusFilter('Todos')
     }
@@ -66,7 +64,6 @@ export function CommissionAssignmentModal({
         if (open) {
             setCommissionId(initialCommissionId || commissions[0]?.id || '')
             setChosenStudentIds(selectedStudentIds)
-            setStep(allowStudentSelection ? 'select' : 'confirm')
             setSearch('')
             setStatusFilter('Todos')
         }
@@ -93,25 +90,25 @@ export function CommissionAssignmentModal({
     return (
         <EntityFormModal
             open={open}
-            title={allowStudentSelection && step === 'select' ? 'Seleccionar alumnos' : selectedStudents.length === 1 ? 'Asignar alumno a comisión' : 'Asignar alumnos a comisión'}
-            subtitle={allowStudentSelection && step === 'select' ? 'Buscá, filtrá y seleccioná los alumnos que querés incorporar a esta comisión.' : 'La asignación manual incorpora a los alumnos directamente a esta comisión.'}
-            submitLabel={allowStudentSelection && step === 'select' ? `Continuar con ${selectedStudents.length}` : `Asignar ${assignableStudents.length} alumno${assignableStudents.length === 1 ? '' : 's'}`}
-            validate={() => validateConditions({ assignmentStudents: allowStudentSelection && step === 'select' && selectedStudents.length === 0 && 'Seleccioná al menos un alumno.', assignmentCommission: step === 'confirm' && !commission && 'Seleccioná una comisión.', assignmentCapacity: step === 'confirm' && assignableStudents.length === 0 && 'La comisión no tiene cupos disponibles.' }, 'Revisá la asignación.')}
+            title={allowStudentSelection ? 'Asignar alumnos' : selectedStudents.length === 1 ? 'Asignar alumno a comisión' : 'Asignar alumnos a comisión'}
+            subtitle={allowStudentSelection ? 'Buscá y seleccioná los alumnos que querés incorporar a esta comisión.' : 'La asignación manual incorpora a los alumnos directamente a esta comisión.'}
+            submitLabel={`Asignar ${assignableStudents.length} alumno${assignableStudents.length === 1 ? '' : 's'}`}
+            validate={() => validateConditions({ assignmentStudents: selectedStudents.length === 0 && 'Seleccioná al menos un alumno.', assignmentCommission: !commission && 'Seleccioná una comisión.', assignmentCapacity: selectedStudents.length > 0 && assignableStudents.length === 0 && 'La comisión no tiene cupos disponibles para estos alumnos.' }, 'Revisá la asignación.')}
             onClose={() => {
                 reset()
                 onClose()
             }}
             onSubmit={() => {
-                if (allowStudentSelection && step === 'select') {
-                    setStep('confirm')
-                } else if (commission && assignableStudents.length > 0) {
+                if (commission && assignableStudents.length > 0) {
                     onConfirm({ commission, studentIds: assignableStudents.map((student) => student.id) })
                     reset()
                 }
             }}
         >
             <div className="form-stack">
-                {allowStudentSelection && step === 'select' ? (
+                {/* From a commission the destination is fixed: picking the students is the only step, with
+                    a short summary of seats under the list. */}
+                {allowStudentSelection ? (<>
                     <FormSection title="Alumnos disponibles">
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                             <label className="search-input-wrap" style={{ flex: '1 1 240px' }}>
@@ -158,10 +155,13 @@ export function CommissionAssignmentModal({
                             })}
                             {filteredStudents.length === 0 && <div style={{ color: 'var(--muted)', padding: 8 }}>No hay alumnos disponibles para esos filtros.</div>}
                         </div>
+                        <div style={{ display: 'grid', gap: 4, marginTop: 12, fontSize: 13 }}>
+                            <div><strong>{selectedStudents.length}</strong> seleccionado{selectedStudents.length === 1 ? '' : 's'} · {availableSeats} cupo{availableSeats === 1 ? '' : 's'} disponible{availableSeats === 1 ? '' : 's'}</div>
+                            {waitlistedStudents.length > 0 && <div style={{ color: 'var(--orange)' }}>{waitlistedStudents.length} {waitlistedStudents.length === 1 ? 'quedará' : 'quedarán'} sin asignar por falta de cupo</div>}
+                        </div>
                     </FormSection>
-                ) : (
+                </>) : (
                     <>
-                        {allowStudentSelection && <button type="button" className="ghost-button" onClick={() => setStep('select')} style={{ justifyContent: 'flex-start' }}>← Volver a la selección</button>}
                         <FormSection title="Comisión de destino">
                             <FormField label="Curso y comisión">
                                 <SearchableSelect
