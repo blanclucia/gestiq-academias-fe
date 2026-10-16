@@ -16,11 +16,13 @@ export type AgendaEventFormValue = {
     recurrence: 'none' | 'weekly'
     repeatUntil: string
     repeatDays: number[]
+    // Esta sede (the one selected in the top bar) or the whole academy.
+    scope: 'branch' | 'academy'
 }
 
 const eventTypes: Array<{ value: AgendaEventType; label: string }> = [
     { value: 'academico', label: 'Académico' }, { value: 'reunion', label: 'Reunión' },
-    { value: 'recordatorio', label: 'Recordatorio' }, { value: 'otro', label: 'Otro' },
+    { value: 'recordatorio', label: 'Recordatorio' }, { value: 'feriado', label: 'Feriado o día sin clases' }, { value: 'otro', label: 'Otro' },
 ]
 const repeatDays = [{ value: 1, label: 'L' }, { value: 2, label: 'M' }, { value: 3, label: 'X' }, { value: 4, label: 'J' }, { value: 5, label: 'V' }, { value: 6, label: 'S' }, { value: 0, label: 'D' }]
 
@@ -36,17 +38,18 @@ function validateAgendaEvent(value: AgendaEventFormValue) {
     return Object.keys(fieldErrors).length ? invalidForm('Revisá los datos del evento.', fieldErrors) : validForm
 }
 
-type Props = { open: boolean; editingEvent: AgendaEvent | null; value: AgendaEventFormValue; onChange: (value: AgendaEventFormValue) => void; onClose: () => void; onSubmit: () => void }
+type Props = { open: boolean; editingEvent: AgendaEvent | null; value: AgendaEventFormValue; branchName?: string; onChange: (value: AgendaEventFormValue) => void; onClose: () => void; onSubmit: () => void | Promise<unknown> }
 
-export function AgendaEventModal({ open, editingEvent, value, onChange, onClose, onSubmit }: Props) {
+export function AgendaEventModal({ open, editingEvent, value, branchName, onChange, onClose, onSubmit }: Props) {
     const update = (changes: Partial<AgendaEventFormValue>) => onChange({ ...value, ...changes })
     const toggleRepeatDay = (day: number) => update({ repeatDays: value.repeatDays.includes(day) ? value.repeatDays.filter((item) => item !== day) : [...value.repeatDays, day] })
 
     return (
-        <EntityFormModal open={open} title={editingEvent ? 'Editar evento' : 'Nuevo evento'} subtitle="Agregá una fecha visible para toda la academia." submitLabel={editingEvent ? 'Guardar cambios' : 'Guardar evento'} validate={() => validateAgendaEvent(value)} onClose={onClose} onSubmit={onSubmit}>
+        <EntityFormModal open={open} title={editingEvent ? 'Editar evento' : 'Nuevo evento'} subtitle={value.scope === 'academy' ? 'Visible en todas las sedes de la academia.' : `Visible solo en ${branchName ?? 'esta sede'}.`} submitLabel={editingEvent ? 'Guardar cambios' : 'Guardar evento'} validate={() => validateAgendaEvent(value)} onClose={onClose} onSubmit={onSubmit}>
             <div className="form-grid">
                 <FormField label="Título" required><input name="title" className="form-input" value={value.title} onChange={(event) => update({ title: event.target.value })} placeholder="Ej. Reunión de equipo" /></FormField>
                 <FormField label="Tipo" required><SearchableSelect name="type" value={value.type} onChange={(type) => update({ type: type as AgendaEventType })} options={eventTypes} /></FormField>
+                <FormField label="Alcance" required><SearchableSelect name="scope" value={value.scope} onChange={(scope) => update({ scope: scope as AgendaEventFormValue['scope'] })} options={[{ value: 'branch', label: branchName ? `Esta sede (${branchName})` : 'Esta sede' }, { value: 'academy', label: 'Toda la academia' }]} /></FormField>
                 <div className="agenda-date-range">
                     <FormField label="Desde" required><input name="date" className="form-input" type="date" value={value.date} onChange={(event) => update({ date: event.target.value, endDate: value.endDate < event.target.value ? event.target.value : value.endDate })} /></FormField>
                     <FormField label="Hasta" required><input name="endDate" className="form-input" type="date" min={value.date} value={value.endDate} onChange={(event) => update({ endDate: event.target.value })} /></FormField>

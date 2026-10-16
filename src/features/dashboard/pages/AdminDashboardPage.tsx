@@ -4,7 +4,7 @@ import { ChartCard } from '@/components/layout/ChartCard'
 import { KpiCard } from '@/components/layout/KpiCard'
 import { getActiveAcademicCycleId, listAcademicCycles, listCourses, listPayments, listStaff, listStudents, useAcademyRepositoryVersion } from '@/services/academyRepository'
 import { getExpenseDisplayStatus, listExpenses, useFinanceRepositoryVersion } from '@/services/financeRepository'
-import { listUpcomingAgendaEvents, useAgendaRepositoryVersion } from '@/services/agendaRepository'
+import { useAgendaEvents } from '@/services/agendaRepository'
 import { calculateOccupancy } from '@/domain/commissions/commissionRules'
 import { resolveChargeCollectionStatus, summarizeChargesToManage } from '@/domain/billing/paymentRules'
 import { useAcademySettings } from '@/services/academySettingsRepository'
@@ -18,7 +18,6 @@ export function AdminDashboardPage() {
     const { path } = useWorkspace()
     useAcademyRepositoryVersion()
     useFinanceRepositoryVersion()
-    useAgendaRepositoryVersion()
     const selectedBranchId = useSelectedBranchId()
     const { branches } = useBranches()
     const selectedBranch = branches.find((branch) => branch.id === selectedBranchId)
@@ -36,7 +35,11 @@ export function AdminDashboardPage() {
     reminderLimit.setDate(reminderLimit.getDate() + 14)
     const reminderLimitKey = `${reminderLimit.getFullYear()}-${String(reminderLimit.getMonth() + 1).padStart(2, '0')}-${String(reminderLimit.getDate()).padStart(2, '0')}`
     const expenseReminders = listExpenses().filter((expense) => expense.branchId === selectedBranchId && expense.status !== 'Pagado' && expense.dueDate && expense.dueDate <= reminderLimitKey).slice(0, 4)
-    const upcomingAgendaEvents = listUpcomingAgendaEvents(todayKey, 5, ['clase'], { branchId: selectedBranchId, teacherUserIds: roster.teacherIds })
+    const agendaUntil = new Date(today)
+    agendaUntil.setDate(agendaUntil.getDate() + 90)
+    const agendaUntilKey = `${agendaUntil.getFullYear()}-${String(agendaUntil.getMonth() + 1).padStart(2, '0')}-${String(agendaUntil.getDate()).padStart(2, '0')}`
+    const { events: agendaEvents } = useAgendaEvents({ from: todayKey, to: agendaUntilKey }, { branchId: selectedBranchId, teacherUserIds: roster.teacherIds })
+    const upcomingAgendaEvents = agendaEvents.filter((event) => event.type !== 'clase' && event.date >= todayKey).slice(0, 5)
 
     const data = (() => {
         const students = listStudents().filter((student) => student.branchId === selectedBranchId)
