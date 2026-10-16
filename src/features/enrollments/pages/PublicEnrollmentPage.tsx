@@ -6,7 +6,7 @@ import {
     GraduationCap,
     Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
     getPublicEnrollmentAvailability,
@@ -19,6 +19,10 @@ import { getPublicPaymentOptions, requiresPaymentStep } from "../model/publicPay
 import type { ApiPublicRegistrationResult } from "@/services/organization/enrollmentsApi";
 import { calculateAge } from "@/domain/students/studentRules";
 import { PlatformCredit } from "@/components/layout/PlatformCredit";
+import { invalidForm } from "@/components/forms/formValidation";
+import { markInvalidFields } from "@/components/forms/markInvalidFields";
+import { normalizeDocument, normalizePersonName } from "@/domain/people/personRules";
+import { describeRegistrationError, stepOfField, validateContactStep, validateStudentStep } from "../model/publicEnrollmentForm";
 
 export function PublicEnrollmentPage() {
     const { organizationSlug, slug } = useParams();
@@ -40,6 +44,7 @@ export function PublicEnrollmentPage() {
     const [copyFeedback, setCopyFeedback] = useState("");
     const [formError, setFormError] = useState("");
     const [formStep, setFormStep] = useState<1 | 2 | 3>(1);
+    const formRef = useRef<HTMLFormElement>(null);
     const [form, setForm] = useState({
         firstName: "",
         lastName: "",
@@ -86,6 +91,11 @@ export function PublicEnrollmentPage() {
         setForm((current) => ({ ...current, [key]: value }));
         setFormError("");
     };
+    // Shows on leaving the field what the backend will store: "LUcia" → "Lucia", "30.111.222" → "30111222".
+    const normalizeName = (key: "firstName" | "lastName" | "tutorName") =>
+        setForm((current) => ({ ...current, [key]: normalizePersonName(current[key]) }));
+    const normalizeDocumentField = () =>
+        setForm((current) => ({ ...current, document: normalizeDocument(current.document) }));
     const copyPaymentValue = async (label: string, value: string) => {
         try {
             await navigator.clipboard.writeText(value);
@@ -111,15 +121,6 @@ export function PublicEnrollmentPage() {
             setFormError(availability.reason || "Elegí una comisión para continuar.");
             return;
         }
-        if (
-            isMinor &&
-            (!form.tutorName.trim() ||
-                !form.tutorEmail.trim() ||
-                !form.tutorPhone.trim())
-        ) {
-            setFormError("Completá los datos de contacto del tutor para continuar.");
-            return;
-        }
         registerMutation.mutate({
             organizationSlug: organizationSlug!,
             slug: slug!,
@@ -127,7 +128,7 @@ export function PublicEnrollmentPage() {
                 commissionId: selectedCommission.id,
                 firstName: form.firstName.trim(),
                 lastName: form.lastName.trim(),
-                document: form.document.trim(),
+                document: normalizeDocument(form.document),
                 email: form.email.trim() || undefined,
                 phone: form.phone.trim() || undefined,
                 birthDate: form.birthDate || undefined,
@@ -139,7 +140,14 @@ export function PublicEnrollmentPage() {
             },
         }, {
             onSuccess: (result) => setRegistration(result),
-            onError: () => setFormError("No pudimos completar la inscripción. Intentá nuevamente."),
+            // A rejected field sends the visitor back to its step, outlined, instead of a generic error.
+            onError: (error) => {
+                const { message, fieldErrors } = describeRegistrationError(error);
+                setFormError(message);
+                if (!fieldErrors) return;
+                setFormStep(stepOfField(Object.keys(fieldErrors)[0]));
+                setTimeout(() => markInvalidFields(formRef.current, invalidForm(message, fieldErrors)), 0);
+            },
         });
     };
     const submit = (event: React.FormEvent) => {
@@ -152,14 +160,10 @@ export function PublicEnrollmentPage() {
     };
 
     const goToContactStep = () => {
-        const missingFields = [
-            !form.firstName.trim() ? "nombre del alumno" : "",
-            !form.lastName.trim() ? "apellido del alumno" : "",
-            requiredFields.has("Documento") && !form.document.trim() ? "documento" : "",
-            requiredFields.has("Fecha de nacimiento") && !form.birthDate ? "fecha de nacimiento" : "",
-        ].filter(Boolean);
-        if (missingFields.length > 0) {
-            setFormError(`Completá: ${missingFields.join(", ")}.`);
+        const result = validateStudentStep(form, requiredFields);
+        const message = markInvalidFields(formRef.current, result);
+        if (!result.valid) {
+            setFormError(message);
             return;
         }
         setFormError("");
@@ -167,12 +171,10 @@ export function PublicEnrollmentPage() {
     };
 
     const goToContactValidationStep = () => {
-        if (isMinor && (!form.tutorName.trim() || (requiredFields.has("Email") && !form.tutorEmail.trim()) || (requiredFields.has("Teléfono") && !form.tutorPhone.trim()))) {
-            setFormError("Completá los datos de contacto del tutor para continuar.");
-            return;
-        }
-        if (!isMinor && ((requiredFields.has("Email") && !form.email.trim()) || (requiredFields.has("Teléfono") && !form.phone.trim()))) {
-            setFormError("Completá los datos de contacto para continuar.");
+        const result = validateContactStep(form, requiredFields, isMinor);
+        const message = markInvalidFields(formRef.current, result);
+        if (!result.valid) {
+            setFormError(message);
             return;
         }
         setFormError("");
@@ -287,7 +289,7 @@ export function PublicEnrollmentPage() {
                             </div>
                         )}
                         {commissionConfirmed && (
-                            <form onSubmit={submit} className="public-enrollment-form">
+                            <form ref={formRef} onSubmit={submit} className="public-enrollment-form" noValidate>
                                 <div
                                     className="public-enrollment-progress"
                                     aria-label="Progreso de inscripción"
@@ -338,34 +340,42 @@ export function PublicEnrollmentPage() {
                                             <label className="public-enrollment-field">
                                                 Nombre del alumno *
                                                 <input
+                                                    name="firstName"
                                                     required
                                                     value={form.firstName}
                                                     onChange={(event) =>
                                                         update("firstName", event.target.value)
                                                     }
+                                                    onBlur={() => normalizeName("firstName")}
                                                     placeholder="Ej. Lucía"
                                                 />
                                             </label>
                                             <label className="public-enrollment-field">
                                                 Apellido del alumno *
                                                 <input
+                                                    name="lastName"
                                                     required
                                                     value={form.lastName}
                                                     onChange={(event) =>
                                                         update("lastName", event.target.value)
                                                     }
+                                                    onBlur={() => normalizeName("lastName")}
                                                     placeholder="Ej. Gómez"
                                                 />
                                             </label>
                                         </div>
                                         <label className="public-enrollment-field">
-                                            DNI{requiredFields.has("Documento") ? " *" : ""}
+                                            {/* Always required: the student is identified by their DNI. */}
+                                            DNI *
                                             <input
-                                                required={requiredFields.has("Documento")}
+                                                name="document"
+                                                required
+                                                inputMode="numeric"
                                                 value={form.document}
                                                 onChange={(event) =>
                                                     update("document", event.target.value)
                                                 }
+                                                onBlur={normalizeDocumentField}
                                                 placeholder="Ej. 32.108.901"
                                             />
                                         </label>
@@ -373,8 +383,10 @@ export function PublicEnrollmentPage() {
                                             Fecha de nacimiento
                                             {requiredFields.has("Fecha de nacimiento") ? " *" : ""}
                                             <input
+                                                name="birthDate"
                                                 required={requiredFields.has("Fecha de nacimiento")}
                                                 type="date"
+                                                max={new Date().toLocaleDateString("sv-SE")}
                                                 value={form.birthDate}
                                                 onChange={(event) =>
                                                     update("birthDate", event.target.value)
@@ -414,17 +426,20 @@ export function PublicEnrollmentPage() {
                                                 <label className="public-enrollment-field">
                                                     Nombre y apellido del tutor *
                                                     <input
+                                                        name="tutorName"
                                                         required
                                                         value={form.tutorName}
                                                         onChange={(event) =>
                                                             update("tutorName", event.target.value)
                                                         }
+                                                        onBlur={() => normalizeName("tutorName")}
                                                     />
                                                 </label>
                                                 <label className="public-enrollment-field">
                                                     Email del tutor
                                                     {requiredFields.has("Email") ? " *" : ""}
                                                     <input
+                                                        name="tutorEmail"
                                                         required={requiredFields.has("Email")}
                                                         type="email"
                                                         value={form.tutorEmail}
@@ -437,6 +452,8 @@ export function PublicEnrollmentPage() {
                                                     Teléfono del tutor
                                                     {requiredFields.has("Teléfono") ? " *" : ""}
                                                     <input
+                                                        name="tutorPhone"
+                                                        type="tel"
                                                         required={requiredFields.has("Teléfono")}
                                                         value={form.tutorPhone}
                                                         onChange={(event) =>
@@ -451,6 +468,7 @@ export function PublicEnrollmentPage() {
                                                 ? "Email del alumno (opcional)"
                                                 : `Email de contacto${requiredFields.has("Email") ? " *" : ""}`}
                                             <input
+                                                name="email"
                                                 required={!isMinor && requiredFields.has("Email")}
                                                 type="email"
                                                 value={form.email}
@@ -465,6 +483,8 @@ export function PublicEnrollmentPage() {
                                                 ? "Teléfono del alumno (opcional)"
                                                 : `Teléfono de contacto${requiredFields.has("Teléfono") ? " *" : ""}`}
                                             <input
+                                                name="phone"
+                                                type="tel"
                                                 required={!isMinor && requiredFields.has("Teléfono")}
                                                 value={form.phone}
                                                 onChange={(event) =>
@@ -477,6 +497,7 @@ export function PublicEnrollmentPage() {
                                             <label className="public-enrollment-field">
                                                 Dirección *
                                                 <input
+                                                    name="address"
                                                     required
                                                     value={form.address}
                                                     onChange={(event) =>

@@ -278,6 +278,17 @@
   resize: vertical;
 }
 
+/* Same outline as .form-input.field-invalid (forms.css), set by markInvalidFields on each step. */
+.public-enrollment-form input.field-invalid:not([type='checkbox']),
+.public-enrollment-form textarea.field-invalid {
+  border-color: var(--red);
+}
+
+.public-enrollment-form input.field-invalid:not([type='checkbox']):focus,
+.public-enrollment-form textarea.field-invalid:focus {
+  box-shadow: 0 0 0 3px var(--red-soft);
+}
+
 .public-enrollment-field {
   display: grid;
   gap: 6px;

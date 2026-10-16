@@ -1276,3 +1276,11 @@
     justify-content: center;
   }
 }
+
+.academy-toggle-option.disabled {
+  cursor: default;
+}
+
+.academy-toggle-option.disabled input {
+  opacity: 0.6;
+}

@@ -1,12 +1,20 @@
 import { invalidForm, validForm, type FormValidationResult } from '@/components/forms/formValidation'
+import { isValidBirthDate, isValidDni, isValidEmail, isValidPersonName, isValidPhone, normalizeDocument } from '@/domain/people/personRules'
 import type { StudentFormValue } from '../components/StudentForm'
 
 export function validateStudent(value: StudentFormValue): FormValidationResult {
     const errors: Record<string, string> = {}
+    // Same rules as the backend and the public enrollment form (domain/people).
+    const document = normalizeDocument(value.document)
     if (!value.firstName.trim()) errors.studentFirstName = 'Ingresá el nombre.'
+    else if (!isValidPersonName(value.firstName.trim())) errors.studentFirstName = 'El nombre solo puede tener letras.'
     if (!value.lastName.trim()) errors.studentLastName = 'Ingresá el apellido.'
-    if (!value.document.trim()) errors.studentDocument = 'Ingresá el documento.'
-    if (value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email)) errors.studentEmail = 'Ingresá un email válido.'
+    else if (!isValidPersonName(value.lastName.trim())) errors.studentLastName = 'El apellido solo puede tener letras.'
+    if (!document) errors.studentDocument = 'Ingresá el documento.'
+    else if (!isValidDni(document)) errors.studentDocument = 'El DNI tiene que tener 7 u 8 números.'
+    if (value.email && !isValidEmail(value.email.trim())) errors.studentEmail = 'Ingresá un email válido.'
+    if (value.phone.trim() && !isValidPhone(value.phone.trim())) errors.studentPhone = 'El teléfono tiene que tener entre 8 y 15 números.'
     if (value.birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(value.birthDate)) errors.studentBirthDate = 'Usá el formato aaaa-mm-dd.'
+    else if (value.birthDate && !isValidBirthDate(value.birthDate)) errors.studentBirthDate = 'Revisá la fecha de nacimiento.'
     return Object.keys(errors).length ? invalidForm('Revisá los datos del alumno.', errors) : validForm
 }

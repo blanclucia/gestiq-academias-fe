@@ -21,9 +21,11 @@ type SettingsToggleOptionProps = {
     checked: boolean
     label: string
     description?: string
+    // A fixed option: shown for context, not editable.
+    disabled?: boolean
     onChange: (checked: boolean) => void
 }
 
-export function SettingsToggleOption({ checked, label, description, onChange }: SettingsToggleOptionProps) {
-    return <label className="academy-toggle-option"><span><strong>{label}</strong>{description && <small>{description}</small>}</span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /></label>
+export function SettingsToggleOption({ checked, label, description, disabled = false, onChange }: SettingsToggleOptionProps) {
+    return <label className={`academy-toggle-option${disabled ? ' disabled' : ''}`}><span><strong>{label}</strong>{description && <small>{description}</small>}</span><input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /></label>
 }
