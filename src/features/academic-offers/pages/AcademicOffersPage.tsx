@@ -177,7 +177,7 @@ export function AcademicOffersPage() {
             })
         } else {
             createPrivateLesson.mutate(lessonData, {
-                onSuccess: (result) => showToast(result.chargeFailed ? 'error' : 'success', result.chargeFailed ? 'Se creó la clase particular, pero no se pudo generar el cargo en Facturación.' : 'Clase particular creada correctamente.'),
+                onSuccess: () => showToast('success', 'Clase particular creada correctamente. Sus cobros ya están en Cobranzas.'),
                 onError: () => showToast('error', 'No se pudo crear la clase particular. Intentá nuevamente.'),
             })
         }

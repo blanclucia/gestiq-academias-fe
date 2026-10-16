@@ -637,16 +637,18 @@ export function StudentsPage() {
                 }}
                 selectedCount={selectedCount}
                 bulkActionItems={[
-                    {
-                        label: 'Comunicar',
-                        icon: <MessageCircle size={15} />,
-                        onClick: () => {
-                            setCommunicationForm({ channel: 'Email', subject: '', message: '' })
-                            setCommunicationTemplateId('custom')
-                            setCommunicationSent(false)
-                            setIsBulkCommunicationOpen(true)
-                        },
-                    },
+                    // Próximamente, con Comunicaciones: hoy "Comunicar" mostraba el mensaje como enviado sin
+                    // enviarle nada a los alumnos.
+                    // {
+                    //     label: 'Comunicar',
+                    //     icon: <MessageCircle size={15} />,
+                    //     onClick: () => {
+                    //         setCommunicationForm({ channel: 'Email', subject: '', message: '' })
+                    //         setCommunicationTemplateId('custom')
+                    //         setCommunicationSent(false)
+                    //         setIsBulkCommunicationOpen(true)
+                    //     },
+                    // },
                     {
                         label: 'Asignar a comisión',
                         onClick: () => {

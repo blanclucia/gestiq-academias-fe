@@ -101,7 +101,7 @@ export function StudentDetailPage() {
                 onClose={() => setEnrollmentTarget(null)}
                 onSubmit={saveEnrollmentStatus}
             >
-                <FormField label="Estado" hint={enrollmentStatus === 'Baja' || enrollmentStatus === 'Finalizado' ? 'Las cuotas pendientes de esta comisión siguen en Cobros: anulá las que ya no correspondan.' : undefined}>
+                <FormField label="Estado" hint={enrollmentStatus === 'Baja' || enrollmentStatus === 'Finalizado' ? 'Se eliminan sus cuotas de esta comisión que vencen después de hoy; las ya vencidas siguen en Cobros.' : undefined}>
                     <SearchableSelect
                         value={enrollmentStatus}
                         onChange={(status) => { setEnrollmentStatus(status as CommissionStudentStatus); setEnrollmentError('') }}

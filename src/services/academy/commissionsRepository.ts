@@ -117,8 +117,10 @@ export function useAssignEnrollment() {
         onSuccess: (_data, { courseId, commissionId, studentId }) => {
             queryClient.invalidateQueries({ queryKey: ['commission-roster', organizationSlug, courseId, commissionId] })
             queryClient.invalidateQueries({ queryKey: ['courses', organizationSlug] })
-            // The student's detail lists the same enrollment (Cursos y comisiones).
+            // The student's detail lists the same enrollment (Cursos y comisiones), and a Baja/Finalizado
+            // cancels the upcoming cuotas backend-side.
             queryClient.invalidateQueries({ queryKey: ['student-enrollments', organizationSlug, studentId] })
+            queryClient.invalidateQueries({ queryKey: ['charges', organizationSlug] })
         },
     })
 }
@@ -135,6 +137,8 @@ export function useRevokeEnrollment() {
         onSuccess: (_data, { courseId, commissionId }) => {
             queryClient.invalidateQueries({ queryKey: ['commission-roster', organizationSlug, courseId, commissionId] })
             queryClient.invalidateQueries({ queryKey: ['courses', organizationSlug] })
+            // Removing a student cancels their upcoming cuotas backend-side.
+            queryClient.invalidateQueries({ queryKey: ['charges', organizationSlug] })
         },
     })
 }

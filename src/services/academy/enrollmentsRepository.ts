@@ -4,7 +4,7 @@ import { useAuth } from '@/auth/AuthContext'
 import { resolveEnrollmentAvailability } from '@/domain/enrollments/enrollmentRules'
 import { getLocalDateString } from '@/domain/shared/dateRules'
 import {
-    confirmRegistrationApi, createEnrollmentOpeningApi, deleteEnrollmentOpeningApi, fetchEnrollmentOpenings, fetchEnrollmentRegistrations,
+    cancelRegistrationApi, confirmRegistrationApi, createEnrollmentOpeningApi, deleteEnrollmentOpeningApi, fetchEnrollmentOpenings, fetchEnrollmentRegistrations,
     fetchPublicOffer, registerPubliclyApi, updateEnrollmentOpeningApi, updateRegistrationNotesApi,
     type ApiOpening, type ApiOpeningCreate, type ApiOpeningPatch, type ApiPublicRegistrationInput, type ApiRegistrationSummary,
 } from '@/services/organization/enrollmentsApi'
@@ -163,6 +163,25 @@ export function useUpdateRegistrationNotes() {
             return updateRegistrationNotesApi(organizationSlug, id, notes)
         },
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['enrollment-registrations', organizationSlug] }),
+    })
+}
+
+// Cancelling frees the seat and deletes the unpaid fee, so the opening counts, the registrations and
+// Cobros all change.
+export function useCancelRegistration() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async (id: string) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            await cancelRegistrationApi(organizationSlug, id)
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['enrollment-registrations', organizationSlug] })
+            queryClient.invalidateQueries({ queryKey: ['enrollment-openings', organizationSlug] })
+            queryClient.invalidateQueries({ queryKey: ['charges', organizationSlug] })
+        },
     })
 }
 

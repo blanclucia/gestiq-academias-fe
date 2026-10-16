@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/auth/AuthContext'
-import { createChargeApi } from '@/services/organization/chargesApi'
 import { createPrivateLessonApi, fetchPrivateLessons, updatePrivateLessonApi, type ApiPrivateLesson, type ApiPrivateLessonCreate, type ApiPrivateLessonPatch } from '@/services/organization/privateLessonsApi'
 import { privateLessonPlanFromApi, privateLessonPlanToApi, privateLessonStatusFromApi, privateLessonStatusToApi } from '@/services/organization/privateLessonsMapping'
 import { readAcademyState, updateAcademyState } from './academyState'
@@ -26,10 +25,6 @@ function fromApiPrivateLesson(lesson: ApiPrivateLesson): PrivateLesson {
 
 function sameMirror(current: PrivateLesson[], next: PrivateLesson[]): boolean {
     return JSON.stringify(current) === JSON.stringify(next)
-}
-
-function planClassCount(plan: string): number {
-    return plan === 'Pack 4 clases' ? 4 : plan === 'Pack 8 clases' ? 8 : plan === 'Pack 12 clases' ? 12 : 1
 }
 
 // listPrivateLessons() stays synchronous — AcademicOffersPage reads it outside a data-fetching
@@ -57,12 +52,8 @@ export function usePrivateLessons(options: { enabled?: boolean } = {}) {
     return { lessons: listPrivateLessons(), isLoading: query.isLoading, isError: query.isError }
 }
 
-// Creating a private lesson also creates a real manual charge in Facturación for it (source=manual),
-// replacing what the old mock payment source (`privateLessonPayments`) used to synthesize on the fly
-// — with a real dueDate (the lesson's own startDate) instead of the hardcoded stale one it used to
-// have. If the charge fails to create, the lesson itself is not rolled back — same criteria already
-// used for "enrolling + generating tuition" in Comisiones. The caller finds out via `chargeFailed` on
-// the result and is responsible for surfacing it (this repository layer doesn't own toasts).
+// The backend creates the lesson's charges in the same transaction (one per month for the monthly
+// plan, a single one for a class or pack), so Cobros refreshes too.
 export function useCreatePrivateLesson() {
     const { session } = useAuth()
     const queryClient = useQueryClient()
@@ -76,18 +67,7 @@ export function useCreatePrivateLesson() {
                 startDate: input.startDate, endDate: input.endDate, days: input.days,
                 fromTime: input.fromTime, toTime: input.toTime,
             }
-            const created = await createPrivateLessonApi(organizationSlug, payload)
-            const amount = input.plan === 'Plan mensual' ? input.costPerClass : input.costPerClass * planClassCount(input.plan)
-            let chargeFailed = false
-            try {
-                await createChargeApi(organizationSlug, {
-                    studentId: input.studentId, concept: `Clases particulares · ${input.plan}`,
-                    amount, dueDate: input.startDate, notes: '',
-                })
-            } catch {
-                chargeFailed = true
-            }
-            return { lesson: fromApiPrivateLesson(created), chargeFailed }
+            return fromApiPrivateLesson(await createPrivateLessonApi(organizationSlug, payload))
         },
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: ['private-lessons', organizationSlug] })
