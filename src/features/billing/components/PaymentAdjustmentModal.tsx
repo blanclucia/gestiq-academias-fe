@@ -1,10 +1,9 @@
 import { EntityFormModal, FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
-import { getPaymentDisplayDate } from '@/domain/billing/paymentRules'
 import type { Payment } from '@/types/domain'
 import { validatePaymentAdjustment } from '../model/billingValidation'
 
-export type PaymentAdjustmentType = 'Bonificacion total' | 'Promocion' | 'Recargo por mora' | 'Importe manual'
+export type PaymentAdjustmentType = 'Sin cambio' | 'Bonificacion total' | 'Promocion' | 'Recargo por mora' | 'Importe manual'
 export type PaymentAdjustmentMode = 'percentage' | 'fixed'
 
 export type PaymentAdjustmentValue = {
@@ -12,6 +11,8 @@ export type PaymentAdjustmentValue = {
     mode: PaymentAdjustmentMode
     value: string
     reason: string
+    // Due date of the charge; changing it alone (keeping the amount) is a valid adjustment.
+    dueDate: string
 }
 
 type AdjustmentTarget = Pick<Payment, 'student' | 'concept' | 'dueDate'> & { originalAmount: number }
@@ -32,8 +33,8 @@ export function PaymentAdjustmentModal({ target, value, adjustedAmount, lateFeeP
     return (
         <EntityFormModal
             open={Boolean(target)}
-            title="Ajustar importe"
-            subtitle="Aplicá una bonificación, promoción o cambio de importe sobre esta cuota pendiente."
+            title="Ajustar cobro"
+            subtitle="Cambiá el vencimiento o aplicá una bonificación, promoción o recargo sobre este cobro pendiente."
             submitLabel="Guardar ajuste"
             validate={() => validatePaymentAdjustment(value)}
             onClose={onClose}
@@ -45,11 +46,11 @@ export function PaymentAdjustmentModal({ target, value, adjustedAmount, lateFeeP
                         <FormField label="Alumno"><input className="form-input" type="text" value={target?.student ?? ''} readOnly /></FormField>
                         <FormField label="Concepto"><input className="form-input" type="text" value={target?.concept ?? ''} readOnly /></FormField>
                         <FormField label="Importe original"><input className="form-input" type="text" value={target ? `$${target.originalAmount.toLocaleString('es-AR')}` : ''} readOnly /></FormField>
-                        <FormField label="Vencimiento"><input className="form-input" type="text" value={target ? getPaymentDisplayDate(target.dueDate) : ''} readOnly /></FormField>
+                        <FormField label="Vencimiento" required><input name="adjustmentDueDate" className="form-input" type="date" value={value.dueDate} onChange={(event) => update({ dueDate: event.target.value })} /></FormField>
                     </FormGrid>
                 </FormSection>
 
-                <FormSection title="Tipo de ajuste" description="El importe original se conserva y el ajuste impacta sólo en el monto final a cobrar.">
+                <FormSection title="Ajuste de importe" description="Opcional. El importe original se conserva y el ajuste impacta sólo en el monto final a cobrar.">
                     <FormGrid>
                         <FormField label="Acción">
                             <SearchableSelect
@@ -59,6 +60,7 @@ export function PaymentAdjustmentModal({ target, value, adjustedAmount, lateFeeP
                                     update({ type, value: type === 'Recargo por mora' && !value.value ? String(lateFeePercent) : value.value })
                                 }}
                                 options={[
+                                    { value: 'Sin cambio', label: 'Sin cambio de importe' },
                                     { value: 'Bonificacion total', label: 'Bonificar 100%' },
                                     { value: 'Promocion', label: 'Aplicar promoción' },
                                     { value: 'Recargo por mora', label: 'Aplicar recargo por mora' },
@@ -71,7 +73,7 @@ export function PaymentAdjustmentModal({ target, value, adjustedAmount, lateFeeP
                                 <SearchableSelect value={value.mode} onChange={(mode) => update({ mode: mode as PaymentAdjustmentMode })} options={[{ value: 'percentage', label: 'Porcentaje' }, { value: 'fixed', label: 'Monto fijo' }]} />
                             </FormField>
                         )}
-                        {value.type !== 'Bonificacion total' && (
+                        {value.type !== 'Bonificacion total' && value.type !== 'Sin cambio' && (
                             <FormField
                                 label={
                                     value.type === 'Importe manual' ? 'Importe final'
@@ -82,7 +84,7 @@ export function PaymentAdjustmentModal({ target, value, adjustedAmount, lateFeeP
                                 <input name="adjustmentValue" className="form-input" type="number" min="0" value={value.value} onChange={(event) => update({ value: event.target.value })} />
                             </FormField>
                         )}
-                        <FormField label="Motivo">
+                        <FormField label="Motivo" required={value.type !== 'Sin cambio'}>
                             <input name="adjustmentReason" className="form-input" type="text" value={value.reason} onChange={(event) => update({ reason: event.target.value })} placeholder="Ej: beca parcial, promo de inscripción, excepción comercial" />
                         </FormField>
                     </FormGrid>

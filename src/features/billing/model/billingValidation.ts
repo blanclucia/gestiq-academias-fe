@@ -1,7 +1,7 @@
 import { invalidForm, validForm, type FormValidationResult } from '@/components/forms/formValidation'
 
 type ManualChargeValue = { studentId: string; category: string; detail: string; amount: string; status: 'Pendiente' | 'Pagado'; dueDate: string; date: string }
-type AdjustmentValue = { type: 'Bonificacion total' | 'Promocion' | 'Recargo por mora' | 'Importe manual'; mode: 'percentage' | 'fixed'; value: string; reason: string }
+type AdjustmentValue = { type: 'Sin cambio' | 'Bonificacion total' | 'Promocion' | 'Recargo por mora' | 'Importe manual'; mode: 'percentage' | 'fixed'; value: string; reason: string; dueDate: string }
 
 export function validateManualCharge(value: ManualChargeValue): FormValidationResult {
     const fieldErrors: Record<string, string> = {}
@@ -26,7 +26,11 @@ export function validatePaymentEdit(value: { amount: number; dueDate: string; pa
     return Object.keys(fieldErrors).length ? invalidForm('Revisá los datos del pago.', fieldErrors) : validForm
 }
 
+// The due date is always required; the reason only when the amount changes (moving the date alone
+// needs no justification). 'Sin cambio' keeps the amount.
 export function validatePaymentAdjustment(value: AdjustmentValue): FormValidationResult {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value.dueDate)) return invalidForm('Ingresá el vencimiento.', { adjustmentDueDate: 'El vencimiento es obligatorio.' })
+    if (value.type === 'Sin cambio') return validForm
     if (!value.reason.trim()) return invalidForm('Indicá el motivo del ajuste.', { adjustmentReason: 'El motivo es obligatorio.' })
     if (value.type === 'Bonificacion total') return validForm
     const amount = Number(value.value)

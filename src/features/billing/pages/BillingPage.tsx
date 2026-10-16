@@ -26,10 +26,11 @@ import { useWorkspace } from '@/workspace/useWorkspace'
 import { useSelectedBranchId } from '@/services/branchRepository'
 
 const defaultAdjustmentForm: PaymentAdjustmentValue = {
-    type: 'Bonificacion total',
+    type: 'Sin cambio',
     mode: 'percentage',
     value: '',
     reason: '',
+    dueDate: '',
 }
 
 
@@ -267,8 +268,9 @@ export function BillingPage() {
                     mode: target.adjustment.mode ?? 'percentage',
                     value: target.adjustment.value ? String(target.adjustment.value) : '',
                     reason: target.adjustment.reason,
+                    dueDate: target.dueDate,
                 }
-                : defaultAdjustmentForm,
+                : { ...defaultAdjustmentForm, dueDate: target.dueDate },
         )
     }
 
@@ -278,6 +280,10 @@ export function BillingPage() {
         }
 
         const originalAmount = adjustTarget.originalAmount
+
+        if (adjustmentForm.type === 'Sin cambio') {
+            return originalAmount
+        }
 
         if (adjustmentForm.type === 'Bonificacion total') {
             return 0
@@ -305,10 +311,17 @@ export function BillingPage() {
             return
         }
 
+        // One save for both: the amount only when it's being adjusted, the due date when it moved.
+        const amountChanges = adjustmentForm.type === 'Sin cambio' ? {} : { amount: adjustedAmountPreview, notes: adjustmentForm.reason.trim() }
+        const dueDateChanges = adjustmentForm.dueDate !== adjustTarget.dueDate ? { dueDate: adjustmentForm.dueDate } : {}
+        if (Object.keys(amountChanges).length === 0 && Object.keys(dueDateChanges).length === 0) {
+            setAdjustTarget(null)
+            return
+        }
         if (adjustTarget.isReal) {
-            await updateCharge.mutateAsync({ id: adjustTarget.id, changes: { amount: adjustedAmountPreview, notes: adjustmentForm.reason.trim() } })
+            await updateCharge.mutateAsync({ id: adjustTarget.id, changes: { ...amountChanges, ...dueDateChanges } })
         } else {
-            updatePaymentRecord(adjustTarget.id, { amount: adjustedAmountPreview })
+            updatePaymentRecord(adjustTarget.id, { ...(adjustmentForm.type === 'Sin cambio' ? {} : { amount: adjustedAmountPreview }), ...dueDateChanges })
         }
 
         setAdjustTarget(null)

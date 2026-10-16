@@ -10,8 +10,13 @@ describe('billing form validation', () => {
         expect(validatePaymentEdit({ amount: -1, dueDate: '' }).fieldErrors).toHaveProperty('editAmount')
     })
     it('requires adjustment reasons and bounds percentages', () => {
-        expect(validatePaymentAdjustment({ type: 'Bonificacion total', mode: 'percentage', value: '', reason: '' }).valid).toBe(false)
-        expect(validatePaymentAdjustment({ type: 'Promocion', mode: 'percentage', value: '101', reason: 'Promo' }).valid).toBe(false)
-        expect(validatePaymentAdjustment({ type: 'Promocion', mode: 'percentage', value: '20', reason: 'Promo' }).valid).toBe(true)
+        const base = { mode: 'percentage' as const, value: '', reason: '', dueDate: '2026-11-10' }
+        expect(validatePaymentAdjustment({ ...base, type: 'Bonificacion total' }).valid).toBe(false)
+        expect(validatePaymentAdjustment({ ...base, type: 'Promocion', value: '101', reason: 'Promo' }).valid).toBe(false)
+        expect(validatePaymentAdjustment({ ...base, type: 'Promocion', value: '20', reason: 'Promo' }).valid).toBe(true)
+    })
+    it('lets the due date move alone, without a reason, but never empty', () => {
+        expect(validatePaymentAdjustment({ type: 'Sin cambio', mode: 'percentage', value: '', reason: '', dueDate: '2026-11-20' }).valid).toBe(true)
+        expect(validatePaymentAdjustment({ type: 'Sin cambio', mode: 'percentage', value: '', reason: '', dueDate: '' }).fieldErrors).toHaveProperty('adjustmentDueDate')
     })
 })

@@ -98,13 +98,15 @@ export function BillingTable(props: BillingTableProps) {
                 const status = resolveChargeCollectionStatus(payment.chargeSnapshot, props.today, props.graceDays)
                 const collectable = ['Pendiente', 'En verificación', 'Vencido', 'Rechazado'].includes(status)
                 return <RowActionMenu ariaLabel={`Acciones para ${payment.student}`} active={props.openMenuId === payment.id} onToggle={() => props.onToggleMenu(payment.id)} actions={[
-                    { label: 'Editar', icon: <PencilLine size={15} />, onClick: () => props.onEdit(payment) },
+                    // Unpaid charges are adjusted (amount and due date) from "Ajustar cobro"; "Editar" is for
+                    // correcting a recorded payment's amount or method.
+                    ...(status === 'Pagado' ? [{ label: 'Editar', icon: <PencilLine size={15} />, onClick: () => props.onEdit(payment) }] : []),
                     ...(collectable ? [
                         { label: 'Generar link de pago', icon: <Link2 size={15} />, onClick: () => props.onPaymentLink(payment) },
                         { label: status === 'En verificación' ? 'Confirmar transferencia' : 'Registrar cobro', icon: <CreditCard size={15} />, onClick: () => props.onCollect(payment) },
                     ] : []),
                     // A discount or surcharge applies to anything still unpaid — overdue included (late fees).
-                    ...(status !== 'Pagado' && status !== 'Anulado' ? [{ label: 'Ajustar importe', icon: <PencilLine size={15} />, onClick: () => props.onAdjust(payment) }] : []),
+                    ...(status !== 'Pagado' && status !== 'Anulado' ? [{ label: 'Ajustar cobro', icon: <PencilLine size={15} />, onClick: () => props.onAdjust(payment) }] : []),
                     ...(status === 'En verificación' ? [{ label: 'Rechazar transferencia', icon: <XCircle size={15} />, onClick: () => props.onRejectTransfer(payment) }] : []),
                     // Próximamente, con Comunicaciones: recordar hoy no le envía nada al alumno.
                     // ...(status === 'Pendiente' || status === 'Vencido' ? [{ label: status === 'Vencido' ? 'Recordar vencido' : 'Recordar próximo vencimiento', icon: <BellRing size={15} />, onClick: () => props.onRemind(payment) }] : []),
