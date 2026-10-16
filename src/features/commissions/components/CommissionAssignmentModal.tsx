@@ -58,6 +58,19 @@ export function CommissionAssignmentModal({
         setSearch('')
         setStatusFilter('Todos')
     }
+    // The modal stays mounted while closed, so its initial state is from before anyone was chosen:
+    // every time it opens, start over from the students and commission the caller passes now.
+    const [wasOpen, setWasOpen] = useState(open)
+    if (open !== wasOpen) {
+        setWasOpen(open)
+        if (open) {
+            setCommissionId(initialCommissionId || commissions[0]?.id || '')
+            setChosenStudentIds(selectedStudentIds)
+            setStep(allowStudentSelection ? 'select' : 'confirm')
+            setSearch('')
+            setStatusFilter('Todos')
+        }
+    }
 
     const commission = commissions.find((item) => item.id === commissionId) ?? null
     const selectedStudents = students.filter((student) => chosenStudentIds.includes(student.id))
@@ -171,10 +184,10 @@ export function CommissionAssignmentModal({
 
                         <FormSection title="Validación de la selección">
                             <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
-                                <div><strong>{assignableStudents.length}</strong> listos para asignar</div>
-                                {alreadyAssigned.length > 0 && <div style={{ color: 'var(--muted)' }}>{alreadyAssigned.length} ya pertenecen a esta comisión</div>}
+                                <div><strong>{assignableStudents.length}</strong> {assignableStudents.length === 1 ? 'listo' : 'listos'} para asignar</div>
+                                {alreadyAssigned.length > 0 && <div style={{ color: 'var(--muted)' }}>{alreadyAssigned.length} ya {alreadyAssigned.length === 1 ? 'pertenece' : 'pertenecen'} a esta comisión</div>}
                                 {selectedStudents.filter((student) => student.status === 'Inactivo').length > 0 && <div style={{ color: 'var(--muted)' }}>Los alumnos inactivos no se asignarán</div>}
-                                {waitlistedStudents.length > 0 && <div style={{ color: 'var(--orange)' }}>{waitlistedStudents.length} quedarán sin asignar por falta de cupo</div>}
+                                {waitlistedStudents.length > 0 && <div style={{ color: 'var(--orange)' }}>{waitlistedStudents.length} {waitlistedStudents.length === 1 ? 'quedará' : 'quedarán'} sin asignar por falta de cupo</div>}
                                 <div style={{ color: 'var(--muted)' }}>{selectedStudents.map((student) => student.fullName).join(' · ') || 'No seleccionaste alumnos'}</div>
                             </div>
                         </FormSection>
