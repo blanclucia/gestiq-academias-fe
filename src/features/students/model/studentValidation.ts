@@ -18,3 +18,15 @@ export function validateStudent(value: StudentFormValue): FormValidationResult {
     else if (value.birthDate && !isValidBirthDate(value.birthDate)) errors.studentBirthDate = 'Revisá la fecha de nacimiento.'
     return Object.keys(errors).length ? invalidForm('Revisá los datos del alumno.', errors) : validForm
 }
+
+export type StudentDetailValue = StudentFormValue & { tutorName: string; tutorEmail: string; tutorPhone: string }
+
+// The detail also edits the tutor: optional fields, validated with the same people rules when typed.
+export function validateStudentDetail(value: StudentDetailValue): FormValidationResult {
+    const base = validateStudent(value)
+    const errors: Record<string, string> = { ...(base.fieldErrors ?? {}) }
+    if (value.tutorName.trim() && !isValidPersonName(value.tutorName.trim())) errors.studentTutorName = 'El nombre del tutor solo puede tener letras.'
+    if (value.tutorEmail.trim() && !isValidEmail(value.tutorEmail.trim())) errors.studentTutorEmail = 'Ingresá un email válido para el tutor.'
+    if (value.tutorPhone.trim() && !isValidPhone(value.tutorPhone.trim())) errors.studentTutorPhone = 'El teléfono del tutor tiene que tener entre 8 y 15 números.'
+    return Object.keys(errors).length ? invalidForm('Revisá los datos del alumno.', errors) : validForm
+}
