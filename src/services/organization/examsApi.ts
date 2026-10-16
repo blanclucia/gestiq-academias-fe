@@ -16,7 +16,7 @@ const apiExamListSchema = z.object({ items: z.array(apiExamSchema) })
 
 export type ApiExam = z.infer<typeof apiExamSchema>
 export type ApiExamCreate = { title: string; examDate: string; firstPaymentDueDate: string; feeAmount: number; installmentCount: number; studentIds: string[] }
-export type ApiExamPatch = Partial<Pick<ApiExamCreate, 'title' | 'examDate' | 'firstPaymentDueDate' | 'feeAmount'>>
+export type ApiExamPatch = Partial<Pick<ApiExamCreate, 'title' | 'examDate' | 'firstPaymentDueDate' | 'feeAmount' | 'studentIds'>>
 type Requester = (path: string, init?: RequestInit) => Promise<unknown>
 const defaultRequest: Requester = (path, init) => authClient.authorizedRequest(path, init)
 

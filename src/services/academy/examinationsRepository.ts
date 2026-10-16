@@ -50,7 +50,7 @@ export function useUpdateCommissionExam() {
     const queryClient = useQueryClient()
     const organizationSlug = session?.organization.slug
     return useMutation({
-        mutationFn: async ({ courseId, commissionId, examId, changes }: ExamTarget & { examId: string; changes: { title?: string; examDate?: string; firstPaymentDueDate?: string; feeAmount?: number } }) => {
+        mutationFn: async ({ courseId, commissionId, examId, changes }: ExamTarget & { examId: string; changes: { title?: string; examDate?: string; firstPaymentDueDate?: string; feeAmount?: number; studentIds?: string[] } }) => {
             if (!organizationSlug) throw new Error('No hay organización activa.')
             return fromApiExam(await updateCommissionExamApi(organizationSlug, courseId, commissionId, examId, changes))
         },

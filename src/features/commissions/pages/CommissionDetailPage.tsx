@@ -23,6 +23,13 @@ import { useWorkspace } from '@/workspace/useWorkspace'
 
 type CommissionTab = 'overview' | 'students' | 'exams'
 
+function describeExamFailure(error: unknown) {
+    const code = (error as { code?: string } | null)?.code
+    if (code === 'exam_student_has_payments') return 'No se puede quitar a un alumno que ya pagó una cuota o informó una transferencia: revertí el pago en Cobranzas primero.'
+    if (code === 'exam_student_not_enrolled') return 'Solo pueden rendir alumnos activos en la comisión.'
+    return 'No se pudo guardar el examen. Intentá nuevamente.'
+}
+
 export function CommissionDetailPage() {
     useAcademyRepositoryVersion()
     const { courseId, commissionId } = useParams()
@@ -52,6 +59,7 @@ export function CommissionDetailPage() {
     const [examStudentIds, setExamStudentIds] = useState<string[]>([])
     const [examAudience, setExamAudience] = useState<CommissionExamAudience>('all')
     const [examSearch, setExamSearch] = useState('')
+    const [examError, setExamError] = useState('')
     const { exams: commissionExams } = useCommissionExams(courseId, commissionId)
     const createExam = useCreateCommissionExam()
     const updateExam = useUpdateCommissionExam()
@@ -176,6 +184,11 @@ export function CommissionDetailPage() {
 
     const openEditExam = (exam: typeof commissionExams[number]) => {
         setEditingExamId(exam.id)
+        setExamError('')
+        // Edit the exam's own list: preselected students, chosen one by one.
+        setExamStudentIds(exam.studentIds)
+        setExamAudience('selected')
+        setExamSearch('')
         setExamForm({ title: exam.title, examDate: exam.examDate ?? '', firstPaymentDueDate: exam.firstPaymentDueDate, feeAmount: String(exam.feeAmount), installmentCount: String(exam.installmentCount) })
         setIsExamOpen(true)
     }
@@ -185,15 +198,24 @@ export function CommissionDetailPage() {
         const feeAmount = Number(examForm.feeAmount)
         const installmentCount = Number(examForm.installmentCount)
         const target = { courseId: course.id, commissionId: commission.id }
-        if (editingExamId) {
-            await updateExam.mutateAsync({ ...target, examId: editingExamId, changes: { title: examForm.title.trim(), examDate: examForm.examDate, firstPaymentDueDate: examForm.firstPaymentDueDate, feeAmount } })
-            showToast('success', 'Examen actualizado: las cuotas pendientes se recalcularon.')
-            setIsExamOpen(false)
-            setEditingExamId(null)
-            return
-        }
         const studentIds = resolveExamStudentIds(commissionStudents, examAudience, examStudentIds)
-        await createExam.mutateAsync({ ...target, input: { title: examForm.title.trim(), examDate: examForm.examDate, firstPaymentDueDate: examForm.firstPaymentDueDate, feeAmount, installmentCount, studentIds } })
+        setExamError('')
+        try {
+            if (editingExamId) {
+                const exam = commissionExams.find((item) => item.id === editingExamId)
+                // Students no longer active in the commission don't show in the list: keep them in the exam.
+                const kept = (exam?.studentIds ?? []).filter((id) => !commissionStudents.some((student) => student.id === id && student.status === 'Activo'))
+                await updateExam.mutateAsync({ ...target, examId: editingExamId, changes: { title: examForm.title.trim(), examDate: examForm.examDate, firstPaymentDueDate: examForm.firstPaymentDueDate, feeAmount, studentIds: [...kept, ...studentIds] } })
+                showToast('success', 'Examen actualizado: las cuotas se recalcularon.')
+                setIsExamOpen(false)
+                setEditingExamId(null)
+                return
+            }
+            await createExam.mutateAsync({ ...target, input: { title: examForm.title.trim(), examDate: examForm.examDate, firstPaymentDueDate: examForm.firstPaymentDueDate, feeAmount, installmentCount, studentIds } })
+        } catch (error) {
+            setExamError(describeExamFailure(error))
+            throw error
+        }
         showToast('success', `Examen creado: se generaron las cuotas de ${studentIds.length} alumno${studentIds.length === 1 ? '' : 's'} en Cobranzas.`)
         setIsExamOpen(false)
     }
@@ -238,6 +260,7 @@ export function CommissionDetailPage() {
                     setIsExamOpen(false)
                     setEditingExamId(null)
                 }}
+                submitErrorMessage={examError || undefined}
                 onSubmit={saveExam}
             />
 
