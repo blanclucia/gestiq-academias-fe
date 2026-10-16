@@ -5,7 +5,7 @@ import { publicRequest } from '@/services/http/client'
 const apiChargeSchema = z.object({
     id: z.string(),
     organizationId: z.string(),
-    source: z.enum(['commission', 'manual']),
+    source: z.enum(['commission', 'manual', 'exam']),
     studentId: z.string(),
     commissionId: z.string().optional(),
     concept: z.string(),

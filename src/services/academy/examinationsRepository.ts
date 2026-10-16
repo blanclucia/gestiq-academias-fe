@@ -1,55 +1,62 @@
-import { splitInstallments } from '@/domain/billing/billingRules'
-import { addMonthsToDate, getLocalDateString } from '@/domain/shared/dateRules'
-import { listStudents } from './studentsRepository'
-import { readAcademyState, updateAcademyState } from './academyState'
-import type { CommissionExam, ExamEnrollment, ExamResultStatus, LegacyExamEnrollmentStatus, ManualCharge } from './academyTypes'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@/auth/AuthContext'
+import { createCommissionExamApi, fetchCommissionExams, updateCommissionExamApi, type ApiExam } from '@/services/organization/examsApi'
+import type { CommissionExam } from './academyTypes'
 
-function normalizeExamEnrollment(enrollment: ExamEnrollment | (Omit<ExamEnrollment, 'participationStatus' | 'resultStatus'> & { status: LegacyExamEnrollmentStatus })): ExamEnrollment {
-    if ('participationStatus' in enrollment) return enrollment
-    const resultStatuses: Partial<Record<LegacyExamEnrollmentStatus, ExamResultStatus>> = { Ausente: 'Ausente', Aprobado: 'Aprobado', 'No aprobado': 'No aprobado' }
-    return { id: enrollment.id, examId: enrollment.examId, commissionId: enrollment.commissionId, studentId: enrollment.studentId, enrolledAt: enrollment.enrolledAt, participationStatus: 'Inscripto', resultStatus: resultStatuses[enrollment.status] }
+// A commission exam as the screens use it: the backend owns the exam, its students and the fee
+// installments (real charges in Cobros), created and repriced in the same transaction.
+export type CommissionExamRecord = CommissionExam & { studentIds: string[] }
+
+const statusFromApi: Record<ApiExam['status'], CommissionExam['status']> = { draft: 'Borrador', open: 'Abierto', closed: 'Cerrado' }
+
+function fromApiExam(exam: ApiExam): CommissionExamRecord {
+    return {
+        id: exam.id, commissionId: exam.commissionId, title: exam.title, examDate: exam.examDate, firstPaymentDueDate: exam.firstPaymentDueDate,
+        feeAmount: exam.feeAmount, installmentCount: exam.installmentCount, status: statusFromApi[exam.status], createdAt: '', studentIds: exam.studentIds,
+    }
 }
 
-export function listCommissionExams(commissionId: string) {
-    const state = readAcademyState()
-    return state.commissionExams.filter((exam) => exam.commissionId === commissionId).map((exam) => ({ ...exam, enrollments: state.examEnrollments.filter((enrollment) => enrollment.examId === exam.id).map(normalizeExamEnrollment) }))
+export function useCommissionExams(courseId: string | undefined, commissionId: string | undefined) {
+    const { session } = useAuth()
+    const organizationSlug = session?.organization.slug
+    const query = useQuery({
+        queryKey: ['commission-exams', organizationSlug, courseId, commissionId],
+        queryFn: ({ signal }) => fetchCommissionExams(organizationSlug!, courseId!, commissionId!, signal),
+        enabled: Boolean(organizationSlug && courseId && commissionId),
+    })
+    return { exams: (query.data ?? []).map(fromApiExam), isLoading: query.isLoading, isError: query.isError }
 }
 
-export function createCommissionExam(input: Omit<CommissionExam, 'id' | 'createdAt' | 'status'>, studentIds: string[]) {
-    const timestamp = Date.now()
-    const exam: CommissionExam = { ...input, id: `EXAM-${timestamp}`, status: 'Abierto', createdAt: getLocalDateString() }
-    const enrollments = studentIds.map((studentId, index): ExamEnrollment => ({ id: `EXAM-ENR-${timestamp}-${index}`, examId: exam.id, commissionId: exam.commissionId, studentId, participationStatus: 'Inscripto', resultStatus: 'Pendiente', enrolledAt: getLocalDateString() }))
-    const installments = splitInstallments(exam.feeAmount, exam.installmentCount)
-    const studentNames = new Map(listStudents().map((student) => [student.id, student.fullName]))
-    const charges = enrollments.flatMap((enrollment) => installments.map((amount, installmentIndex): ManualCharge => ({
-        id: `PAY-EXAM-${timestamp}-${installmentIndex}-${enrollment.studentId}`,
-        student: studentNames.get(enrollment.studentId) ?? enrollment.studentId,
-        category: 'Examen',
-        detail: `${exam.title} · Cuota ${installmentIndex + 1}/${exam.installmentCount}`,
-        amount,
-        method: 'Transferencia',
-        date: '-',
-        dueDate: addMonthsToDate(exam.firstPaymentDueDate, installmentIndex),
-        status: 'Pendiente',
-        examId: exam.id,
-        examEnrollmentId: enrollment.id,
-        installmentNumber: installmentIndex + 1,
-    })))
-    updateAcademyState((current) => ({ ...current, commissionExams: [...current.commissionExams, exam], examEnrollments: [...current.examEnrollments, ...enrollments], manualCharges: [...current.manualCharges, ...charges] }))
-    return exam
+type ExamTarget = { courseId: string; commissionId: string }
+
+export function useCreateCommissionExam() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async ({ courseId, commissionId, input }: ExamTarget & { input: { title: string; examDate: string; firstPaymentDueDate: string; feeAmount: number; installmentCount: number; studentIds: string[] } }) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            return fromApiExam(await createCommissionExamApi(organizationSlug, courseId, commissionId, input))
+        },
+        onSuccess: (_exam, { courseId, commissionId }) => {
+            queryClient.invalidateQueries({ queryKey: ['commission-exams', organizationSlug, courseId, commissionId] })
+            queryClient.invalidateQueries({ queryKey: ['charges', organizationSlug] })
+        },
+    })
 }
 
-export function updateCommissionExam(id: string, changes: Partial<Pick<CommissionExam, 'title' | 'examDate' | 'firstPaymentDueDate' | 'feeAmount'>>) {
-    updateAcademyState((current) => {
-        const exam = current.commissionExams.find((item) => item.id === id)
-        if (!exam) return current
-        const nextExam = { ...exam, ...changes }
-        const installments = splitInstallments(nextExam.feeAmount, nextExam.installmentCount)
-        const manualCharges = current.manualCharges.map((charge) => {
-            if (charge.examId !== id || charge.status === 'Pagado' || !charge.installmentNumber) return charge
-            const installmentIndex = charge.installmentNumber - 1
-            return { ...charge, amount: installments[installmentIndex], dueDate: addMonthsToDate(nextExam.firstPaymentDueDate, installmentIndex) }
-        })
-        return { ...current, commissionExams: current.commissionExams.map((item) => item.id === id ? nextExam : item), manualCharges }
+export function useUpdateCommissionExam() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return useMutation({
+        mutationFn: async ({ courseId, commissionId, examId, changes }: ExamTarget & { examId: string; changes: { title?: string; examDate?: string; firstPaymentDueDate?: string; feeAmount?: number } }) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            return fromApiExam(await updateCommissionExamApi(organizationSlug, courseId, commissionId, examId, changes))
+        },
+        onSuccess: (_exam, { courseId, commissionId }) => {
+            queryClient.invalidateQueries({ queryKey: ['commission-exams', organizationSlug, courseId, commissionId] })
+            queryClient.invalidateQueries({ queryKey: ['charges', organizationSlug] })
+        },
     })
 }

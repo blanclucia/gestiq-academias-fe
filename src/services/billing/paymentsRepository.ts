@@ -48,9 +48,8 @@ function sameChargesMirror(current: RealCharge[], next: RealCharge[]): boolean {
 }
 
 // listPayments() stays synchronous — BillingPage and its modals read it outside a data-fetching
-// lifecycle. Real charges (cuotas de comisión + cargos manuales + cuotas de inscripción, desde que
-// Inscripciones es real) come from the local mirror kept warm by useCharges()/<ChargesSync>;
-// old-assignment/exam rows stay exactly as before — those sources are still 100% mock.
+// lifecycle. Every charge is real (cuotas de comisión, cargos manuales, inscripciones, clases
+// particulares y cuotas de exámenes) and comes from the local mirror kept warm by useCharges()/<ChargesSync>.
 export function listPayments(): PaymentRecord[] {
     const state = readAcademyState()
     const studentNames = new Map(listStudents().map((student) => [student.id, student.fullName]))
@@ -59,10 +58,7 @@ export function listPayments(): PaymentRecord[] {
         method: charge.method, date: charge.date, dueDate: charge.dueDate, amount: charge.amount, originalAmount: charge.amount,
         status: charge.status, isReal: true,
     }))
-    // Exam-fee installments (examinationsRepository.ts) still write directly into state.manualCharges
-    // — that module remains 100% mock, unrelated to the real "Nuevo cobro" flow in BillingPage.
-    const examManualCharges: LegacyPaymentRecord[] = state.manualCharges.map((charge) => ({ id: charge.id, student: charge.student || 'Sin alumno asociado', concept: `${charge.category}${charge.detail ? ` · ${charge.detail}` : ''}`, method: charge.method, date: charge.date, dueDate: charge.dueDate, amount: charge.amount, originalAmount: charge.amount, status: charge.status }))
-    return [...realCharges, ...examManualCharges]
+    return realCharges
         .map((payment) => state.paymentUpdates[payment.id] ? { ...payment, ...state.paymentUpdates[payment.id] } : payment)
         .filter((payment) => !state.paymentUpdates[payment.id]?.deleted)
         .map((payment) => ({ ...payment, chargeSnapshot: paymentReadModelToChargeSnapshot(payment) }))

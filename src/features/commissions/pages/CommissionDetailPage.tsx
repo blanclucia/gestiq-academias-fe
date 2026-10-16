@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { createCommissionExam, listCommissionExams, listCourses, listStudents, updateCommissionExam, useAcademyRepositoryVersion, useAssignEnrollment, useCommissionRoster, useGenerateTuition, useUpdateCommission, type CommissionStudentStatus } from '@/services/academyRepository'
+import { listCourses, listStudents, useAcademyRepositoryVersion, useAssignEnrollment, useCommissionRoster, useGenerateTuition, useUpdateCommission, useCommissionExams, useCreateCommissionExam, useUpdateCommissionExam, type CommissionStudentStatus } from '@/services/academyRepository'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { useToast } from '@/components/ui/ToastContext'
 import { describeEnrollmentFailure } from '@/services/organization/academicOffersApi'
@@ -52,6 +52,9 @@ export function CommissionDetailPage() {
     const [examStudentIds, setExamStudentIds] = useState<string[]>([])
     const [examAudience, setExamAudience] = useState<CommissionExamAudience>('all')
     const [examSearch, setExamSearch] = useState('')
+    const { exams: commissionExams } = useCommissionExams(courseId, commissionId)
+    const createExam = useCreateCommissionExam()
+    const updateExam = useUpdateCommissionExam()
 
     const courses = listCourses()
     const course = courses.find((item) => item.id === courseId) ?? courses[0]
@@ -118,7 +121,6 @@ export function CommissionDetailPage() {
     const selectedStudents = commissionStudents.filter((student) => selectedStudentIds.includes(student.id))
     const communicationTemplates = listCommunicationTemplates(getSelectedBranchId()).filter((template) => template.enabled && template.channels.includes(communicationForm.channel))
     const communicationRecipients = selectedStudents.filter((student) => communicationForm.channel === 'Email' ? Boolean(student.email.trim()) : Boolean(student.phone.trim()))
-    const commissionExams = listCommissionExams(commission.id)
 
     const openCommunication = (studentIds: string[]) => {
         const firstTemplate = listCommunicationTemplates(getSelectedBranchId()).find((template) => template.enabled && template.channels.includes('Email'))
@@ -178,17 +180,21 @@ export function CommissionDetailPage() {
         setIsExamOpen(true)
     }
 
-    const saveExam = () => {
+    // Awaited by the modal: on failure it stays open with the error instead of closing as if saved.
+    const saveExam = async () => {
         const feeAmount = Number(examForm.feeAmount)
         const installmentCount = Number(examForm.installmentCount)
+        const target = { courseId: course.id, commissionId: commission.id }
         if (editingExamId) {
-            updateCommissionExam(editingExamId, { title: examForm.title.trim(), examDate: examForm.examDate, firstPaymentDueDate: examForm.firstPaymentDueDate, feeAmount })
+            await updateExam.mutateAsync({ ...target, examId: editingExamId, changes: { title: examForm.title.trim(), examDate: examForm.examDate, firstPaymentDueDate: examForm.firstPaymentDueDate, feeAmount } })
+            showToast('success', 'Examen actualizado: las cuotas pendientes se recalcularon.')
             setIsExamOpen(false)
             setEditingExamId(null)
             return
         }
-        const selectedExamStudentIds = resolveExamStudentIds(commissionStudents, examAudience, examStudentIds)
-        createCommissionExam({ title: examForm.title.trim(), commissionId: commission.id, examDate: examForm.examDate || undefined, firstPaymentDueDate: examForm.firstPaymentDueDate, feeAmount, installmentCount }, selectedExamStudentIds)
+        const studentIds = resolveExamStudentIds(commissionStudents, examAudience, examStudentIds)
+        await createExam.mutateAsync({ ...target, input: { title: examForm.title.trim(), examDate: examForm.examDate, firstPaymentDueDate: examForm.firstPaymentDueDate, feeAmount, installmentCount, studentIds } })
+        showToast('success', `Examen creado: se generaron las cuotas de ${studentIds.length} alumno${studentIds.length === 1 ? '' : 's'} en Cobranzas.`)
         setIsExamOpen(false)
     }
 
