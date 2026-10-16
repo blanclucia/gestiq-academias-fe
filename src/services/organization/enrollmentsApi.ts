@@ -137,6 +137,11 @@ export async function confirmRegistrationApi(organizationSlug: string, registrat
     return apiRegistrationSummarySchema.parse(await request(registrationsPath(organizationSlug, `/${registrationId}/confirm`), { method: 'POST' }))
 }
 
+// Only for a registration neither confirmed nor paid (409 registration_confirmed / registration_paid).
+export async function cancelRegistrationApi(organizationSlug: string, registrationId: string, request: Requester = defaultRequest): Promise<void> {
+    await request(registrationsPath(organizationSlug, `/${registrationId}/cancel`), { method: 'POST' })
+}
+
 export async function fetchPublicOffer(organizationSlug: string, slug: string, signal?: AbortSignal, request: Requester = defaultPublicRequest): Promise<ApiPublicOffer> {
     return apiPublicOfferSchema.parse(await request(publicOfferPath(organizationSlug, slug), { signal }))
 }

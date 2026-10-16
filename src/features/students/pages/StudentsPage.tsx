@@ -14,6 +14,7 @@ import { useSelectedBranchId } from '@/services/branchRepository'
 import { listCommunicationTemplates } from '@/services/communicationTemplateRepository'
 import { csvHeaders, importFieldLabels, parseStudentCsv, requiredImportFields, suggestStudentImportMapping as suggestMapping, type ImportFieldKey, type ImportStudentRow } from '../model/studentImport'
 import { validateStudent } from '../model/studentValidation'
+import { isValidBirthDate, isValidDni, isValidEmail, isValidPersonName, isValidPhone, normalizeDocument } from '@/domain/people/personRules'
 import { validateConditions } from '@/components/forms/formValidation'
 import { splitFilterValue } from '@/components/crud/filterValues'
 import { StudentsTable } from '../components/StudentsTable'
@@ -176,27 +177,42 @@ export function StudentsPage() {
                 rowNumber: lineIndex + 2,
                 firstName: pick('firstName'),
                 lastName: pick('lastName'),
-                document: pick('document'),
+                document: normalizeDocument(pick('document')),
                 email: pick('email'),
                 phone: pick('phone'),
                 birthDate: pick('birthDate') || undefined,
                 errors: [],
             }
 
+            // Same rules the backend applies (domain/people), so the preview flags what it would reject.
             if (!row.firstName) {
                 row.errors.push('Falta nombre')
+            } else if (!isValidPersonName(row.firstName)) {
+                row.errors.push('Nombre inválido')
             }
 
             if (!row.lastName) {
                 row.errors.push('Falta apellido')
+            } else if (!isValidPersonName(row.lastName)) {
+                row.errors.push('Apellido inválido')
             }
 
             if (!row.document) {
                 row.errors.push('Falta documento')
+            } else if (!isValidDni(row.document)) {
+                row.errors.push('DNI inválido (7 u 8 números)')
             }
 
-            if (row.email && !row.email.includes('@')) {
-                row.errors.push('Email invalido')
+            if (row.email && !isValidEmail(row.email)) {
+                row.errors.push('Email inválido')
+            }
+
+            if (row.phone && !isValidPhone(row.phone)) {
+                row.errors.push('Teléfono inválido')
+            }
+
+            if (row.birthDate && !isValidBirthDate(row.birthDate)) {
+                row.errors.push('Fecha de nacimiento inválida')
             }
 
             return row
@@ -621,16 +637,18 @@ export function StudentsPage() {
                 }}
                 selectedCount={selectedCount}
                 bulkActionItems={[
-                    {
-                        label: 'Comunicar',
-                        icon: <MessageCircle size={15} />,
-                        onClick: () => {
-                            setCommunicationForm({ channel: 'Email', subject: '', message: '' })
-                            setCommunicationTemplateId('custom')
-                            setCommunicationSent(false)
-                            setIsBulkCommunicationOpen(true)
-                        },
-                    },
+                    // Próximamente, con Comunicaciones: hoy "Comunicar" mostraba el mensaje como enviado sin
+                    // enviarle nada a los alumnos.
+                    // {
+                    //     label: 'Comunicar',
+                    //     icon: <MessageCircle size={15} />,
+                    //     onClick: () => {
+                    //         setCommunicationForm({ channel: 'Email', subject: '', message: '' })
+                    //         setCommunicationTemplateId('custom')
+                    //         setCommunicationSent(false)
+                    //         setIsBulkCommunicationOpen(true)
+                    //     },
+                    // },
                     {
                         label: 'Asignar a comisión',
                         onClick: () => {

@@ -606,6 +606,8 @@
     color: var(--text);
     font-weight: 600;
     text-align: left;
+    /* The menu grows to its longest action instead of wrapping it ("Cambiar estado" in two lines). */
+    white-space: nowrap;
 }
 
 .menu-action-item:hover {

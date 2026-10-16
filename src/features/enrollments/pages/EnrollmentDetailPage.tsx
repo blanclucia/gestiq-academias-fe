@@ -1,14 +1,15 @@
-import { ArrowLeft, CalendarDays, CheckCircle2, CreditCard, ExternalLink, Lock, RotateCcw, StickyNote, Users, Wallet } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CheckCircle2, CreditCard, ExternalLink, Lock, RotateCcw, StickyNote, Users, Wallet, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
+import { RowActionMenu } from '@/components/ui/RowActionMenu'
 import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { SectionHeading } from '@/components/ui/SectionHeading'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-    listCourses, listEnrollmentOpenings, useAcademyRepositoryVersion, useConfirmRegistration, useEnrollmentRegistrations,
+    listCourses, listEnrollmentOpenings, useAcademyRepositoryVersion, useCancelRegistration, useConfirmRegistration, useEnrollmentRegistrations,
     useUpdateCharge, useUpdateEnrollmentOpening, useUpdateRegistrationNotes, type EnrollmentRegistrationRow,
 } from '@/services/academyRepository'
 import { chargeMethodToApi } from '@/services/organization/chargesMapping'
@@ -45,12 +46,15 @@ export function EnrollmentDetailPage() {
     const [collectTarget, setCollectTarget] = useState<EnrollmentRegistrationRow | null>(null)
     const [collectForm, setCollectForm] = useState<{ date: string; method: Payment['method'] }>({ date: getTodayString(), method: 'Transferencia' })
     const [confirmTarget, setConfirmTarget] = useState<EnrollmentRegistrationRow | null>(null)
+    const [cancelTarget, setCancelTarget] = useState<EnrollmentRegistrationRow | null>(null)
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null)
     const [noteTarget, setNoteTarget] = useState<EnrollmentRegistrationRow | null>(null)
     const [noteDraft, setNoteDraft] = useState('')
     const updateOpening = useUpdateEnrollmentOpening()
     const updateCharge = useUpdateCharge()
     const updateNotes = useUpdateRegistrationNotes()
     const confirmRegistration = useConfirmRegistration()
+    const cancelRegistration = useCancelRegistration()
 
     const courses = listCourses()
     const course = courses.find((item) => item.id === courseId)
@@ -145,6 +149,23 @@ export function EnrollmentDetailPage() {
                         onError: () => showToast('error', 'No se pudo confirmar la inscripción. Intentá nuevamente.'),
                     })
                     setConfirmTarget(null)
+                }}
+            />
+
+            {/* Only a pending request can be cancelled: a confirmed student is dropped from the commission
+                instead, and a paid fee is reverted in Cobros first (the backend enforces both). */}
+            <DeleteConfirmationModal
+                open={Boolean(cancelTarget)}
+                title="Cancelar inscripción"
+                description={`Se elimina la inscripción de ${cancelTarget?.name ?? 'este alumno'}: libera su lugar en la comisión y se borra su cobro de inscripción pendiente. El alumno sigue cargado en Alumnos.`}
+                confirmLabel="Cancelar inscripción"
+                cancelLabel="Volver"
+                onClose={() => setCancelTarget(null)}
+                onConfirm={async () => {
+                    if (!cancelTarget) return
+                    await cancelRegistration.mutateAsync(cancelTarget.id)
+                    showToast('success', 'Inscripción cancelada.')
+                    setCancelTarget(null)
                 }}
             />
 
@@ -263,12 +284,15 @@ export function EnrollmentDetailPage() {
                                                 </div>
                                                 <div className="detail-row-actions">
                                                     <StatusBadge label={student.payment} tone={student.payment === 'Pagado' ? 'success' : student.payment === 'En verificación' ? 'warning' : 'neutral'} />
-                                                    <button type="button" className="secondary-button compact-button" onClick={() => { setNoteTarget(student); setNoteDraft(student.notes) }}><StickyNote size={15} />{student.notes ? 'Editar nota' : 'Agregar nota'}</button>
-                                                    {!student.rosterConfirmed && <button type="button" className="secondary-button compact-button" onClick={() => setConfirmTarget(student)}><CheckCircle2 size={15} /> {student.payment === 'Pagado' ? 'Confirmar' : 'Confirmar sin pago'}</button>}
                                                     {student.payment !== 'Pagado' && <button type="button" className="primary-button compact-button" onClick={() => {
                                                         setCollectForm({ date: getTodayString(), method: 'Transferencia' })
                                                         setCollectTarget(student)
                                                     }}><CreditCard size={15} /> Registrar pago</button>}
+                                                    <RowActionMenu ariaLabel={`Acciones para ${student.name}`} active={openMenuId === student.id} onToggle={() => setOpenMenuId((current) => current === student.id ? null : student.id)} actions={[
+                                                        { label: student.notes ? 'Editar nota' : 'Agregar nota', icon: <StickyNote size={15} />, onClick: () => { setNoteTarget(student); setNoteDraft(student.notes) } },
+                                                        ...(!student.rosterConfirmed ? [{ label: student.payment === 'Pagado' ? 'Confirmar' : 'Confirmar sin pago', icon: <CheckCircle2 size={15} />, onClick: () => setConfirmTarget(student) }] : []),
+                                                        ...(!student.rosterConfirmed && student.payment !== 'Pagado' && student.payment !== 'En verificación' ? [{ label: 'Cancelar inscripción', icon: <XCircle size={15} />, onClick: () => setCancelTarget(student), variant: 'danger' as const }] : []),
+                                                    ]} />
                                                 </div>
                                             </div>
                                         ))}

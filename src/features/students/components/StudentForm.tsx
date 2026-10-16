@@ -55,7 +55,7 @@ export function StudentForm({ initialValues, value, onChange }: {
                     </FormField>
 
                     <FormField label="Teléfono">
-                        <input className="form-input" type="tel" value={form.phone} onChange={(event) => update('phone', event.target.value)} placeholder="+54 11 1234-5678" />
+                        <input name="studentPhone" className="form-input" type="tel" value={form.phone} onChange={(event) => update('phone', event.target.value)} placeholder="+54 11 1234-5678" />
                     </FormField>
 
                     <FormField label="Fecha de nacimiento">

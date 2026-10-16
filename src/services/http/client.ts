@@ -2,11 +2,14 @@ export class ApiError extends Error {
     readonly status: number
     readonly code: string
     readonly retryAfter?: string
-    constructor(status: number, code: string, retryAfter?: string) {
+    // Fields the backend rejected on a 422 (e.g. { document: 'invalid' }), so forms can point at them.
+    readonly fields?: Record<string, string>
+    constructor(status: number, code: string, retryAfter?: string, fields?: Record<string, string>) {
         super(code)
         this.status = status
         this.code = code
         this.retryAfter = retryAfter
+        this.fields = fields
     }
 }
 
@@ -20,7 +23,7 @@ export function createHttpClient(baseUrl: string, fetcher: typeof fetch = (...ar
         const response = await fetcher(`${baseUrl.replace(/\/$/, '')}${path}`, { ...init, headers, signal, credentials: init.credentials ?? 'omit', cache: 'no-store' })
         if (!response.ok) {
             const body = await response.json().catch(() => null)
-            throw new ApiError(response.status, body?.error?.code ?? 'request_failed', response.headers.get('Retry-After') ?? undefined)
+            throw new ApiError(response.status, body?.error?.code ?? 'request_failed', response.headers.get('Retry-After') ?? undefined, body?.error?.fields)
         }
         return response.status === 204 ? undefined : response.json()
     }

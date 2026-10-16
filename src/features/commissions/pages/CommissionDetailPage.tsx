@@ -202,7 +202,7 @@ export function CommissionDetailPage() {
                 onClose={() => setStatusTarget(null)}
                 onSubmit={saveStudentStatus}
             >
-                <FormField label="Estado">
+                <FormField label="Estado" hint={statusDraft === 'Baja' || statusDraft === 'Finalizado' ? 'Se eliminan sus cuotas de esta comisión que vencen después de hoy; las ya vencidas siguen en Cobros.' : undefined}>
                     <SearchableSelect
                         value={statusDraft}
                         onChange={(status) => setStatusDraft(status as CommissionStudentStatus)}

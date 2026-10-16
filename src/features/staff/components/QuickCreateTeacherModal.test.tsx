@@ -21,7 +21,8 @@ const fillAndSubmit = () => {
     fireEvent.change(document.querySelector('[name=teacherFirstName]')!, { target: { value: 'Ana' } })
     fireEvent.change(document.querySelector('[name=teacherLastName]')!, { target: { value: 'Pérez' } })
     fireEvent.change(document.querySelector('[name=teacherEmail]')!, { target: { value: 'ana@example.com' } })
-    fireEvent.change(document.querySelector('[name=teacherDni]')!, { target: { value: '30111222' } })
+    // Typed with dots, like a student's DNI: accepted and sent without them.
+    fireEvent.change(document.querySelector('[name=teacherDni]')!, { target: { value: '30.111.222' } })
     fireEvent.click(screen.getByRole('button', { name: 'Crear profesor' }))
 }
 

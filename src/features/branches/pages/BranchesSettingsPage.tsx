@@ -10,6 +10,7 @@ import { listStaff } from '@/services/academyRepository'
 import { getBranchSettings, listBranchAutomations, saveBranchAutomations, saveBranchSettings, type BranchAutomation, type BranchSettings } from '@/services/branchConfigurationRepository'
 import { defaultCommunicationTemplates as defaultTemplates, listCommunicationTemplates, saveCommunicationTemplates, type CommunicationTemplate } from '@/services/communicationTemplateRepository'
 import { validateConditions } from '@/components/forms/formValidation'
+import { isValidEmail, isValidPhone } from '@/domain/people/personRules'
 import { SettingsField as Field, SettingsToggleOption as ToggleOption } from '@/components/forms/SettingsControls'
 import { WeekDaysCheckboxGroup } from '@/components/forms/WeekDaysCheckboxGroup'
 import { Card } from '@/components/ui/Card'
@@ -94,7 +95,8 @@ export function BranchesSettingsPage() {
 
     const saveBranchCore = () => {
         if (!settings.name.trim() || !settings.address.trim()) { showToast('error', 'Completá el nombre y la dirección de la sede.'); return }
-        if (!settings.email.includes('@')) { showToast('error', 'Ingresá un correo electrónico válido.'); return }
+        if (!isValidEmail(settings.email.trim())) { showToast('error', 'Ingresá un correo electrónico válido.'); return }
+        if (settings.phone.trim() && !isValidPhone(settings.phone.trim())) { showToast('error', 'El teléfono tiene que tener entre 8 y 15 números.'); return }
         if (settings.weekDays.length === 0) { showToast('error', 'Elegí al menos un día de atención.'); return }
         if (settings.openingTime >= settings.closingTime) { showToast('error', 'La hora de apertura debe ser anterior a la de cierre.'); return }
         const normalized = { ...settings, name: settings.name.trim(), email: settings.email.trim(), address: settings.address.trim(), phone: settings.phone.trim() }

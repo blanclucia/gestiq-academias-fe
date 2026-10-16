@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { EntityFormModal, FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
 import { validateConditions } from '@/components/forms/formValidation'
+import { isValidDni, isValidEmail, isValidPersonName, normalizeDocument, normalizePersonName } from '@/domain/people/personRules'
 import { useToast } from '@/components/ui/ToastContext'
 import { useCreateStaffMember } from '@/services/academyRepository'
 import { useBranchRosterInvalidation, useSetBranchStaffScope } from '@/services/branchRepository'
 import { isMemberConflict } from '@/services/organization/membersApi'
 import { isStaffDniConflict } from '@/services/organization/staffApi'
 
-const dniPattern = /^[0-9]{7,8}$/
+// Typed freely, with or without dots, like a student's DNI: normalized on leaving the field and on save.
+const isValidDniInput = (value: string) => isValidDni(normalizeDocument(value))
 
 const emptyForm = { firstName: '', lastName: '', email: '', dni: '', specialty: '' }
 
@@ -44,21 +46,22 @@ export function QuickCreateTeacherModal({ open, onClose, onCreated, branchId }: 
             subtitle="Alta rápida para poder asignarlo a esta comisión."
             submitLabel="Crear profesor"
             validate={() => validateConditions({
-                teacherFirstName: !form.firstName.trim() && 'Ingresá el nombre.',
-                teacherLastName: !form.lastName.trim() && 'Ingresá el apellido.',
-                teacherEmail: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) && 'Ingresá un email válido.',
-                teacherDni: !dniPattern.test(form.dni.trim()) && 'Ingresá un DNI válido (7 u 8 dígitos, sin puntos).',
+                teacherFirstName: !form.firstName.trim() ? 'Ingresá el nombre.' : !isValidPersonName(form.firstName.trim()) && 'El nombre solo puede tener letras.',
+                teacherLastName: !form.lastName.trim() ? 'Ingresá el apellido.' : !isValidPersonName(form.lastName.trim()) && 'El apellido solo puede tener letras.',
+                teacherEmail: !isValidEmail(form.email.trim()) && 'Ingresá un email válido.',
+                teacherDni: !isValidDniInput(form.dni) && 'El DNI tiene que tener 7 u 8 números.',
             }, 'Revisá los datos del profesor.')}
             onClose={close}
             onSubmit={() => {
                 createStaffMember.mutate({
-                    firstName: form.firstName.trim(),
-                    lastName: form.lastName.trim(),
-                    fullName: `${form.firstName.trim()} ${form.lastName.trim()}`,
+                    // Capitalized like the backend stores it, so the commission shows it right away.
+                    firstName: normalizePersonName(form.firstName),
+                    lastName: normalizePersonName(form.lastName),
+                    fullName: normalizePersonName(`${form.firstName} ${form.lastName}`),
                     email: form.email.trim(),
                     phone: '',
                     specialty: form.specialty.trim(),
-                    dni: form.dni.trim(),
+                    dni: normalizeDocument(form.dni),
                     role: 'Docente',
                     status: 'Activo',
                     isAdministrator: false,
@@ -95,7 +98,7 @@ export function QuickCreateTeacherModal({ open, onClose, onCreated, branchId }: 
                             <input name="teacherEmail" className="form-input" type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
                         </FormField>
                         <FormField label="DNI" required hint="Sin puntos ni espacios. No queda asignado a ninguna sede todavía — eso se hace después desde Sedes → Staff.">
-                            <input name="teacherDni" className="form-input" type="text" inputMode="numeric" value={form.dni} onChange={(event) => setForm((current) => ({ ...current, dni: event.target.value.replace(/\D/g, '').slice(0, 8) }))} />
+                            <input name="teacherDni" className="form-input" type="text" inputMode="numeric" value={form.dni} onChange={(event) => setForm((current) => ({ ...current, dni: event.target.value }))} onBlur={() => setForm((current) => ({ ...current, dni: normalizeDocument(current.dni) }))} placeholder="Ej: 32.108.901" />
                         </FormField>
                         <FormField label="Especialidad o área">
                             <input className="form-input" type="text" value={form.specialty} onChange={(event) => setForm((current) => ({ ...current, specialty: event.target.value }))} placeholder="Ej. Inglés, Administración" />

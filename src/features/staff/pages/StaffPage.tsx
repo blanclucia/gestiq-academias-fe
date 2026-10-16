@@ -12,6 +12,7 @@ import { listStaff, useAcademyRepositoryVersion, useCreateStaffMember, useDelete
 import { isMemberConflict } from '@/services/organization/membersApi'
 import { isStaffDniConflict } from '@/services/organization/staffApi'
 import { validateConditions } from '@/components/forms/formValidation'
+import { isValidEmail, isValidDni, isValidPersonName, isValidPhone, normalizeDocument, normalizePersonName } from '@/domain/people/personRules'
 import { splitFilterValue } from '@/components/crud/filterValues'
 import { InfoTooltip } from '@/components/ui/InfoTooltip'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
@@ -48,11 +49,11 @@ const emptyTeacherForm = {
     status: 'Activo' as Teacher['status'],
 }
 
-const dniPattern = /^[0-9]{7,8}$/
-// Allows digits, spaces and the usual phone punctuation, but still rejects free-text typos —
-// the minimum digit count (not just pattern) catches something like "N/A" slipping through.
-const phonePattern = /^[0-9+()\s-]{6,20}$/
-const isValidPhone = (value: string) => value.trim() === '' || (phonePattern.test(value.trim()) && (value.match(/\d/g) ?? []).length >= 6)
+// Same rules as students and the backend (domain/people); the phone is optional.
+// Typed freely, with or without dots, like a student's DNI: normalized on leaving the field and on save.
+const isValidDniInput = (value: string) => isValidDni(normalizeDocument(value))
+const isValidOptionalPhone = (value: string) => value.trim() === '' || isValidPhone(value.trim())
+const nameError = (value: string, missing: string) => !value.trim() ? missing : !isValidPersonName(value.trim()) && 'El nombre y el apellido solo pueden tener letras.'
 
 export function StaffPage({
     compact = false,
@@ -119,7 +120,7 @@ export function StaffPage({
                 title="Nuevo integrante del staff"
                 subtitle="Completá los datos para incorporarlo a esta sede."
                 submitLabel="Agregar al staff"
-                validate={() => validateConditions({ teacherFirstName: !newTeacher.firstName.trim() && 'Ingresá el nombre.', teacherLastName: !newTeacher.lastName.trim() && 'Ingresá el apellido.', teacherEmail: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newTeacher.email) && 'Ingresá un email válido.', teacherDni: !dniPattern.test(newTeacher.dni.trim()) && 'Ingresá un DNI válido (7 u 8 dígitos, sin puntos).', teacherPhone: !isValidPhone(newTeacher.phone) && 'Ingresá un teléfono válido (solo números, espacios, +, - o paréntesis).', teacherRole: newTeacher.role !== 'Docente' && !newIsAdministrator && 'Asigná permisos de administración.' }, 'Revisá los datos del integrante.')}
+                validate={() => validateConditions({ teacherFirstName: nameError(newTeacher.firstName, 'Ingresá el nombre.'), teacherLastName: nameError(newTeacher.lastName, 'Ingresá el apellido.'), teacherEmail: !isValidEmail(newTeacher.email.trim()) && 'Ingresá un email válido.', teacherDni: !isValidDniInput(newTeacher.dni) && 'El DNI tiene que tener 7 u 8 números.', teacherPhone: !isValidOptionalPhone(newTeacher.phone) && 'El teléfono tiene que tener entre 8 y 15 números.', teacherRole: newTeacher.role !== 'Docente' && !newIsAdministrator && 'Asigná permisos de administración.' }, 'Revisá los datos del integrante.')}
                 onClose={() => {
                     setIsCreateModalOpen(false)
                     setNewTeacher(emptyTeacherForm)
@@ -127,7 +128,7 @@ export function StaffPage({
                     setCreateError('')
                 }}
                 onSubmit={() => {
-                    if (!newTeacher.firstName.trim() || !newTeacher.lastName.trim() || !newTeacher.email.trim() || !dniPattern.test(newTeacher.dni.trim())) {
+                    if (!newTeacher.firstName.trim() || !newTeacher.lastName.trim() || !newTeacher.email.trim() || !isValidDniInput(newTeacher.dni)) {
                         setCreateError('Completá nombre, apellido, email y un DNI válido.')
                         return
                     }
@@ -136,7 +137,7 @@ export function StaffPage({
                         return
                     }
                     setCreateError('')
-                    createStaffMember.mutate({ ...newTeacher, fullName: `${newTeacher.firstName.trim()} ${newTeacher.lastName.trim()}`, email: newTeacher.email.trim(), phone: newTeacher.phone.trim(), specialty: newTeacher.specialty.trim(), dni: newTeacher.dni.trim(), isAdministrator: newIsAdministrator }, {
+                    createStaffMember.mutate({ ...newTeacher, firstName: normalizePersonName(newTeacher.firstName), lastName: normalizePersonName(newTeacher.lastName), fullName: normalizePersonName(`${newTeacher.firstName} ${newTeacher.lastName}`), email: newTeacher.email.trim(), phone: newTeacher.phone.trim(), specialty: newTeacher.specialty.trim(), dni: normalizeDocument(newTeacher.dni), isAdministrator: newIsAdministrator }, {
                         onSuccess: (created) => {
                             onStaffCreated?.(created.id)
                             if (newIsAdministrator) onToggleAdministrator?.(created.id, true)
@@ -162,7 +163,7 @@ export function StaffPage({
                                 <input name="teacherEmail" className="form-input" type="email" value={newTeacher.email} onChange={(event) => setNewTeacher((current) => ({ ...current, email: event.target.value }))} />
                             </FormField>
                             <FormField label="DNI" required hint="Sin puntos ni espacios. Se usa para crear su usuario y, si corresponde, para asignarla como administradora.">
-                                <input name="teacherDni" className="form-input" type="text" inputMode="numeric" value={newTeacher.dni} onChange={(event) => setNewTeacher((current) => ({ ...current, dni: event.target.value.replace(/\D/g, '').slice(0, 8) }))} />
+                                <input name="teacherDni" className="form-input" type="text" inputMode="numeric" value={newTeacher.dni} onChange={(event) => setNewTeacher((current) => ({ ...current, dni: event.target.value }))} onBlur={() => setNewTeacher((current) => ({ ...current, dni: normalizeDocument(current.dni) }))} placeholder="Ej: 32.108.901" />
                             </FormField>
                             <FormField label="Teléfono">
                                 <input name="teacherPhone" className="form-input" type="tel" value={newTeacher.phone} onChange={(event) => setNewTeacher((current) => ({ ...current, phone: event.target.value }))} />
@@ -197,7 +198,7 @@ export function StaffPage({
                 open={isEditModalOpen}
                 title="Editar docente"
                 subtitle="Actualiza la información del docente."
-                validate={() => validateConditions({ teacherFirstName: !editingTeacherForm.firstName.trim() && 'Ingresá el nombre.', teacherLastName: !editingTeacherForm.lastName.trim() && 'Ingresá el apellido.', teacherEmail: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editingTeacherForm.email) && 'Ingresá un email válido.', teacherDni: editingIsAdministrator && !editingTeacher?.userId && !dniPattern.test(editingTeacherForm.dni.trim()) && 'Para asignarla como administradora, ingresá un DNI válido (7 u 8 dígitos).', teacherPhone: !isValidPhone(editingTeacherForm.phone) && 'Ingresá un teléfono válido (solo números, espacios, +, - o paréntesis).', teacherRole: editingTeacherForm.role !== 'Docente' && !editingIsAdministrator && 'Asigná permisos de administración.' }, 'Revisá los datos del integrante.')}
+                validate={() => validateConditions({ teacherFirstName: nameError(editingTeacherForm.firstName, 'Ingresá el nombre.'), teacherLastName: nameError(editingTeacherForm.lastName, 'Ingresá el apellido.'), teacherEmail: !isValidEmail(editingTeacherForm.email.trim()) && 'Ingresá un email válido.', teacherDni: editingIsAdministrator && !editingTeacher?.userId && !isValidDniInput(editingTeacherForm.dni) && 'Para asignarla como administradora, ingresá un DNI de 7 u 8 números.', teacherPhone: !isValidOptionalPhone(editingTeacherForm.phone) && 'El teléfono tiene que tener entre 8 y 15 números.', teacherRole: editingTeacherForm.role !== 'Docente' && !editingIsAdministrator && 'Asigná permisos de administración.' }, 'Revisá los datos del integrante.')}
                 onClose={() => {
                     setIsEditModalOpen(false)
                     setEditingTeacher(null)
@@ -211,11 +212,14 @@ export function StaffPage({
                         id,
                         changes: {
                             ...editingTeacherForm,
-                            fullName: `${editingTeacherForm.firstName.trim()} ${editingTeacherForm.lastName.trim()}`,
+                            // Shown capitalized right away, as the backend stores it.
+                            firstName: normalizePersonName(editingTeacherForm.firstName),
+                            lastName: normalizePersonName(editingTeacherForm.lastName),
+                            fullName: normalizePersonName(`${editingTeacherForm.firstName} ${editingTeacherForm.lastName}`),
                             email: editingTeacherForm.email.trim(),
                             phone: editingTeacherForm.phone.trim(),
                             specialty: editingTeacherForm.specialty.trim(),
-                            dni: editingTeacherForm.dni.trim() || undefined,
+                            dni: normalizeDocument(editingTeacherForm.dni) || undefined,
                         },
                         isAdministrator: editingIsAdministrator,
                     }, {
@@ -247,7 +251,7 @@ export function StaffPage({
                                 <input name="teacherEmail" className="form-input" type="email" value={editingTeacherForm.email} onChange={(event) => setEditingTeacherForm((current) => ({ ...current, email: event.target.value }))} />
                             </FormField>
                             <FormField label="DNI" hint={editingTeacher?.userId ? 'Ya tiene un usuario del sistema vinculado.' : 'Sin puntos ni espacios. Hace falta para asignarla como administradora.'}>
-                                <input name="teacherDni" className="form-input" type="text" inputMode="numeric" value={editingTeacherForm.dni} onChange={(event) => setEditingTeacherForm((current) => ({ ...current, dni: event.target.value.replace(/\D/g, '').slice(0, 8) }))} />
+                                <input name="teacherDni" className="form-input" type="text" inputMode="numeric" value={editingTeacherForm.dni} onChange={(event) => setEditingTeacherForm((current) => ({ ...current, dni: event.target.value }))} onBlur={() => setEditingTeacherForm((current) => ({ ...current, dni: normalizeDocument(current.dni) }))} placeholder="Ej: 32.108.901" />
                             </FormField>
                             <FormField label="Teléfono">
                                 <input name="teacherPhone" className="form-input" type="tel" value={editingTeacherForm.phone} onChange={(event) => setEditingTeacherForm((current) => ({ ...current, phone: event.target.value }))} />

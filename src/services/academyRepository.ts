@@ -6,7 +6,7 @@ export { listStudents, useCreateStudent, useDeleteStudent, useStudentEnrollments
 export { getActiveAcademicCycleId, listAcademicCycles, listCourses, useAcademicCycles, useActivateCycle, useCourses, useCreateCourse, useCreateCycle, useDeleteCourse, useUpdateCourse } from '@/services/academy/coursesRepository'
 export { getCommissionRemovalBlockers, getCourseRemovalBlockers, useAssignEnrollment, useCommissionRoster, useCreateCommission, useDeleteCommission, useRevokeEnrollment, useUpdateCommission } from '@/services/academy/commissionsRepository'
 export {
-    getPublicEnrollmentAvailability, listEnrollmentOpenings, useConfirmRegistration, useCreateEnrollmentOpening, useDeleteEnrollmentOpening,
+    getPublicEnrollmentAvailability, listEnrollmentOpenings, useCancelRegistration, useConfirmRegistration, useCreateEnrollmentOpening, useDeleteEnrollmentOpening,
     useEnrollmentOpenings, useEnrollmentRegistrations, usePublicOffer, useRegisterPublicly, useUpdateEnrollmentOpening, useUpdateRegistrationNotes,
     type EnrollmentRegistrationRow, type PublicEnrollmentOffer,
 } from '@/services/academy/enrollmentsRepository'
