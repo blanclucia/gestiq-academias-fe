@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { EntityFormModal, FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
 import { validateConditions } from '@/components/forms/formValidation'
+import { isValidEmail, isValidPersonName, normalizePersonName } from '@/domain/people/personRules'
 import { useToast } from '@/components/ui/ToastContext'
 import { useCreateStaffMember } from '@/services/academyRepository'
 import { useBranchRosterInvalidation, useSetBranchStaffScope } from '@/services/branchRepository'
@@ -44,17 +45,18 @@ export function QuickCreateTeacherModal({ open, onClose, onCreated, branchId }: 
             subtitle="Alta rápida para poder asignarlo a esta comisión."
             submitLabel="Crear profesor"
             validate={() => validateConditions({
-                teacherFirstName: !form.firstName.trim() && 'Ingresá el nombre.',
-                teacherLastName: !form.lastName.trim() && 'Ingresá el apellido.',
-                teacherEmail: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) && 'Ingresá un email válido.',
+                teacherFirstName: !form.firstName.trim() ? 'Ingresá el nombre.' : !isValidPersonName(form.firstName.trim()) && 'El nombre solo puede tener letras.',
+                teacherLastName: !form.lastName.trim() ? 'Ingresá el apellido.' : !isValidPersonName(form.lastName.trim()) && 'El apellido solo puede tener letras.',
+                teacherEmail: !isValidEmail(form.email.trim()) && 'Ingresá un email válido.',
                 teacherDni: !dniPattern.test(form.dni.trim()) && 'Ingresá un DNI válido (7 u 8 dígitos, sin puntos).',
             }, 'Revisá los datos del profesor.')}
             onClose={close}
             onSubmit={() => {
                 createStaffMember.mutate({
-                    firstName: form.firstName.trim(),
-                    lastName: form.lastName.trim(),
-                    fullName: `${form.firstName.trim()} ${form.lastName.trim()}`,
+                    // Capitalized like the backend stores it, so the commission shows it right away.
+                    firstName: normalizePersonName(form.firstName),
+                    lastName: normalizePersonName(form.lastName),
+                    fullName: normalizePersonName(`${form.firstName} ${form.lastName}`),
                     email: form.email.trim(),
                     phone: '',
                     specialty: form.specialty.trim(),

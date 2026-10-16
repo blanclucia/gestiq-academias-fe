@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isValidBirthDate, isValidDni, isValidPersonName, isValidPhone, normalizeDocument, normalizePersonName } from './personRules'
+import { isValidBirthDate, isValidCuit, isValidDni, isValidPersonName, isValidPhone, normalizeCuit, normalizeDocument, normalizePersonName } from './personRules'
 
 describe('personRules', () => {
     it('capitalizes names like the backend', () => {
@@ -31,5 +31,13 @@ describe('personRules', () => {
         expect(isValidBirthDate('2010-10-16', today)).toBe(true)
         expect(isValidBirthDate('2026-10-17', today)).toBe(false)
         expect(isValidBirthDate('1925-01-01', today)).toBe(false)
+    })
+
+    it('checks the CUIT check digit like the backend', () => {
+        expect(normalizeCuit('20-30111222-0')).toBe('20301112220')
+        expect(isValidCuit('20301112220')).toBe(true)
+        expect(isValidCuit('30712345671')).toBe(true)
+        expect(isValidCuit('30712345678')).toBe(false)
+        expect(isValidCuit('2030111222')).toBe(false)
     })
 })

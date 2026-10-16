@@ -49,3 +49,19 @@ export function isValidBirthDate(value: string, today = new Date()) {
     const oldest = new Date(today.getFullYear() - maxAge, today.getMonth(), today.getDate())
     return value <= isoDay(today) && value >= isoDay(oldest)
 }
+
+// "20-30111222-0" → "20301112220".
+export function normalizeCuit(value: string) {
+    return value.replace(/[-.\s]/g, '')
+}
+
+// 11 digits whose last one is the AFIP check digit: catches a mistyped CUIT/CUIL before a student
+// transfers to the wrong account holder. Same rule as the backend (people.ValidCUIT).
+export function isValidCuit(value: string) {
+    if (!/^\d{11}$/.test(value)) return false
+    const weights = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
+    const sum = weights.reduce((total, weight, index) => total + weight * Number(value[index]), 0)
+    const check = 11 - (sum % 11)
+    if (check === 10) return false
+    return Number(value[10]) === (check === 11 ? 0 : check)
+}
