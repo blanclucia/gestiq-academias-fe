@@ -45,7 +45,8 @@ export type ApiStudentInput = {
     notes: string
     status: 'active' | 'pending' | 'inactive'
 }
-export type ApiStudentPatch = Partial<ApiStudentInput>
+// Tutor data is edited from the student's detail; the create form doesn't ask for it.
+export type ApiStudentPatch = Partial<ApiStudentInput> & { tutorName?: string; tutorEmail?: string; tutorPhone?: string }
 type Requester = (path: string, init?: RequestInit) => Promise<unknown>
 const defaultRequest: Requester = (path, init) => authClient.authorizedRequest(path, init)
 

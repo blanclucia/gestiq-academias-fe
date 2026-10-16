@@ -95,7 +95,7 @@ export function useUpdateStudent() {
     const queryClient = useQueryClient()
     const organizationSlug = session?.organization.slug
     return useMutation({
-        mutationFn: async ({ id, changes }: { id: string; changes: Partial<Parameters<typeof toApiInput>[0]> }) => {
+        mutationFn: async ({ id, changes }: { id: string; changes: Partial<Parameters<typeof toApiInput>[0]> & { tutorName?: string; tutorEmail?: string; tutorPhone?: string } }) => {
             if (!organizationSlug) throw new Error('No hay organización activa.')
             const patch: ApiStudentPatch = {}
             if (changes.firstName !== undefined) patch.firstName = changes.firstName
@@ -105,6 +105,9 @@ export function useUpdateStudent() {
             if (changes.phone !== undefined) patch.phone = changes.phone
             if (changes.birthDate !== undefined) patch.birthDate = changes.birthDate
             if (changes.notes !== undefined) patch.notes = changes.notes
+            if (changes.tutorName !== undefined) patch.tutorName = changes.tutorName
+            if (changes.tutorEmail !== undefined) patch.tutorEmail = changes.tutorEmail
+            if (changes.tutorPhone !== undefined) patch.tutorPhone = changes.tutorPhone
             if (changes.status !== undefined) patch.status = studentStatusToApi(changes.status)
             return updateStudentApi(organizationSlug, id, patch)
         },
