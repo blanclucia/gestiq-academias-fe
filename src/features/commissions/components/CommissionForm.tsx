@@ -108,7 +108,7 @@ export function CommissionForm({
                 </FormGrid>
             </FormSection>
 
-            <FormSection title="Período y facturación" description="Estas fechas determinan las mensualidades que se generarán para cada alumno.">
+            <FormSection title="Período y cuotas" description="Estas fechas determinan las mensualidades que se generarán para cada alumno.">
                 <FormGrid>
                     <FormField label="Inicio de cursada" required>
                         <input name="commissionStartDate" className="form-input" type="date" value={formValue.startDate} onChange={(event) => update({ startDate: event.target.value })} />

@@ -2,7 +2,8 @@ import { CreditCard, Link2, PencilLine, RotateCcw, Trash2, XCircle } from 'lucid
 import { DataTable } from '@/components/ui/DataTable'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
 import { StatusBadge, type StatusBadgeTone } from '@/components/ui/StatusBadge'
-import { getPaymentDisplayDate, getPaymentReminderLabel, resolveChargeCollectionStatus } from '@/domain/billing/paymentRules'
+import { getPaymentDisplayDate, resolveChargeCollectionStatus } from '@/domain/billing/paymentRules'
+import { formatCurrencyARS } from '@/domain/shared/formattingRules'
 import type { ChargePaymentSnapshot, Payment } from '@/types/domain'
 import type { PaymentAdjustmentMode, PaymentAdjustmentType } from './PaymentAdjustmentModal'
 
@@ -78,15 +79,17 @@ export function BillingTable(props: BillingTableProps) {
                     },
                 },
                 { key: 'concept', header: 'Concepto', accessor: (payment) => <span>{payment.concept}</span> },
-                { key: 'method', header: 'Método', accessor: (payment) => <span>{payment.method}</span> },
+                // A method only exists once there's a payment (or a reported transfer); unpaid rows show a dash.
+                { key: 'method', header: 'Método', accessor: (payment) => { const status = resolveChargeCollectionStatus(payment.chargeSnapshot, props.today, props.graceDays); return <span>{status === 'Pagado' || status === 'En verificación' ? payment.method : '—'}</span> } },
                 { key: 'date', header: 'Vencimiento', accessor: (payment) => <strong>{getPaymentDisplayDate(payment.dueDate)}</strong> },
                 { key: 'paymentDate', header: 'Fecha pago', accessor: (payment) => <span>{getPaymentDisplayDate(payment.date)}</span> },
                 {
-                    key: 'amount', header: 'Monto', align: 'right', accessor: (payment) => <div style={{ display: 'grid', gap: 2, justifyItems: 'end' }}><strong>{`$${payment.amount.toLocaleString('es-AR')}`}</strong>{payment.adjustment && payment.originalAmount !== payment.amount ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>Original $ {payment.originalAmount.toLocaleString('es-AR')} · {payment.adjustment.type}</span> : null}</div>,
+                    key: 'amount', header: 'Monto', align: 'right', accessor: (payment) => <div style={{ display: 'grid', gap: 2, justifyItems: 'end' }}><strong>{formatCurrencyARS(payment.amount)}</strong>{payment.adjustment && payment.originalAmount !== payment.amount ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>Original {formatCurrencyARS(payment.originalAmount)} · {payment.adjustment.type}</span> : null}</div>,
                 },
-                {
-                    key: 'reminder', header: 'Recordatorio', accessor: (payment) => <span>{getPaymentReminderLabel(payment, resolveChargeCollectionStatus(payment.chargeSnapshot, props.today, props.graceDays), props.today)}{payment.lastReminderAt ? ` · Último ${getPaymentDisplayDate(payment.lastReminderAt)}` : ''}</span>,
-                },
+                // Próximamente, con Comunicaciones (los recordatorios están desactivados):
+                // {
+                // key: 'reminder', header: 'Recordatorio', accessor: (payment) => <span>{getPaymentReminderLabel(payment, resolveChargeCollectionStatus(payment.chargeSnapshot, props.today, props.graceDays), props.today)}{payment.lastReminderAt ? ` · Último ${getPaymentDisplayDate(payment.lastReminderAt)}` : ''}</span>,
+                // },
                 {
                     key: 'status', header: 'Estado', align: 'center', accessor: (payment) => { const status = resolveChargeCollectionStatus(payment.chargeSnapshot, props.today, props.graceDays); return <StatusBadge label={status} tone={statusToneMap[status]} /> },
                 },
@@ -101,7 +104,7 @@ export function BillingTable(props: BillingTableProps) {
                         { label: status === 'En verificación' ? 'Confirmar transferencia' : 'Registrar cobro', icon: <CreditCard size={15} />, onClick: () => props.onCollect(payment) },
                     ] : []),
                     // A discount or surcharge applies to anything still unpaid — overdue included (late fees).
-                    ...(status !== 'Pagado' && status !== 'Anulado' ? [{ label: 'Ajustar pago', icon: <PencilLine size={15} />, onClick: () => props.onAdjust(payment) }] : []),
+                    ...(status !== 'Pagado' && status !== 'Anulado' ? [{ label: 'Ajustar importe', icon: <PencilLine size={15} />, onClick: () => props.onAdjust(payment) }] : []),
                     ...(status === 'En verificación' ? [{ label: 'Rechazar transferencia', icon: <XCircle size={15} />, onClick: () => props.onRejectTransfer(payment) }] : []),
                     // Próximamente, con Comunicaciones: recordar hoy no le envía nada al alumno.
                     // ...(status === 'Pendiente' || status === 'Vencido' ? [{ label: status === 'Vencido' ? 'Recordar vencido' : 'Recordar próximo vencimiento', icon: <BellRing size={15} />, onClick: () => props.onRemind(payment) }] : []),

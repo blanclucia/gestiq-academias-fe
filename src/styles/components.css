@@ -32,6 +32,14 @@
     box-shadow: none;
 }
 
+/* Panels under the KPIs of the Cobros and Finanzas summaries: same ChartCard as the dashboard. */
+.summary-panels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+
 /* Nested inside a page container (Cobros and Finanzas summaries): a subtle tint so they stand apart. */
 .data-table-card .kpi-card,
 .data-table-card .chart-card {

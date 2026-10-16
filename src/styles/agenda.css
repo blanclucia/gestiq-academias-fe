@@ -559,7 +559,7 @@
   height: 30px;
   border: 1px solid var(--border);
   border-radius: 50%;
-  background: var(--surface);
+  background: var(--field);
   color: var(--muted);
   font-size: .72rem;
   font-weight: 750;

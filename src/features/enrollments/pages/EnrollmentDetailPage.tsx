@@ -172,13 +172,13 @@ export function EnrollmentDetailPage() {
             <EntityFormModal
                 open={Boolean(collectTarget)}
                 title="Registrar cobro"
-                subtitle="Al registrar el pago, el alumno queda confirmado en la comisión."
+                subtitle="Al registrar el cobro, el alumno queda confirmado en la comisión."
                 submitLabel="Confirmar pago"
                 validate={() => validateConditions({ collectionTarget: !collectTarget && 'No hay una inscripción seleccionada.', collectionDate: !collectForm.date && 'Ingresá la fecha del cobro.' }, 'Revisá los datos del cobro.')}
                 onClose={() => setCollectTarget(null)}
                 onSubmit={() => {
                     if (collectTarget) updateCharge.mutate({ id: collectTarget.chargeId, changes: { status: 'paid', method: chargeMethodToApi(collectForm.method), paidAt: collectForm.date, paidAmount: collectTarget.chargeAmount } }, {
-                        onSuccess: () => showToast('success', 'Pago registrado: el alumno quedó confirmado en la comisión.'),
+                        onSuccess: () => showToast('success', 'Cobro registrado: el alumno quedó confirmado en la comisión.'),
                         onError: () => showToast('error', 'No se pudo registrar el cobro. Intentá nuevamente.'),
                     })
                     setCollectTarget(null)
@@ -279,7 +279,7 @@ export function EnrollmentDetailPage() {
                                             <div className="enrollment-student-row" key={student.id}>
                                                 <div>
                                                     <div className="detail-row-title">{student.name}</div>
-                                                    <div className="detail-row-meta">{student.rosterConfirmed ? 'Alumno activo' : student.payment === 'Pagado' ? 'Pago registrado, sin confirmar' : 'Se confirma al registrar el pago'}</div>
+                                                    <div className="detail-row-meta">{student.rosterConfirmed ? 'Alumno activo' : student.payment === 'Pagado' ? 'Cobro registrado, sin confirmar' : 'Se confirma al registrar el cobro'}</div>
                                                     {student.notes && <div className="enrollment-student-note-preview"><StickyNote size={13} />{student.notes}</div>}
                                                 </div>
                                                 <div className="detail-row-actions">
@@ -287,7 +287,7 @@ export function EnrollmentDetailPage() {
                                                     {student.payment !== 'Pagado' && <button type="button" className="primary-button compact-button" onClick={() => {
                                                         setCollectForm({ date: getTodayString(), method: 'Transferencia' })
                                                         setCollectTarget(student)
-                                                    }}><CreditCard size={15} /> Registrar pago</button>}
+                                                    }}><CreditCard size={15} /> Registrar cobro</button>}
                                                     <RowActionMenu ariaLabel={`Acciones para ${student.name}`} active={openMenuId === student.id} onToggle={() => setOpenMenuId((current) => current === student.id ? null : student.id)} actions={[
                                                         { label: student.notes ? 'Editar nota' : 'Agregar nota', icon: <StickyNote size={15} />, onClick: () => { setNoteTarget(student); setNoteDraft(student.notes) } },
                                                         ...(!student.rosterConfirmed ? [{ label: student.payment === 'Pagado' ? 'Confirmar' : 'Confirmar sin pago', icon: <CheckCircle2 size={15} />, onClick: () => setConfirmTarget(student) }] : []),

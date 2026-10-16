@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, CheckCircle2, CreditCard, PencilLine, Plus, Search, Trash2, WalletCards } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, CheckCircle2, CreditCard, PencilLine, Plus, Search, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
@@ -6,6 +6,7 @@ import { DeleteConfirmationModal, EntityFormModal, FormField, FormGrid, FormSect
 import { FilterModal } from '@/components/crud/FilterModal'
 import { FilterChips } from '@/components/crud/FilterChips'
 import { splitFilterValue } from '@/components/crud/filterValues'
+import { ChartCard } from '@/components/layout/ChartCard'
 import { KpiCard } from '@/components/layout/KpiCard'
 import { DataTable } from '@/components/ui/DataTable'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
@@ -36,7 +37,8 @@ function emptyExpense(branchId: string): ExpenseInput {
 }
 
 export function FinancePage() {
-    const [searchParams] = useSearchParams()
+    // The active tab lives in the URL (?tab=expenses), like Cobros and the detail pages.
+    const [searchParams, setSearchParams] = useSearchParams()
     useAcademyRepositoryVersion()
     useFinanceRepositoryVersion()
     const { showToast } = useToast()
@@ -47,7 +49,8 @@ export function FinancePage() {
     const selectedBranchId = useSelectedBranchId()
     const { branches } = useBranches()
     const selectedBranch = branches.find((branch) => branch.id === selectedBranchId) ?? branches[0]
-    const [activeTab, setActiveTab] = useState<FinanceTab>(() => searchParams.get('tab') === 'expenses' ? 'expenses' : 'summary')
+    const activeTab: FinanceTab = searchParams.get('tab') === 'expenses' ? 'expenses' : 'summary'
+    const setActiveTab = (tab: FinanceTab) => setSearchParams(tab === 'summary' ? {} : { tab }, { replace: true })
     const [expenseForm, setExpenseForm] = useState<ExpenseInput>(() => emptyExpense(selectedBranchId))
     const [isExpenseOpen, setIsExpenseOpen] = useState(false)
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
@@ -146,7 +149,7 @@ export function FinancePage() {
             {activeTab === 'summary' && <div className="finance-tab-content">
                 <div className="summary-date-range"><DateRangeControl value={dateRange} onChange={setDateRange} /></div>
                 <div className="kpi-grid"><KpiCard title="Ingresos cobrados" value={currency.format(received)} change="En el período" /><KpiCard title="Ingresos proyectados" value={currency.format(projection.projectedIncome)} change="Cobrados y por cobrar" /><KpiCard title="Egresos planificados" value={currency.format(projection.plannedExpenses)} change={`${currency.format(paid)} pagados · ${currency.format(committed)} pendientes`} positive={false} /><KpiCard title="Resultado proyectado" value={currency.format(projection.projectedBalance)} change={projection.coverageRate === null ? 'Sin egresos planificados' : `${projection.coverageRate.toFixed(1)}% de cobertura`} positive={projection.projectedBalance >= 0} /></div>
-                <div className="finance-summary-grid"><section className="finance-panel"><div className="finance-panel-heading"><div><h3>Próximos vencimientos</h3><p>Obligaciones a atender en los próximos 14 días.</p></div><CalendarClock size={20} /></div><div className="finance-reminder-list">{reminders.map((expense) => <button type="button" key={expense.id} onClick={() => { setActiveTab('expenses'); setSearch(expense.concept) }}><span className={getExpenseDisplayStatus(expense, today) === 'Vencido' ? 'danger' : 'warning'}>{getExpenseDisplayStatus(expense, today) === 'Vencido' ? <AlertTriangle size={17} /> : <CalendarClock size={17} />}</span><span><strong>{expense.concept}</strong><small>{expense.category} · vence {formatDate(expense.dueDate)}</small></span><b>{currency.format(expense.amount)}</b></button>)}{reminders.length === 0 && <div className="finance-empty"><CheckCircle2 size={22} /> No hay vencimientos próximos.</div>}</div></section><section className="finance-panel"><div className="finance-panel-heading"><div><h3>Balance del período</h3><p>Movimientos efectivamente realizados en el rango elegido.</p></div><WalletCards size={20} /></div><div className="finance-balance"><div><span><ArrowUpRight size={17} /> Ingresos</span><strong>{currency.format(received)}</strong></div><div><span><ArrowDownRight size={17} /> Egresos</span><strong>{currency.format(paid)}</strong></div><div className="total"><span>Resultado</span><strong>{currency.format(received - paid)}</strong></div></div></section></div>
+                <div className="summary-panels"><ChartCard title="Próximos vencimientos" subtitle="Obligaciones a atender en los próximos 14 días."><div className="finance-reminder-list">{reminders.map((expense) => <button type="button" key={expense.id} onClick={() => { setActiveTab('expenses'); setSearch(expense.concept) }}><span className={getExpenseDisplayStatus(expense, today) === 'Vencido' ? 'danger' : 'warning'}>{getExpenseDisplayStatus(expense, today) === 'Vencido' ? <AlertTriangle size={17} /> : <CalendarClock size={17} />}</span><span><strong>{expense.concept}</strong><small>{expense.category} · vence {formatDate(expense.dueDate)}</small></span><b>{currency.format(expense.amount)}</b></button>)}{reminders.length === 0 && <div className="finance-empty"><CheckCircle2 size={22} /> No hay vencimientos próximos.</div>}</div></ChartCard><ChartCard title="Balance del período" subtitle="Movimientos efectivamente realizados en el rango elegido." value={currency.format(received - paid)}><div className="finance-balance"><div><span><ArrowUpRight size={17} /> Ingresos</span><strong>{currency.format(received)}</strong></div><div><span><ArrowDownRight size={17} /> Egresos</span><strong>{currency.format(paid)}</strong></div><div className="total"><span>Resultado</span><strong>{currency.format(received - paid)}</strong></div></div></ChartCard></div>
             </div>}
 
             {activeTab === 'expenses' && <div className="finance-tab-content">

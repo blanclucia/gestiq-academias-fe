@@ -56,38 +56,9 @@
   font-size: 0.72rem;
 }
 
-.finance-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 18px;
-}
 
-.finance-panel {
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--surface);
-  overflow: hidden;
-}
 
-.finance-panel-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px;
-}
 
-.finance-panel-heading h3,
-.finance-panel-heading p {
-  margin: 0;
-}
-
-.finance-panel-heading p {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 13px;
-}
 
 .finance-reminder-list,
 .dashboard-finance-reminders {
@@ -189,7 +160,7 @@
   padding: 13px 14px;
   border: 1px solid var(--border);
   border-radius: 13px;
-  background: var(--surface);
+  background: var(--surface-subtle);
 }
 
 .finance-expense-main {
@@ -244,10 +215,6 @@
 }
 
 @media (max-width: 900px) {
-  .finance-summary-grid {
-    grid-template-columns: 1fr;
-  }
-
   .finance-expense-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
   }

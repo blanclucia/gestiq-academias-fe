@@ -1715,7 +1715,7 @@ html.dark .donut-chart {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 16px;
-  background: var(--surface);
+  background: var(--surface-subtle);
 }
 
 .enrollment-commission-header {
