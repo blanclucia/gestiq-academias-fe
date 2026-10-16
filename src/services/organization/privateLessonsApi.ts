@@ -55,6 +55,11 @@ export async function createPrivateLessonApi(organizationSlug: string, input: Ap
     return apiPrivateLessonSchema.parse(await request(privateLessonsPath(organizationSlug), { method: 'POST', body: JSON.stringify(input) }))
 }
 
+// Only for a lesson nobody paid for (409 private_lesson_has_payments otherwise; cancel it instead).
+export async function deletePrivateLessonApi(organizationSlug: string, lessonId: string, request: Requester = defaultRequest): Promise<void> {
+    await request(privateLessonsPath(organizationSlug, `/${lessonId}`), { method: 'DELETE' })
+}
+
 export async function updatePrivateLessonApi(organizationSlug: string, lessonId: string, patch: ApiPrivateLessonPatch, request: Requester = defaultRequest): Promise<ApiPrivateLesson> {
     return apiPrivateLessonSchema.parse(await request(privateLessonsPath(organizationSlug, `/${lessonId}`), { method: 'PATCH', body: JSON.stringify(patch) }))
 }

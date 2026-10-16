@@ -1,4 +1,4 @@
-import { Trash2, BookOpen, CalendarDays, CalendarPlus } from 'lucide-react'
+import { Trash2, BookOpen, CalendarDays, CalendarPlus, PencilLine } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CourseForm, type CourseFormValue } from '../components/CourseForm'
@@ -12,8 +12,8 @@ import { EntityCell } from '@/components/ui/PersonCell'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
 import { StatusBadge, type StatusBadgeTone } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { type AcademicCourse, getActiveAcademicCycleId, getCourseRemovalBlockers, listAcademicCycles, listCourses, listPrivateLessons, listStaff, listStudents, useAcademyRepositoryVersion, useActivateCycle, useCreateCourse, useCreateCycle, useCreatePrivateLesson, useDeleteCourse, useUpdatePrivateLesson } from '@/services/academyRepository'
-import { isCycleOverlap } from '@/services/organization/academicOffersApi'
+import { type AcademicCourse, getActiveAcademicCycleId, getCourseRemovalBlockers, listAcademicCycles, listCourses, listPrivateLessons, listStaff, listStudents, useAcademyRepositoryVersion, useActivateCycle, useDeleteCycle, useDeletePrivateLesson, useUpdateCycle, useCreateCourse, useCreateCycle, useCreatePrivateLesson, useDeleteCourse, useUpdatePrivateLesson } from '@/services/academyRepository'
+import { isCycleOverlap, isCycleWithCourses } from '@/services/organization/academicOffersApi'
 import { PrivateLessonsTable, type PrivateStudentRow } from '../components/PrivateLessonsTable'
 import { splitFilterValue } from '@/components/crud/filterValues'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
@@ -50,6 +50,14 @@ export function AcademicOffersPage() {
     const [createCycleError, setCreateCycleError] = useState('')
     const createCycle = useCreateCycle()
     const activateCycle = useActivateCycle()
+    const updateCycle = useUpdateCycle()
+    const deleteCycle = useDeleteCycle()
+    // Editing reuses the creation modal; deleting is only for a cycle created by mistake (no offers).
+    const [editingCycleId, setEditingCycleId] = useState<string | null>(null)
+    const [isDeleteCycleOpen, setIsDeleteCycleOpen] = useState(false)
+    const deletePrivateLesson = useDeletePrivateLesson()
+    const [cancelLessonTarget, setCancelLessonTarget] = useState<{ id: string; student: string } | null>(null)
+    const [deleteLessonTarget, setDeleteLessonTarget] = useState<{ id: string; student: string } | null>(null)
     const createCourse = useCreateCourse()
     const deleteCourse = useDeleteCourse()
     const createPrivateLesson = useCreatePrivateLesson()
@@ -202,13 +210,25 @@ export function AcademicOffersPage() {
         <>
             <EntityFormModal
                 open={isCreateCycleOpen}
-                title="Nuevo ciclo lectivo"
-                subtitle="Creá el período que organizará la oferta, las comisiones y sus inscripciones."
-                submitLabel="Crear ciclo"
+                title={editingCycleId ? 'Editar ciclo lectivo' : 'Nuevo ciclo lectivo'}
+                subtitle={editingCycleId ? 'Cambiá el nombre o las fechas del período.' : 'Creá el período que organizará la oferta, las comisiones y sus inscripciones.'}
+                submitLabel={editingCycleId ? 'Guardar cambios' : 'Crear ciclo'}
                 validate={() => validateConditions({ cycleName: !cycleForm.name.trim() && 'Ingresá el nombre.', cycleStartDate: !cycleForm.startDate && 'Ingresá el inicio.', cycleEndDate: (!cycleForm.endDate || cycleForm.endDate < cycleForm.startDate) && 'Ingresá una fecha de fin válida.' }, 'Revisá los datos del ciclo.')}
-                onClose={() => { setIsCreateCycleOpen(false); setCreateCycleError('') }}
-                onSubmit={() => {
+                onClose={() => { setIsCreateCycleOpen(false); setEditingCycleId(null); setCreateCycleError('') }}
+                onSubmit={async () => {
                     setCreateCycleError('')
+                    if (editingCycleId) {
+                        try {
+                            await updateCycle.mutateAsync({ id: editingCycleId, changes: { name: cycleForm.name.trim(), startDate: cycleForm.startDate, endDate: cycleForm.endDate } })
+                        } catch (error) {
+                            setCreateCycleError(isCycleOverlap(error) ? 'Las fechas se solapan con otro ciclo lectivo que no está cerrado. Ajustá el rango.' : 'No se pudo guardar el ciclo lectivo. Intentá nuevamente.')
+                            throw error
+                        }
+                        showToast('success', 'Ciclo lectivo actualizado.')
+                        setIsCreateCycleOpen(false)
+                        setEditingCycleId(null)
+                        return
+                    }
                     createCycle.mutate({ ...cycleForm, name: cycleForm.name.trim(), status: 'Borrador' }, {
                         onSuccess: (created) => {
                             setIsCreateCycleOpen(false)
@@ -227,7 +247,63 @@ export function AcademicOffersPage() {
                     <label className="form-field"><span className="form-field-label"><span>Fecha de cierre <b className="form-required-mark">*</b></span></span><input name="cycleEndDate" className="form-input" type="date" value={cycleForm.endDate} onChange={(event) => { setCycleForm((current) => ({ ...current, endDate: event.target.value })); setCreateCycleError('') }} /></label>
                 </div>
                 {createCycleError && <p className="form-error-message" role="alert">{createCycleError}</p>}
+                {editingCycleId && <div className="cycle-danger-zone"><span>¿Lo creaste por error? Solo se puede eliminar si no tiene ofertas académicas.</span><button type="button" className="secondary-button compact-button danger-button" onClick={() => setIsDeleteCycleOpen(true)}><Trash2 size={15} />Eliminar ciclo</button></div>}
             </EntityFormModal>
+
+            <DeleteConfirmationModal
+                open={isDeleteCycleOpen}
+                title="Eliminar ciclo lectivo"
+                description={`Se elimina el ciclo "${cycleForm.name}". Si era el ciclo activo, vas a tener que activar otro para seguir cargando ofertas.`}
+                confirmErrorMessage="No se pudo eliminar el ciclo lectivo. Intentá nuevamente."
+                onClose={() => setIsDeleteCycleOpen(false)}
+                onConfirm={async () => {
+                    if (!editingCycleId) return
+                    try {
+                        await deleteCycle.mutateAsync(editingCycleId)
+                    } catch (error) {
+                        if (isCycleWithCourses(error)) {
+                            setIsDeleteCycleOpen(false)
+                            setCreateCycleError('No se puede eliminar: el ciclo tiene ofertas académicas. Eliminalas primero o dejá el ciclo como está.')
+                            return
+                        }
+                        throw error
+                    }
+                    showToast('success', 'Ciclo lectivo eliminado.')
+                    setIsDeleteCycleOpen(false)
+                    setIsCreateCycleOpen(false)
+                    setEditingCycleId(null)
+                }}
+            />
+
+            <DeleteConfirmationModal
+                open={Boolean(cancelLessonTarget)}
+                title="Cancelar clase particular"
+                description={`La clase de ${cancelLessonTarget?.student ?? 'este alumno'} queda finalizada y se eliminan sus cobros sin pagar que vencen después de hoy. Los vencidos y los pagados se conservan.`}
+                confirmLabel="Cancelar clase"
+                cancelLabel="Volver"
+                confirmErrorMessage="No se pudo cancelar la clase particular. Intentá nuevamente."
+                onClose={() => setCancelLessonTarget(null)}
+                onConfirm={async () => {
+                    if (!cancelLessonTarget) return
+                    await updatePrivateLesson.mutateAsync({ id: cancelLessonTarget.id, changes: { status: 'Finalizada' } })
+                    showToast('success', 'Clase particular cancelada.')
+                    setCancelLessonTarget(null)
+                }}
+            />
+
+            <DeleteConfirmationModal
+                open={Boolean(deleteLessonTarget)}
+                title="Eliminar clase particular"
+                description={`Usalo si la cargaste por error: se borran la clase de ${deleteLessonTarget?.student ?? 'este alumno'} y todos sus cobros sin pagar. Si ya pagó alguno, cancelala en su lugar.`}
+                confirmErrorMessage="No se pudo eliminar: si el alumno ya pagó algún cobro de esta clase, cancelala en su lugar."
+                onClose={() => setDeleteLessonTarget(null)}
+                onConfirm={async () => {
+                    if (!deleteLessonTarget) return
+                    await deletePrivateLesson.mutateAsync(deleteLessonTarget.id)
+                    showToast('success', 'Clase particular eliminada.')
+                    setDeleteLessonTarget(null)
+                }}
+            />
 
             <EntityFormModal
                 open={isCreateModalOpen}
@@ -279,7 +355,7 @@ export function AcademicOffersPage() {
             <EntityFormModal
                 open={isPrivateModalOpen}
                 title={editingPrivateLessonId ? 'Reprogramar clase particular' : 'Nuevo particular'}
-                subtitle={editingPrivateLessonId ? 'Actualizá la agenda o las condiciones de la clase.' : 'Seleccioná un alumno y completá los datos de la clase particular.'}
+                subtitle={editingPrivateLessonId ? 'Si cambiás el plan, el precio o los días, se recalculan los cobros sin pagar que vencen después de hoy.' : 'Seleccioná un alumno y completá los datos de la clase particular.'}
                 submitLabel={editingPrivateLessonId ? 'Guardar cambios' : 'Crear particular'}
                 validate={() => validateConditions({ privateStudent: !students.some((student) => student.id === privateLessonForm.studentId) && 'Seleccioná un alumno.', privateTeacher: !privateLessonForm.teacherId && 'Seleccioná un docente.', privatePurpose: !privateLessonForm.purpose.trim() && 'Ingresá el motivo.', privateCost: Number(privateLessonForm.costPerClass) <= 0 && 'Ingresá un costo válido.', privateStart: !privateLessonForm.startDate && 'Ingresá el inicio.', privateEnd: (!privateLessonForm.endDate || privateLessonForm.endDate < privateLessonForm.startDate) && 'Ingresá una fecha de fin válida.', privateDays: privateLessonForm.days.length === 0 && 'Seleccioná al menos un día.', privateTime: (!privateLessonForm.fromTime || !privateLessonForm.toTime || privateLessonForm.toTime <= privateLessonForm.fromTime) && 'Ingresá un horario válido.' }, 'Revisá los datos de la clase particular.')}
                 onClose={() => {
@@ -349,7 +425,15 @@ export function AcademicOffersPage() {
                                     options={cycles.map((cycle) => ({ value: cycle.id, label: cycle.name }))}
                                     onChange={(cycleId) => activateCycle.mutate(cycleId, { onError: () => showToast('error', 'No se pudo cambiar el ciclo lectivo activo.') })}
                                 />
-                                <button type="button" className="secondary-button cycle-icon-action" aria-label="Crear nuevo ciclo lectivo" data-tooltip="Crear y configurar un nuevo ciclo lectivo" onClick={() => setIsCreateCycleOpen(true)}><CalendarPlus size={16} /></button>
+                                <button type="button" className="secondary-button cycle-icon-action" aria-label="Editar ciclo lectivo" data-tooltip="Editar el ciclo lectivo seleccionado" disabled={!activeCycleId} onClick={() => {
+                                    const cycle = cycles.find((item) => item.id === activeCycleId)
+                                    if (!cycle) return
+                                    setEditingCycleId(cycle.id)
+                                    setCycleForm({ name: cycle.name, startDate: cycle.startDate, endDate: cycle.endDate })
+                                    setCreateCycleError('')
+                                    setIsCreateCycleOpen(true)
+                                }}><PencilLine size={16} /></button>
+                                <button type="button" className="secondary-button cycle-icon-action" aria-label="Crear nuevo ciclo lectivo" data-tooltip="Crear y configurar un nuevo ciclo lectivo" onClick={() => { setEditingCycleId(null); setCycleForm({ name: '', startDate: '2027-01-01', endDate: '2027-12-31' }); setIsCreateCycleOpen(true) }}><CalendarPlus size={16} /></button>
                             </div>
                         </div>
                     </div>
@@ -425,10 +509,8 @@ export function AcademicOffersPage() {
                             setEditingPrivateLessonId(item.id)
                             setIsPrivateModalOpen(true)
                         }}
-                        onCancel={(item) => updatePrivateLesson.mutate({ id: item.id, changes: { status: 'Finalizada' } }, {
-                            onSuccess: () => showToast('success', 'Clase particular cancelada correctamente.'),
-                            onError: () => showToast('error', 'No se pudo cancelar la clase particular. Intentá nuevamente.'),
-                        })}
+                        onCancel={(item) => setCancelLessonTarget({ id: item.id, student: item.student })}
+                        onDelete={(item) => setDeleteLessonTarget({ id: item.id, student: item.student })}
                     />
                 )}
             </CrudListPage>
