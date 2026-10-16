@@ -114,9 +114,11 @@ export function useAssignEnrollment() {
             if (!organizationSlug) throw new Error('No hay organización activa.')
             await assignEnrollmentApi(organizationSlug, courseId, commissionId, studentId, status ? enrollmentStatusToApi(status) : undefined)
         },
-        onSuccess: (_data, { courseId, commissionId }) => {
+        onSuccess: (_data, { courseId, commissionId, studentId }) => {
             queryClient.invalidateQueries({ queryKey: ['commission-roster', organizationSlug, courseId, commissionId] })
             queryClient.invalidateQueries({ queryKey: ['courses', organizationSlug] })
+            // The student's detail lists the same enrollment (Cursos y comisiones).
+            queryClient.invalidateQueries({ queryKey: ['student-enrollments', organizationSlug, studentId] })
         },
     })
 }

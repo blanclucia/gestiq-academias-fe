@@ -1,7 +1,9 @@
-import { Activity, ArrowLeft, Cake, GraduationCap, PauseCircle, PlayCircle, Wallet } from 'lucide-react'
+import { Activity, ArrowLeft, BookOpen, Cake, GraduationCap, PauseCircle, PlayCircle, SlidersHorizontal, Wallet } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { DeleteConfirmationModal } from '@/components/crud/EntityFormModal'
+import { DeleteConfirmationModal, EntityFormModal, FormField } from '@/components/crud/EntityFormModal'
+import { RowActionMenu } from '@/components/ui/RowActionMenu'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { Card } from '@/components/ui/Card'
 import { DataTable } from '@/components/ui/DataTable'
 import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
@@ -11,7 +13,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/ToastContext'
 import { formatCurrencyARS, formatShortDate } from '@/domain/shared/formattingRules'
 import { calculateAge } from '@/domain/students/studentRules'
-import { listPayments, listStudents, useAcademyRepositoryVersion, useCharges, useStudentEnrollments, useUpdateStudent } from '@/services/academyRepository'
+import { listPayments, listStudents, useAcademyRepositoryVersion, useAssignEnrollment, useCharges, useGenerateTuition, useStudentEnrollments, useUpdateStudent, type CommissionStudentStatus, type StudentEnrollmentHistoryRow } from '@/services/academyRepository'
+import { describeEnrollmentFailure } from '@/services/organization/academicOffersApi'
 import { isStudentDocumentConflict } from '@/services/organization/studentsApi'
 import { useWorkspace } from '@/workspace/useWorkspace'
 import { StudentSettingsCards } from '../components/StudentSettingsCards'
@@ -38,6 +41,12 @@ export function StudentDetailPage() {
     const setActiveTab = (tab: StudentTab) => setSearchParams(tab === 'overview' ? {} : { tab }, { replace: true })
     const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false)
     const updateStudent = useUpdateStudent()
+    const assignEnrollment = useAssignEnrollment()
+    const generateTuition = useGenerateTuition()
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+    const [enrollmentTarget, setEnrollmentTarget] = useState<StudentEnrollmentHistoryRow | null>(null)
+    const [enrollmentStatus, setEnrollmentStatus] = useState<CommissionStudentStatus>('Activo')
+    const [enrollmentError, setEnrollmentError] = useState('')
 
     const student = listStudents().find((item) => item.id === studentId)
     const { history: commissionHistory } = useStudentEnrollments(student?.id)
@@ -67,8 +76,45 @@ export function StudentDetailPage() {
         ? { label: 'Pausar alumno', icon: <PauseCircle size={15} />, description: `${student.fullName} pasará a estado Inactivo. Sigue en sus comisiones y conserva sus cobros; podés reactivarlo cuando quieras.`, done: 'Alumno pausado correctamente.' }
         : { label: student.status === 'Pendiente' ? 'Activar alumno' : 'Reactivar alumno', icon: <PlayCircle size={15} />, description: `${student.fullName} pasará a estado Activo.`, done: student.status === 'Pendiente' ? 'Alumno activado correctamente.' : 'Alumno reactivado correctamente.' }
 
+    // Same flow as Comisión → Alumnos → Cambiar estado: reactivating generates the missing cuotas.
+    const saveEnrollmentStatus = async () => {
+        if (!enrollmentTarget) return
+        try {
+            await assignEnrollment.mutateAsync({ courseId: enrollmentTarget.courseId, commissionId: enrollmentTarget.commissionId, studentId: student.id, status: enrollmentStatus })
+            if (enrollmentStatus === 'Activo') await generateTuition.mutateAsync({ studentId: student.id, commissionId: enrollmentTarget.commissionId })
+        } catch (error) {
+            setEnrollmentError(describeEnrollmentFailure(error) ?? 'No se pudo actualizar el estado. Intentá nuevamente.')
+            throw error
+        }
+        showToast('success', enrollmentStatus === 'Baja' ? `${student.fullName} quedó dado de baja de ${enrollmentTarget.commissionName}.` : 'Estado en la comisión actualizado.')
+        setEnrollmentTarget(null)
+    }
+
     return (
         <div className="dashboard-page">
+            <EntityFormModal
+                open={Boolean(enrollmentTarget)}
+                title="Estado en la comisión"
+                subtitle={enrollmentTarget ? `${enrollmentTarget.courseName} · ${enrollmentTarget.commissionName}` : undefined}
+                submitLabel="Guardar estado"
+                submitErrorMessage={enrollmentError || undefined}
+                onClose={() => setEnrollmentTarget(null)}
+                onSubmit={saveEnrollmentStatus}
+            >
+                <FormField label="Estado" hint={enrollmentStatus === 'Baja' || enrollmentStatus === 'Finalizado' ? 'Las cuotas pendientes de esta comisión siguen en Cobros: anulá las que ya no correspondan.' : undefined}>
+                    <SearchableSelect
+                        value={enrollmentStatus}
+                        onChange={(status) => { setEnrollmentStatus(status as CommissionStudentStatus); setEnrollmentError('') }}
+                        options={[
+                            { value: 'Activo', label: 'Activo' },
+                            { value: 'Pausado', label: 'Pausado' },
+                            { value: 'Finalizado', label: 'Finalizado' },
+                            { value: 'Baja', label: 'Baja' },
+                        ]}
+                    />
+                </FormField>
+            </EntityFormModal>
+
             <DeleteConfirmationModal
                 open={isStatusChangeOpen}
                 title={statusAction.label}
@@ -150,6 +196,10 @@ export function StudentDetailPage() {
                                     { key: 'enrolledAt', header: 'Alta', accessor: (entry) => formatShortDate(entry.enrolledAt.slice(0, 10), '-') },
                                     { key: 'status', header: 'Estado', accessor: (entry) => <StatusBadge label={entry.status} tone={entry.status === 'Activo' ? 'success' : entry.status === 'Pausado' ? 'warning' : entry.status === 'Baja' ? 'danger' : 'neutral'} />, align: 'center' },
                                 ]}
+                                renderActions={(entry) => <RowActionMenu ariaLabel={`Acciones para ${entry.commissionName}`} active={openMenuId === entry.id} onToggle={() => setOpenMenuId((current) => current === entry.id ? null : entry.id)} actions={[
+                                    { label: 'Ver comisión', icon: <BookOpen size={15} />, onClick: () => navigate(path(`oferta/${entry.courseId}/comisiones/${entry.commissionId}`)) },
+                                    { label: 'Cambiar estado', icon: <SlidersHorizontal size={15} />, onClick: () => { setEnrollmentStatus(entry.status); setEnrollmentError(''); setEnrollmentTarget(entry); setOpenMenuId(null) } },
+                                ]} />}
                             />
                         </Card>
                     )}
