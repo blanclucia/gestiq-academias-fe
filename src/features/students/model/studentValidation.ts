@@ -1,4 +1,5 @@
 import { invalidForm, validForm, type FormValidationResult } from '@/components/forms/formValidation'
+import { isMinor } from '@/domain/students/studentRules'
 import { isValidBirthDate, isValidDni, isValidEmail, isValidPersonName, isValidPhone, normalizeDocument } from '@/domain/people/personRules'
 import type { StudentFormValue } from '../components/StudentForm'
 
@@ -16,17 +17,20 @@ export function validateStudent(value: StudentFormValue): FormValidationResult {
     if (value.phone.trim() && !isValidPhone(value.phone.trim())) errors.studentPhone = 'El teléfono tiene que tener entre 8 y 15 números.'
     if (value.birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(value.birthDate)) errors.studentBirthDate = 'Usá el formato aaaa-mm-dd.'
     else if (value.birthDate && !isValidBirthDate(value.birthDate)) errors.studentBirthDate = 'Revisá la fecha de nacimiento.'
-    return Object.keys(errors).length ? invalidForm('Revisá los datos del alumno.', errors) : validForm
-}
-
-export type StudentDetailValue = StudentFormValue & { tutorName: string; tutorEmail: string; tutorPhone: string }
-
-// The detail also edits the tutor: optional fields, validated with the same people rules when typed.
-export function validateStudentDetail(value: StudentDetailValue): FormValidationResult {
-    const base = validateStudent(value)
-    const errors: Record<string, string> = { ...(base.fieldErrors ?? {}) }
-    if (value.tutorName.trim() && !isValidPersonName(value.tutorName.trim())) errors.studentTutorName = 'El nombre del tutor solo puede tener letras.'
+    // A minor needs a tutor with a way to reach them, like on the public enrollment form.
+    if (isMinor(value.birthDate || undefined)) {
+        if (!value.tutorName.trim()) errors.studentTutorName = 'Ingresá el nombre del tutor.'
+        else if (!isValidPersonName(value.tutorName.trim())) errors.studentTutorName = 'El nombre del tutor solo puede tener letras.'
+        if (!value.tutorEmail.trim() && !value.tutorPhone.trim()) errors.studentTutorPhone = 'Ingresá un email o un teléfono del tutor.'
+    }
     if (value.tutorEmail.trim() && !isValidEmail(value.tutorEmail.trim())) errors.studentTutorEmail = 'Ingresá un email válido para el tutor.'
     if (value.tutorPhone.trim() && !isValidPhone(value.tutorPhone.trim())) errors.studentTutorPhone = 'El teléfono del tutor tiene que tener entre 8 y 15 números.'
     return Object.keys(errors).length ? invalidForm('Revisá los datos del alumno.', errors) : validForm
+}
+
+export type StudentDetailValue = StudentFormValue
+
+// The detail edits the same fields, tutor included.
+export function validateStudentDetail(value: StudentDetailValue): FormValidationResult {
+    return validateStudent(value)
 }

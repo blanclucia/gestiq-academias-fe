@@ -68,10 +68,11 @@ export function useStudents(options: { enabled?: boolean } = {}) {
     return { students: listStudents(), isLoading: query.isLoading, isError: query.isError, error: query.error }
 }
 
-function toApiInput(form: { firstName: string; lastName: string; document: string; email: string; phone: string; birthDate?: string; notes?: string; status: 'Activo' | 'Pendiente' | 'Inactivo' }, branchId: string): ApiStudentInput {
+function toApiInput(form: { firstName: string; lastName: string; document: string; email: string; phone: string; birthDate?: string; notes?: string; status: 'Activo' | 'Pendiente' | 'Inactivo'; tutorName?: string; tutorEmail?: string; tutorPhone?: string }, branchId: string): ApiStudentInput {
     return {
         branchId, firstName: form.firstName, lastName: form.lastName, document: form.document, email: form.email, phone: form.phone,
         birthDate: form.birthDate ?? '', notes: form.notes ?? '', status: studentStatusToApi(form.status),
+        tutorName: form.tutorName ?? '', tutorEmail: form.tutorEmail ?? '', tutorPhone: form.tutorPhone ?? '',
     }
 }
 
@@ -95,7 +96,7 @@ export function useUpdateStudent() {
     const queryClient = useQueryClient()
     const organizationSlug = session?.organization.slug
     return useMutation({
-        mutationFn: async ({ id, changes }: { id: string; changes: Partial<Parameters<typeof toApiInput>[0]> & { tutorName?: string; tutorEmail?: string; tutorPhone?: string } }) => {
+        mutationFn: async ({ id, changes }: { id: string; changes: Partial<Parameters<typeof toApiInput>[0]> }) => {
             if (!organizationSlug) throw new Error('No hay organización activa.')
             const patch: ApiStudentPatch = {}
             if (changes.firstName !== undefined) patch.firstName = changes.firstName

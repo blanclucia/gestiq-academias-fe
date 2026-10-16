@@ -57,7 +57,7 @@ export function StudentSettingsCards({ student, saving, onSave }: Props) {
         {showTutor && <Card>
             <SectionHeading icon={<ShieldCheck size={20} />} title="Tutor o responsable" description="Contacto principal mientras el alumno sea menor de edad." />
             <div className="form-grid academy-settings-grid">
-                <Field label="Nombre y apellido"><input name="studentTutorName" className="form-input" value={draft.tutorName} onChange={(event) => update({ tutorName: event.target.value })} onBlur={() => update({ tutorName: normalizePersonName(draft.tutorName) })} /></Field>
+                <Field label="Nombre y apellido" required={isMinor(draft.birthDate || undefined)}><input name="studentTutorName" className="form-input" value={draft.tutorName} onChange={(event) => update({ tutorName: event.target.value })} onBlur={() => update({ tutorName: normalizePersonName(draft.tutorName) })} /></Field>
                 <Field label="Email"><input name="studentTutorEmail" className="form-input" type="email" value={draft.tutorEmail} onChange={(event) => update({ tutorEmail: event.target.value })} /></Field>
                 <Field label="Teléfono"><input name="studentTutorPhone" className="form-input" type="tel" value={draft.tutorPhone} onChange={(event) => update({ tutorPhone: event.target.value })} /></Field>
             </div>

@@ -14,6 +14,7 @@ import { useSelectedBranchId } from '@/services/branchRepository'
 import { listCommunicationTemplates } from '@/services/communicationTemplateRepository'
 import { csvHeaders, importFieldLabels, parseStudentCsv, requiredImportFields, suggestStudentImportMapping as suggestMapping, type ImportFieldKey, type ImportStudentRow } from '../model/studentImport'
 import { validateStudent } from '../model/studentValidation'
+import { isMinor } from '@/domain/students/studentRules'
 import { isValidBirthDate, isValidDni, isValidEmail, isValidPersonName, isValidPhone, normalizeDocument } from '@/domain/people/personRules'
 import { validateConditions } from '@/components/forms/formValidation'
 import { splitFilterValue } from '@/components/crud/filterValues'
@@ -26,7 +27,7 @@ type StudentFilters = {
     status: string
 }
 
-const emptyStudentForm: StudentFormValue = { firstName: '', lastName: '', document: '', email: '', phone: '', birthDate: '', status: 'Activo', notes: '' }
+const emptyStudentForm: StudentFormValue = { firstName: '', lastName: '', document: '', email: '', phone: '', birthDate: '', status: 'Activo', notes: '', tutorName: '', tutorEmail: '', tutorPhone: '' }
 
 type StatusChangeRequest = {
     studentId: string
@@ -213,6 +214,9 @@ export function StudentsPage() {
 
             if (row.birthDate && !isValidBirthDate(row.birthDate)) {
                 row.errors.push('Fecha de nacimiento inválida')
+            } else if (isMinor(row.birthDate)) {
+                // The CSV has no tutor columns, and a minor is created with a tutor: load it from the form.
+                row.errors.push('Menor de edad: cargalo con "Nuevo" para sumar a su tutor')
             }
 
             return row
@@ -528,6 +532,9 @@ export function StudentsPage() {
                             birthDate: editingStudent.birthDate,
                             status: editingStudent.status,
                             notes: editingStudent.notes,
+                            tutorName: editingStudent.tutorName,
+                            tutorEmail: editingStudent.tutorEmail,
+                            tutorPhone: editingStudent.tutorPhone,
                         } : undefined
                     }
                 />
@@ -679,7 +686,7 @@ export function StudentsPage() {
                     onView={(student) => navigate(path(`alumnos/${student.id}`))}
                     onAssign={(student) => { setAssignmentStudentIds([student.id]); setIsAssignmentModalOpen(true) }}
                     onPrivateLesson={(student) => navigate(path(`oferta?tab=private&student=${student.id}`))}
-                    onEdit={(student) => { setEditingStudent(student); setStudentForm({ firstName: student.firstName, lastName: student.lastName, document: student.document, email: student.email, phone: student.phone, birthDate: student.birthDate ?? '', status: student.status, notes: student.notes ?? '' }); setIsEditModalOpen(true) }}
+                    onEdit={(student) => { setEditingStudent(student); setStudentForm({ firstName: student.firstName, lastName: student.lastName, document: student.document, email: student.email, phone: student.phone, birthDate: student.birthDate ?? '', status: student.status, notes: student.notes ?? '', tutorName: student.tutorName ?? '', tutorEmail: student.tutorEmail ?? '', tutorPhone: student.tutorPhone ?? '' }); setIsEditModalOpen(true) }}
                     onStatus={(student) => setStatusChangeRequest({ studentId: student.id, studentName: student.fullName, nextStatus: student.status === 'Inactivo' ? 'Activo' : 'Inactivo' })}
                     onDelete={setDeleteTarget}
                 />
