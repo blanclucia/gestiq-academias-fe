@@ -1,8 +1,8 @@
-import { useSyncExternalStore } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@/auth/AuthContext'
 import { getActiveAcademicCycleId, listCourses, listEnrollmentOpenings, listPrivateLessons, listStaff, listStudents } from '@/services/academyRepository'
-import { createRepositoryEvents } from '@/services/shared/repositoryEvents'
-import { readStoredValue, writeStoredValue } from '@/services/shared/storage'
-import { getWeeklyAgendaDates, isAgendaEventInBranch, shiftAgendaDate, type AgendaBranchScope } from '@/domain/agenda/agendaRules'
+import { createAgendaEventApi, deleteAgendaEventApi, fetchAgendaEvents, updateAgendaEventApi, type ApiAgendaEvent, type ApiAgendaEventInput, type ApiAgendaList } from '@/services/organization/agendaApi'
+import { getWeeklyAgendaDates, isAgendaEventInBranch, type AgendaBranchScope } from '@/domain/agenda/agendaRules'
 
 export type AgendaEventType = 'feriado' | 'cumpleanos' | 'clase' | 'inscripcion' | 'academico' | 'reunion' | 'recordatorio' | 'otro'
 export type AgendaEventScope = 'general' | 'commission'
@@ -28,32 +28,15 @@ export type AgendaEvent = {
     staffUserId?: string
 }
 
-const storageKey = 'gestiq-agenda-events-v1'
-const repositoryEvents = createRepositoryEvents(storageKey)
-
-const initialHolidays: AgendaEvent[] = [
-    { id: 'HOL-2026-01-01', title: 'Año Nuevo', type: 'feriado', scope: 'general', date: '2026-01-01', allDay: true, source: 'system', createdAt: '2026-01-01' },
-    { id: 'HOL-2026-02-16', title: 'Carnaval', type: 'feriado', scope: 'general', date: '2026-02-16', endDate: '2026-02-17', allDay: true, source: 'system', createdAt: '2026-01-01' },
-    { id: 'HOL-2026-03-24', title: 'Día Nacional de la Memoria por la Verdad y la Justicia', type: 'feriado', scope: 'general', date: '2026-03-24', allDay: true, source: 'system', createdAt: '2026-01-01' },
-    { id: 'HOL-2026-04-02', title: 'Día del Veterano y de los Caídos en la Guerra de Malvinas', type: 'feriado', scope: 'general', date: '2026-04-02', allDay: true, source: 'system', createdAt: '2026-01-01' },
-    { id: 'HOL-2026-05-01', title: 'Día del Trabajador', type: 'feriado', scope: 'general', date: '2026-05-01', allDay: true, source: 'system', createdAt: '2026-01-01' },
-    { id: 'HOL-2026-05-25', title: 'Día de la Revolución de Mayo', type: 'feriado', scope: 'general', date: '2026-05-25', allDay: true, source: 'system', createdAt: '2026-01-01' },
-    { id: 'HOL-2026-06-20', title: 'Paso a la Inmortalidad del General Manuel Belgrano', type: 'feriado', scope: 'general', date: '2026-06-20', allDay: true, source: 'system', createdAt: '2026-01-01' },
-    { id: 'HOL-2026-07-09', title: 'Día de la Independencia', type: 'feriado', scope: 'general', date: '2026-07-09', allDay: true, source: 'system', createdAt: '2026-01-01' },
-    { id: 'HOL-2026-08-17', title: 'Paso a la Inmortalidad del General José de San Martín', type: 'feriado', scope: 'general', date: '2026-08-17', allDay: true, source: 'system', createdAt: '2026-01-01' },
-    { id: 'HOL-2026-10-12', title: 'Día del Respeto a la Diversidad Cultural', type: 'feriado', scope: 'general', date: '2026-10-12', allDay: true, source: 'system', createdAt: '2026-01-01' },
-    { id: 'HOL-2026-11-20', title: 'Día de la Soberanía Nacional', type: 'feriado', scope: 'general', date: '2026-11-20', allDay: true, source: 'system', createdAt: '2026-01-01' },
-    { id: 'HOL-2026-12-08', title: 'Inmaculada Concepción de María', type: 'feriado', scope: 'general', date: '2026-12-08', allDay: true, source: 'system', createdAt: '2026-01-01' },
-    { id: 'HOL-2026-12-25', title: 'Navidad', type: 'feriado', scope: 'general', date: '2026-12-25', allDay: true, source: 'system', createdAt: '2026-01-01' },
-]
-
-function readEvents() {
-    return readStoredValue<AgendaEvent[]>(storageKey, [])
-}
-
-function writeEvents(events: AgendaEvent[]) {
-    writeStoredValue(storageKey, events)
-    repositoryEvents.emit()
+// Events used to live in the browser (this key). They were test data only seen by whoever created
+// them; the agenda now reads the backend, so the old copy is just removed.
+const legacyStorageKey = 'gestiq-agenda-events-v1'
+function discardLegacyEvents() {
+    try {
+        window.localStorage.removeItem(legacyStorageKey)
+    } catch {
+        // Storage may be unavailable (private mode): nothing to discard.
+    }
 }
 
 function dateForBirthday(birthDate: string, year: number) {
@@ -130,50 +113,90 @@ function derivedEnrollmentEvents(year: number): AgendaEvent[] {
     })
 }
 
-export function useAgendaRepositoryVersion() {
-    return useSyncExternalStore(repositoryEvents.subscribe, repositoryEvents.getRevision, () => 0)
-}
-
-export function listAgendaEvents(year: number) {
-    const stored = readEvents()
-    const storedIds = new Set(stored.map((event) => event.id))
-    const holidays = initialHolidays.filter((event) => event.date.startsWith(`${year}-`) && !storedIds.has(event.id))
-    return [...holidays, ...derivedBirthdayEvents(year), ...derivedClassEvents(year), ...derivedEnrollmentEvents(year), ...stored.filter((event) => event.date.startsWith(`${year}-`))].sort((a, b) => a.date.localeCompare(b.date))
-}
-
-export function listUpcomingAgendaEvents(fromDate: string, limit = 6, excludedTypes: AgendaEventType[] = [], branchScope?: AgendaBranchScope) {
-    const commissionBranchIds = new Map(listCourses().flatMap((course) => course.commissions.map((commission) => [commission.id, course.branchId] as const)))
-    return listAgendaEvents(Number(fromDate.slice(0, 4)))
-        .filter((event) => event.date >= fromDate && !excludedTypes.includes(event.type) && (!branchScope || isAgendaEventInBranch(event, branchScope, commissionBranchIds)))
-        .slice(0, limit)
-}
-
-export function createAgendaEvent(event: Omit<AgendaEvent, 'id' | 'source' | 'createdAt'>) {
-    const next: AgendaEvent = { ...event, id: `EVENT-${Date.now()}`, source: 'admin', createdAt: new Date().toISOString() }
-    writeEvents([...readEvents(), next])
-    return next
-}
-
-export function createRecurringAgendaEvents(event: Omit<AgendaEvent, 'id' | 'source' | 'createdAt'>, repeatUntil: string, weekdays: number[]) {
-    const duration = event.endDate ? Math.max(0, Math.round((new Date(`${event.endDate}T12:00:00`).getTime() - new Date(`${event.date}T12:00:00`).getTime()) / 86400000)) : 0
-    const occurrences: AgendaEvent[] = []
-    let cursor = event.date
-    let index = 0
-    while (cursor <= repeatUntil) {
-        if (weekdays.includes(new Date(`${cursor}T12:00:00`).getDay())) {
-            occurrences.push({ ...event, date: cursor, endDate: duration ? shiftAgendaDate(cursor, duration) : undefined, id: `EVENT-${Date.now()}-${index}`, source: 'admin', createdAt: new Date().toISOString() })
-            index += 1
-        }
-        cursor = shiftAgendaDate(cursor, 1)
+function fromApiEvent(event: ApiAgendaEvent): AgendaEvent {
+    return {
+        id: event.id, title: event.title, description: event.description || undefined, type: event.type, scope: 'general',
+        date: event.date, endDate: event.endDate !== event.date ? event.endDate : undefined, allDay: event.allDay,
+        location: event.location || undefined, startTime: event.startTime || undefined, endTime: event.endTime || undefined,
+        source: 'admin', createdAt: '', branchId: event.branchId ?? undefined,
     }
-    writeEvents([...readEvents(), ...occurrences])
-    return occurrences
 }
 
-export function updateAgendaEvent(id: string, changes: Partial<Omit<AgendaEvent, 'id' | 'source' | 'createdAt'>>) {
-    writeEvents(readEvents().map((event) => event.id === id ? { ...event, ...changes } : event))
+function holidayEvents(holidays: ApiAgendaList['holidays']): AgendaEvent[] {
+    return holidays.map((holiday) => ({ id: `HOL-${holiday.date}-${holiday.title}`, title: holiday.title, type: 'feriado', scope: 'general', date: holiday.date, allDay: true, source: 'system', createdAt: '' }))
 }
 
-export function removeAgendaEvent(id: string) {
-    writeEvents(readEvents().filter((event) => event.id !== id))
+const yearsBetween = (from: string, to: string) => {
+    const years: number[] = []
+    for (let year = Number(from.slice(0, 4)); year <= Number(to.slice(0, 4)); year += 1) years.push(year)
+    return years
+}
+
+// Every event of the range for a branch: the academy's own events and the national holidays from the
+// backend, plus classes, enrollment openings and birthdays derived from their modules. Derived ones
+// are filtered with the same branch rule the dashboard uses.
+export function useAgendaEvents(range: { from: string; to: string }, branchScope?: AgendaBranchScope) {
+    const { session } = useAuth()
+    const organizationSlug = session?.organization.slug
+    const query = useQuery({
+        queryKey: ['agenda-events', organizationSlug, range.from, range.to, branchScope?.branchId ?? ''],
+        queryFn: ({ signal }) => {
+            discardLegacyEvents()
+            return fetchAgendaEvents(organizationSlug!, { from: range.from, to: range.to, branchId: branchScope?.branchId || undefined }, signal)
+        },
+        enabled: Boolean(organizationSlug),
+    })
+    const commissionBranchIds = new Map(listCourses().flatMap((course) => course.commissions.map((commission) => [commission.id, course.branchId] as const)))
+    const derived = yearsBetween(range.from, range.to).flatMap((year) => [...derivedBirthdayEvents(year), ...derivedClassEvents(year), ...derivedEnrollmentEvents(year)])
+        .filter((event) => !branchScope?.branchId || isAgendaEventInBranch(event, branchScope, commissionBranchIds))
+    const stored = query.data ? [...holidayEvents(query.data.holidays), ...query.data.items.map(fromApiEvent)] : []
+    const events = [...stored, ...derived]
+        .filter((event) => event.date <= range.to && (event.endDate ?? event.date) >= range.from)
+        .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime ?? '').localeCompare(b.startTime ?? ''))
+    return { events, isLoading: query.isLoading, isError: query.isError }
+}
+
+export type AgendaEventInput = Omit<ApiAgendaEventInput, 'branchId'> & { branchId?: string }
+
+const toApiInput = (input: AgendaEventInput): ApiAgendaEventInput => ({ ...input, branchId: input.branchId ?? null })
+
+function useAgendaInvalidation() {
+    const { session } = useAuth()
+    const queryClient = useQueryClient()
+    const organizationSlug = session?.organization.slug
+    return { organizationSlug, invalidate: () => queryClient.invalidateQueries({ queryKey: ['agenda-events', organizationSlug] }) }
+}
+
+// A weekly series is expanded by the backend into one event per matching day.
+export function useCreateAgendaEvent() {
+    const { organizationSlug, invalidate } = useAgendaInvalidation()
+    return useMutation({
+        mutationFn: async ({ input, recurrence }: { input: AgendaEventInput; recurrence?: { weekdays: number[]; repeatUntil: string } }) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            return createAgendaEventApi(organizationSlug, { ...toApiInput(input), ...(recurrence ? { recurrence } : {}) })
+        },
+        onSuccess: invalidate,
+    })
+}
+
+export function useUpdateAgendaEvent() {
+    const { organizationSlug, invalidate } = useAgendaInvalidation()
+    return useMutation({
+        mutationFn: async ({ id, input }: { id: string; input: AgendaEventInput }) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            return updateAgendaEventApi(organizationSlug, id, toApiInput(input))
+        },
+        onSuccess: invalidate,
+    })
+}
+
+export function useDeleteAgendaEvent() {
+    const { organizationSlug, invalidate } = useAgendaInvalidation()
+    return useMutation({
+        mutationFn: async (id: string) => {
+            if (!organizationSlug) throw new Error('No hay organización activa.')
+            await deleteAgendaEventApi(organizationSlug, id)
+        },
+        onSuccess: invalidate,
+    })
 }

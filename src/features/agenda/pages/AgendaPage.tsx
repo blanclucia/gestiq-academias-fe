@@ -1,14 +1,16 @@
 import { useState } from "react";
 import {
-    createAgendaEvent,
-    createRecurringAgendaEvents,
-    listAgendaEvents,
-    removeAgendaEvent,
-    updateAgendaEvent,
-    useAgendaRepositoryVersion,
+    useAgendaEvents,
+    useCreateAgendaEvent,
+    useDeleteAgendaEvent,
+    useUpdateAgendaEvent,
     type AgendaEvent,
+    type AgendaEventInput,
     type AgendaEventType,
 } from "@/services/agendaRepository";
+import { useBranchRoster, useBranches, useSelectedBranchId } from "@/services/branchRepository";
+import { DeleteConfirmationModal } from "@/components/crud/EntityFormModal";
+import { useToast } from "@/components/ui/ToastContext";
 import { AgendaDayDetailsModal } from "../components/AgendaDayDetailsModal";
 import { AgendaUpcomingPanel } from "../components/AgendaUpcomingPanel";
 import { AgendaEventModal, type AgendaEventFormValue } from "../components/AgendaEventModal";
@@ -20,6 +22,7 @@ const generalEventTypes: AgendaEventType[] = [
     "reunion",
     "academico",
     "recordatorio",
+    "feriado",
     "otro",
 ];
 
@@ -28,7 +31,15 @@ const generalEventTypes: AgendaEventType[] = [
 */
 
 export function AgendaPage() {
-    useAgendaRepositoryVersion();
+    const { showToast } = useToast();
+    const selectedBranchId = useSelectedBranchId();
+    const { branches } = useBranches();
+    const { roster } = useBranchRoster(selectedBranchId || undefined);
+    const branchName = branches.find((branch) => branch.id === selectedBranchId)?.name;
+    const createEvent = useCreateAgendaEvent();
+    const updateEvent = useUpdateAgendaEvent();
+    const deleteEvent = useDeleteAgendaEvent();
+    const [deleteTarget, setDeleteTarget] = useState<AgendaEvent | null>(null);
     const today = new Date();
     const [viewDate, setViewDate] = useState(
         new Date(today.getFullYear(), today.getMonth(), 1),
@@ -52,8 +63,15 @@ export function AgendaPage() {
         recurrence: "none" as "none" | "weekly",
         repeatUntil: initialDate,
         repeatDays: [new Date(`${initialDate}T12:00:00`).getDay()],
+        scope: "branch",
     });
-    const events = listAgendaEvents(viewDate.getFullYear());
+    // The whole year on screen (plus the days of neighbouring months the calendar shows), for the
+    // selected branch: its events, the academy-wide ones and national holidays.
+    const viewYear = viewDate.getFullYear();
+    const { events } = useAgendaEvents(
+        { from: `${viewYear - 1}-12-25`, to: `${viewYear + 1}-01-07` },
+        { branchId: selectedBranchId, teacherUserIds: roster.teacherIds },
+    );
     const visibleEvents = events.filter(
         (event) =>
             selectedType === "all" ||
@@ -113,31 +131,29 @@ export function AgendaPage() {
             recurrence: "none",
             repeatUntil: event.date,
             repeatDays: [new Date(`${event.date}T12:00:00`).getDay()],
+            scope: event.branchId ? "branch" : "academy",
         });
         setIsCreateOpen(true);
     };
-    const saveEvent = () => {
-        const changes = {
+    // Awaited by the modal: on failure it stays open with the error instead of closing as if saved.
+    const saveEvent = async () => {
+        const input: AgendaEventInput = {
+            branchId: eventForm.scope === "branch" ? selectedBranchId || undefined : undefined,
             title: eventForm.title.trim(),
-            description: eventForm.description.trim() || undefined,
-            type: eventForm.type,
-            scope: "general" as const,
+            description: eventForm.description.trim(),
+            type: eventForm.type as AgendaEventInput["type"],
             date: eventForm.date,
-            endDate:
-                eventForm.endDate === eventForm.date ? undefined : eventForm.endDate,
+            endDate: eventForm.endDate || eventForm.date,
             allDay: eventForm.allDay,
-            startTime: eventForm.allDay ? undefined : eventForm.startTime,
-            endTime: eventForm.allDay ? undefined : eventForm.endTime,
-            location: eventForm.location.trim() || undefined,
+            startTime: eventForm.allDay ? "" : eventForm.startTime,
+            endTime: eventForm.allDay ? "" : eventForm.endTime,
+            location: eventForm.location.trim(),
         };
-        if (editingEvent) updateAgendaEvent(editingEvent.id, changes);
+        if (editingEvent) await updateEvent.mutateAsync({ id: editingEvent.id, input });
         else if (eventForm.recurrence === "weekly")
-            createRecurringAgendaEvents(
-                changes,
-                eventForm.repeatUntil,
-                eventForm.repeatDays,
-            );
-        else createAgendaEvent(changes);
+            await createEvent.mutateAsync({ input, recurrence: { weekdays: eventForm.repeatDays, repeatUntil: eventForm.repeatUntil } });
+        else await createEvent.mutateAsync({ input });
+        showToast("success", editingEvent ? "Evento actualizado." : "Evento creado.");
         setIsCreateOpen(false);
         setEditingEvent(null);
         setEventForm({
@@ -153,16 +169,30 @@ export function AgendaPage() {
             recurrence: "none",
             repeatUntil: eventForm.date,
             repeatDays: [new Date(`${eventForm.date}T12:00:00`).getDay()],
+            scope: eventForm.scope,
         });
     };
 
     return (
         <div className="dashboard-page agenda-page">
             <AgendaDayDetailsModal date={detailsDate} events={detailsEvents} onClose={() => setDetailsDate("")} />
+            <DeleteConfirmationModal
+                open={Boolean(deleteTarget)}
+                title="Eliminar evento"
+                description={`Se elimina "${deleteTarget?.title ?? ""}" de la agenda${deleteTarget?.branchId ? " de esta sede" : " de toda la academia"}. Si es parte de una serie, solo se borra esta fecha.`}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={async () => {
+                    if (!deleteTarget) return;
+                    await deleteEvent.mutateAsync(deleteTarget.id);
+                    showToast("success", "Evento eliminado.");
+                    setDeleteTarget(null);
+                }}
+            />
             <AgendaEventModal
                 open={isCreateOpen}
                 editingEvent={editingEvent}
                 value={eventForm}
+                branchName={branchName}
                 onChange={setEventForm}
                 onClose={() => {
                     setIsCreateOpen(false);
@@ -195,7 +225,7 @@ export function AgendaPage() {
                         <MonthCalendar viewDate={viewDate} events={visibleEvents} selectedDate={selectedDate} todayDate={initialDate} onCreate={openCreate} onShowDetails={setDetailsDate} />
                     </section>
                 </div>
-                <AgendaUpcomingPanel events={upcomingEvents} onEdit={openEdit} onDelete={removeAgendaEvent} />
+                <AgendaUpcomingPanel events={upcomingEvents} onEdit={openEdit} onDelete={(id) => setDeleteTarget(events.find((event) => event.id === id) ?? null)} />
             </div>
         </div>
     );
