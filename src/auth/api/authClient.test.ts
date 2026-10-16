@@ -26,6 +26,20 @@ describe('silent bootstrap from the refresh cookie', () => {
         await client.bootstrap()
         expect(client.getSnapshot().phase).toBe('anonymous')
     })
+    it('retries a rate-limited refresh instead of signing out, since the cookie was never consumed', async () => {
+        const request = vi.fn().mockRejectedValueOnce(new ApiError(429, 'rate_limited')).mockResolvedValueOnce(pair)
+        const client = new AuthClient(request, 0)
+        await client.bootstrap()
+        expect(client.getSnapshot().phase).toBe('signed-in')
+        expect(request).toHaveBeenCalledTimes(2)
+    })
+    it('gives up after repeated rate limits', async () => {
+        const request = vi.fn().mockRejectedValue(new ApiError(429, 'rate_limited'))
+        const client = new AuthClient(request, 0)
+        await client.bootstrap()
+        expect(client.getSnapshot().phase).toBe('anonymous')
+        expect(request).toHaveBeenCalledTimes(3)
+    })
     it('is a no-op once a real login has already moved past bootstrapping', async () => {
         const request = vi.fn().mockResolvedValueOnce(pair)
         const client = new AuthClient(request)

@@ -3,6 +3,7 @@ import { EntityFormModal, FormField, FormGrid, FormSection } from '@/components/
 import { validateConditions } from '@/components/forms/formValidation'
 import { useToast } from '@/components/ui/ToastContext'
 import { useCreateStaffMember } from '@/services/academyRepository'
+import { useBranchRosterInvalidation, useSetBranchStaffScope } from '@/services/branchRepository'
 import { isMemberConflict } from '@/services/organization/membersApi'
 import { isStaffDniConflict } from '@/services/organization/staffApi'
 
@@ -14,15 +15,19 @@ type QuickCreateTeacherModalProps = {
     open: boolean
     onClose: () => void
     onCreated: (fullName: string) => void
+    // Branch of the commission being edited: the new teacher is assigned to it right away, so they show
+    // up in that branch's Staff and dashboard instead of floating in the organization unassigned.
+    branchId?: string
 }
 
 // A lighter alternative to the full staff form (StaffPage.tsx) for when a commission is being
 // created and no teacher exists yet — creates a Docente profile (with a real backend user) without
-// leaving the commission form. The person still isn't assigned to any sede after this; that's done
-// afterward from Sedes → la sede → tab Staff, same as any other staff member.
-export function QuickCreateTeacherModal({ open, onClose, onCreated }: QuickCreateTeacherModalProps) {
+// leaving the commission form, and assigns it to the commission's branch (same as Sedes → Staff).
+export function QuickCreateTeacherModal({ open, onClose, onCreated, branchId }: QuickCreateTeacherModalProps) {
     const { showToast } = useToast()
     const createStaffMember = useCreateStaffMember()
+    const setBranchStaffScope = useSetBranchStaffScope()
+    const invalidateBranchRoster = useBranchRosterInvalidation()
     const [form, setForm] = useState(emptyForm)
     const [error, setError] = useState('')
 
@@ -60,8 +65,18 @@ export function QuickCreateTeacherModal({ open, onClose, onCreated }: QuickCreat
                 }, {
                     onSuccess: (created) => {
                         onCreated(created.fullName)
-                        showToast('success', 'Profesor creado correctamente.')
                         close()
+                        if (!branchId || !created.userId) {
+                            showToast('success', 'Profesor creado correctamente.')
+                            return
+                        }
+                        setBranchStaffScope.mutate({ branchId, userId: created.userId, enabled: true }, {
+                            onSuccess: () => {
+                                invalidateBranchRoster(branchId)
+                                showToast('success', 'Profesor creado y asignado a la sede.')
+                            },
+                            onError: () => showToast('error', 'El profesor quedó creado, pero no se pudo asignar a la sede. Asignalo desde Sedes → Staff.'),
+                        })
                     },
                     onError: (mutationError) => setError(isMemberConflict(mutationError) || isStaffDniConflict(mutationError) ? 'Ya existe un integrante con ese DNI en esta organización.' : 'No se pudo crear el profesor. Intentá nuevamente.'),
                 })

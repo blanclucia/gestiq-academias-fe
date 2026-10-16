@@ -1,6 +1,8 @@
 import { Bell, IdCard, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
 import { useState } from 'react'
+import { Card } from '@/components/ui/Card'
+import { SectionHeading } from '@/components/ui/SectionHeading'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 const tabs = [
@@ -39,14 +41,8 @@ export function ProfilePage() {
 
                 <div className="academy-tab-panel">
                     {activeTab === 'datos' && (
-                        <section className="academy-settings-card">
-                            <div className="academy-section-heading">
-                                <IdCard size={20} />
-                                <div>
-                                    <h2>Datos personales</h2>
-                                    <p>Tu identidad dentro de la organización.</p>
-                                </div>
-                            </div>
+                        <Card>
+                            <SectionHeading icon={<IdCard size={20} />} title="Datos personales" description="Tu identidad dentro de la organización." />
                             <div className="form-grid academy-settings-grid">
                                 <div className="form-field">
                                     <span className="form-field-label">Nombre</span>
@@ -65,37 +61,25 @@ export function ProfilePage() {
                                     <p className="detail-info-copy">{roleLabel}</p>
                                 </div>
                             </div>
-                        </section>
+                        </Card>
                     )}
 
                     {activeTab === 'seguridad' && (
-                        <section className="academy-settings-card">
-                            <div className="academy-section-heading">
-                                <ShieldCheck size={20} />
-                                <div>
-                                    <h2>Seguridad</h2>
-                                    <p>Acceso y permisos del usuario.</p>
-                                </div>
-                            </div>
+                        <Card>
+                            <SectionHeading icon={<ShieldCheck size={20} />} title="Seguridad" description="Acceso y permisos del usuario." />
                             <div className="academy-placeholder">
                                 <p>Próximamente se definirán permisos, sesiones activas y configuraciones de seguridad.</p>
                             </div>
-                        </section>
+                        </Card>
                     )}
 
                     {activeTab === 'notificaciones' && (
-                        <section className="academy-settings-card">
-                            <div className="academy-section-heading">
-                                <Bell size={20} />
-                                <div>
-                                    <h2>Notificaciones</h2>
-                                    <p>Alertas y avisos del sistema.</p>
-                                </div>
-                            </div>
+                        <Card>
+                            <SectionHeading icon={<Bell size={20} />} title="Notificaciones" description="Alertas y avisos del sistema." />
                             <div className="academy-placeholder">
                                 <p>Próximamente se configurarán los canales, frecuencia y alertas de notificación.</p>
                             </div>
-                        </section>
+                        </Card>
                     )}
                 </div>
             </div>

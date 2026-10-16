@@ -24,7 +24,7 @@ type ManualChargeModalProps = {
     paymentMethods: Payment['method'][]
     onChange: (value: ManualChargeValue) => void
     onClose: () => void
-    onSubmit: () => void
+    onSubmit: () => void | Promise<unknown>
 }
 
 export function ManualChargeModal({ open, value, students, paymentMethods, onChange, onClose, onSubmit }: ManualChargeModalProps) {
@@ -34,7 +34,7 @@ export function ManualChargeModal({ open, value, students, paymentMethods, onCha
         <EntityFormModal
             open={open}
             title="Nuevo cobro"
-            subtitle="Registrá un concepto extraordinario, asociado o no a un alumno."
+            subtitle="Registrá un concepto extraordinario de un alumno: examen, material, certificado u otro."
             submitLabel={value.status === 'Pagado' ? 'Registrar ingreso' : 'Crear cobro pendiente'}
             validate={() => validateManualCharge(value)}
             onClose={onClose}
@@ -53,14 +53,16 @@ export function ManualChargeModal({ open, value, students, paymentMethods, onCha
                             <input name="amount" className="form-input" type="number" min={1} step={1000} value={value.amount} onChange={(event) => update({ amount: event.target.value })} />
                         </FormField>
                         <FormField label="Alumno" required>
-                            <SearchableSelect name="studentId" value={value.studentId} options={students.map((student) => ({ value: student.id, label: `${student.fullName} · ${student.document}` }))} onChange={(studentId) => update({ studentId })} placeholder="Buscar alumno" emptyLabel="No encontramos alumnos." />
+                            <SearchableSelect name="studentId" value={value.studentId} options={students.map((student) => ({ value: student.id, label: `${student.fullName} · ${student.document}` }))} onChange={(studentId) => update({ studentId })} placeholder="Buscar alumno" emptyLabel="No encontramos alumnos." clearable clearLabel="Quitar alumno" />
                         </FormField>
                     </FormGrid>
                 </FormSection>
-                <FormSection title="Estado y fecha">
+                <FormSection title="Cobro" description="Si ya te pagaron, indicá cuándo y con qué medio; si no, queda pendiente con su vencimiento.">
                     <FormGrid>
-                        <FormField label="Estado">
-                            <SearchableSelect value={value.status} onChange={(status) => update({ status: status as ManualChargeValue['status'] })} options={[{ value: 'Pendiente', label: 'Pendiente' }, { value: 'Pagado', label: 'Pagado' }]} />
+                        {/* An explicit question instead of a "Status" select: the payment method only applies once
+                            it was collected, and hiding it behind "Pagado" made it look missing. */}
+                        <FormField label="¿Ya se cobró?">
+                            <SearchableSelect value={value.status} onChange={(status) => update({ status: status as ManualChargeValue['status'] })} options={[{ value: 'Pendiente', label: 'No, queda pendiente' }, { value: 'Pagado', label: 'Sí, ya se cobró' }]} />
                         </FormField>
                         {value.status === 'Pendiente' ? (
                             <FormField label="Vencimiento" required><input name="dueDate" className="form-input" type="date" value={value.dueDate} onChange={(event) => update({ dueDate: event.target.value })} /></FormField>

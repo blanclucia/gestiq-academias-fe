@@ -12,12 +12,14 @@ export function chargeStatusFromApi(status: 'pending' | 'paid' | 'under_review' 
     if (status === 'rejected') return 'Rechazado'
     return 'Pendiente'
 }
-export function chargeMethodToApi(method: 'Transferencia' | 'Tarjeta' | 'Efectivo'): 'transfer' | 'card' | 'cash' {
+export function chargeMethodToApi(method: 'Transferencia' | 'Mercado Pago' | 'Tarjeta' | 'Efectivo'): 'transfer' | 'card' | 'cash' | 'mercado_pago' {
+    if (method === 'Mercado Pago') return 'mercado_pago'
     if (method === 'Tarjeta') return 'card'
     if (method === 'Efectivo') return 'cash'
     return 'transfer'
 }
-export function chargeMethodFromApi(method: 'transfer' | 'card' | 'cash'): 'Transferencia' | 'Tarjeta' | 'Efectivo' {
+export function chargeMethodFromApi(method: 'transfer' | 'card' | 'cash' | 'mercado_pago'): 'Transferencia' | 'Mercado Pago' | 'Tarjeta' | 'Efectivo' {
+    if (method === 'mercado_pago') return 'Mercado Pago'
     if (method === 'card') return 'Tarjeta'
     if (method === 'cash') return 'Efectivo'
     return 'Transferencia'

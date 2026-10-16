@@ -12,7 +12,7 @@ const apiChargeSchema = z.object({
     amount: z.number(),
     dueDate: z.string(),
     status: z.enum(['pending', 'paid', 'under_review', 'rejected']),
-    method: z.enum(['transfer', 'card', 'cash']).optional(),
+    method: z.enum(['transfer', 'card', 'cash', 'mercado_pago']).optional(),
     paidAt: z.string().optional(),
     paidAmount: z.number().optional(),
     notes: z.string(),
@@ -34,7 +34,7 @@ export type ApiChargeInput = {
     amount: number
     dueDate: string
     status?: 'pending' | 'paid' | 'under_review' | 'rejected'
-    method?: 'transfer' | 'card' | 'cash'
+    method?: 'transfer' | 'card' | 'cash' | 'mercado_pago'
     paidAt?: string
     paidAmount?: number
     notes: string

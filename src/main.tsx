@@ -19,8 +19,10 @@ import './styles/public.css'
 import './styles/detail-pages.css'
 import './styles/pages.css'
 import App from './app/App.tsx'
+import { applyCachedBrandColors } from './theme/brandTheme'
 
 document.documentElement.classList.toggle('dark', window.localStorage.getItem('gestiq-dark-mode') === 'true')
+applyCachedBrandColors()
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
 

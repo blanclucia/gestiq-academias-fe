@@ -1,6 +1,8 @@
-import { ArrowLeft, Award, Mail, MessageCircle, Send } from 'lucide-react'
+import { Activity, ArrowLeft, Award, Gauge, GraduationCap, Lock, Mail, MessageCircle, RotateCcw, Send, Users } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { createCommissionExam, listCommissionExams, listCourses, listStudents, updateCommissionExam, useAcademyRepositoryVersion, useAssignEnrollment, useCommissionRoster, useGenerateTuition, useUpdateCommission, type CommissionStudentStatus } from '@/services/academyRepository'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
@@ -11,19 +13,27 @@ import { DeleteConfirmationModal, EntityFormModal, FormField, FormGrid, FormSect
 import { getSelectedBranchId } from '@/services/branchRepository'
 import { listCommunicationTemplates } from '@/services/communicationTemplateRepository'
 import { validateConditions } from '@/components/forms/formValidation'
-import { CommissionSummary } from '../components/CommissionSummary'
+import { CommissionSettingsCards } from '../components/CommissionSettingsCards'
+import { toCommissionFormValue } from '../model/commissionFormValue'
 import { CommissionStudentsTable } from '../components/CommissionStudentsTable'
 import { CommissionExamsTab } from '../components/CommissionExamsTab'
 import { CommissionExamModal, type CommissionExamAudience, type CommissionExamFormValue } from '../components/CommissionExamModal'
 import { getActiveExamStudents, resolveExamStudentIds } from '@/domain/examinations/examinationRules'
 import { useWorkspace } from '@/workspace/useWorkspace'
 
+type CommissionTab = 'overview' | 'students' | 'exams'
+
 export function CommissionDetailPage() {
     useAcademyRepositoryVersion()
     const { courseId, commissionId } = useParams()
     const navigate = useNavigate()
     const { path } = useWorkspace()
-    const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'exams'>('overview')
+    // The active tab lives in the URL (?tab=students) so links can open a specific tab and going back
+    // from a student's profile returns to the same one.
+    const [searchParams, setSearchParams] = useSearchParams()
+    const requestedTab = searchParams.get('tab')
+    const activeTab: CommissionTab = requestedTab === 'students' || requestedTab === 'exams' ? requestedTab : 'overview'
+    const setActiveTab = (tab: CommissionTab) => setSearchParams(tab === 'overview' ? {} : { tab }, { replace: true })
     const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false)
     const [isCloseCommissionOpen, setIsCloseCommissionOpen] = useState(false)
     const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([])
@@ -72,6 +82,7 @@ export function CommissionDetailPage() {
         )
     }
 
+    const statusTone = commission.status === 'Activa' ? 'success' : commission.status === 'Programada' ? 'warning' : 'neutral'
     const allStudents = listStudents()
     const rosterIds = new Set(commissionStudents.map((student) => student.id))
     // Mirrors the backend guards on AssignEnrollment (closed course/commission, full capacity) so
@@ -301,7 +312,7 @@ export function CommissionDetailPage() {
             <DeleteConfirmationModal
                 open={isCloseCommissionOpen}
                 title="Cerrar comisión"
-                description={`La comisión ${commission.name} dejará de estar activa. Las inscripciones ya creadas se conservarán para consulta.`}
+                description={`Al cerrar ${commission.name} no se podrán asignar alumnos nuevos ni reactivar inscripciones, y no se generarán cuotas nuevas. Los alumnos, las cuotas ya generadas, la asistencia y los exámenes se conservan. Podés reabrirla cuando quieras.`}
                 confirmLabel="Cerrar comisión"
                 onClose={() => setIsCloseCommissionOpen(false)}
                 onConfirm={() => {
@@ -313,10 +324,10 @@ export function CommissionDetailPage() {
                 }}
             />
 
-            <div className="page-header compact" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, width: '100%' }}>
-                <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="page-header compact">
+                <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: 'var(--muted)', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                        <Link to={path(`oferta/${course.id}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--muted)', textDecoration: 'none' }}>
+                        <Link to={path(`oferta/${course.id}?tab=commissions`)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--muted)', textDecoration: 'none' }}>
                             <ArrowLeft size={14} />
                             {course.name}
                         </Link>
@@ -327,15 +338,18 @@ export function CommissionDetailPage() {
                     </div>
                     <h1 style={{ marginTop: 16 }}>{commission.name}</h1>
                 </div>
-
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0 }}>
-                    <Link to={path(`oferta/${course.id}?editCommission=${commission.id}`)} className="secondary-button compact-button">Editar comisión</Link>
-                    {commission.status !== 'Cerrada' && <button type="button" className="secondary-button compact-button" onClick={() => setIsCloseCommissionOpen(true)}>Cerrar comisión</button>}
+                <div className="page-header-actions">
+                    {commission.status === 'Cerrada'
+                        ? <button type="button" className="secondary-button compact-button" disabled={updateCommission.isPending} onClick={() => updateCommission.mutate({ courseId: course.id, commissionId: commission.id, changes: { status: 'Activa' } }, {
+                            onSuccess: () => showToast('success', 'Comisión reabierta: vuelve a estar Activa.'),
+                            onError: () => showToast('error', 'No se pudo reabrir la comisión. Intentá nuevamente.'),
+                        })}><RotateCcw size={15} />Reabrir comisión</button>
+                        : <button type="button" className="secondary-button compact-button" onClick={() => setIsCloseCommissionOpen(true)}><Lock size={15} />Cerrar comisión</button>}
                 </div>
             </div>
 
-            <div className="data-table-card" style={{ padding: 20 }}>
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'students' | 'exams')}>
+            <div className="academy-tabs-wrap">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CommissionTab)}>
                     <TabsList variant="line" aria-label="Detalle de comisión">
                         <TabsTrigger value="overview">Resumen</TabsTrigger>
                         <TabsTrigger value="students">Alumnos</TabsTrigger>
@@ -343,30 +357,56 @@ export function CommissionDetailPage() {
                     </TabsList>
                 </Tabs>
 
-                {activeTab === 'overview' && (
-                    <CommissionSummary courseName={course.name} commission={commission} studentCount={commissionStudents.length} />
-                )}
+                <div className="offer-detail-stack">
+                    {activeTab === 'overview' && (
+                        <MetricTileGrid>
+                            <MetricTile icon={<GraduationCap size={20} />} label="Alumnos" value={commissionStudents.length} />
+                            <MetricTile icon={<Gauge size={20} />} label="Cupos" value={`${commissionStudents.length}/${commission.capacity}`} />
+                            <MetricTile icon={<Users size={20} />} label="Profesores" value={commission.teachers.join(', ') || 'Sin asignar'} />
+                            <MetricTile icon={<Activity size={20} />} label="Estado" value={<StatusBadge label={commission.status} tone={statusTone} />} />
+                        </MetricTileGrid>
+                    )}
 
-                {activeTab === 'students' && (
-                    <CommissionStudentsTable
-                        rows={commissionStudents}
-                        selectedIds={selectedStudentIds}
-                        openMenuId={openMenuId}
-                        onSelectionChange={setSelectedStudentIds}
-                        onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)}
-                        onAssign={() => setIsAssignmentModalOpen(true)}
-                        assignDisabledReason={assignDisabledReason}
-                        onView={(student) => navigate(path(`alumnos/${student.id}`))}
-                        onCommunicate={openCommunication}
-                        onCertificate={openCertificate}
-                        onStatus={openStatus}
-                    />
-                )}
+                    {activeTab === 'overview' && (
+                        <CommissionSettingsCards
+                            // Remount on every saved change (own save, closing the commission) so the draft restarts from it.
+                            key={`${commission.id}:${JSON.stringify(toCommissionFormValue(commission))}`}
+                            commission={commission}
+                            branchId={course.branchId}
+                            siblingNames={course.commissions.filter((item) => item.id !== commission.id).map((item) => item.name)}
+                            saving={updateCommission.isPending}
+                            onSave={async (changes) => {
+                                try {
+                                    await updateCommission.mutateAsync({ courseId: course.id, commissionId: commission.id, changes })
+                                    showToast('success', 'Comisión actualizada correctamente.')
+                                    return true
+                                } catch {
+                                    return false
+                                }
+                            }}
+                        />
+                    )}
 
-                {activeTab === 'exams' && (
-                    <CommissionExamsTab exams={commissionExams} openMenuId={openMenuId} onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)} onCreate={openExam} onEdit={openEditExam} />
-                )}
+                    {activeTab === 'students' && (
+                        <CommissionStudentsTable
+                            rows={commissionStudents}
+                            selectedIds={selectedStudentIds}
+                            openMenuId={openMenuId}
+                            onSelectionChange={setSelectedStudentIds}
+                            onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)}
+                            onAssign={() => setIsAssignmentModalOpen(true)}
+                            assignDisabledReason={assignDisabledReason}
+                            onView={(student) => navigate(path(`alumnos/${student.id}`))}
+                            onCommunicate={openCommunication}
+                            onCertificate={openCertificate}
+                            onStatus={openStatus}
+                        />
+                    )}
 
+                    {activeTab === 'exams' && (
+                        <CommissionExamsTab exams={commissionExams} openMenuId={openMenuId} onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)} onCreate={openExam} onEdit={openEditExam} />
+                    )}
+                </div>
             </div>
         </div>
     )

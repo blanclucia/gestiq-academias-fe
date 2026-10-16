@@ -15,8 +15,10 @@ import {
 } from "@/services/academyRepository";
 import { usePublicEnrollmentSettings } from "@/services/organization/publicSettingsApi";
 import { paymentMethodsFromApi, requiredFieldsFromApi } from "@/services/organization/settingsMapping";
+import { getPublicPaymentOptions, requiresPaymentStep } from "../model/publicPaymentOptions";
 import type { ApiPublicRegistrationResult } from "@/services/organization/enrollmentsApi";
 import { calculateAge } from "@/domain/students/studentRules";
+import { PlatformCredit } from "@/components/layout/PlatformCredit";
 
 export function PublicEnrollmentPage() {
     const { organizationSlug, slug } = useParams();
@@ -75,6 +77,7 @@ export function PublicEnrollmentPage() {
                 <div className="public-enrollment-card">
                     <h1>Inscripción no disponible</h1>
                     <p>{availability.reason || "Este link no existe o ya no está vigente."}</p>
+                    <PlatformCredit />
                 </div>
             </main>
         );
@@ -94,10 +97,13 @@ export function PublicEnrollmentPage() {
     };
     const requiredFields = new Set(requiredFieldsFromApi(settings.enrollments.requiredFields));
     const enabledMethods = paymentMethodsFromApi(settings.payments.enabledMethods);
-    const canUseMercadoPago = enabledMethods.includes("Mercado Pago");
-    const canUseTransferencia = enabledMethods.includes("Transferencia");
-    const canUseEfectivo = enabledMethods.includes("Efectivo");
-    const hasAnyPaymentMethod = canUseMercadoPago || canUseTransferencia || canUseEfectivo;
+    const paymentOptions = getPublicPaymentOptions({ ...settings.payments, enabledMethods });
+    const canUseMercadoPago = paymentOptions.mercadoPago;
+    const canUseTransferencia = paymentOptions.transfer;
+    const canUseEfectivo = paymentOptions.inPerson;
+    const showPaymentStep = requiresPaymentStep(offer.amount);
+    // Pay where the course is taught; the academy's general address is only a fallback for branches without one.
+    const inPersonAddress = offer.branchAddress || settings.general.address;
     const age = form.birthDate ? calculateAge(form.birthDate) : null;
     const isMinor = age !== null && age < 18;
     const performRegistration = () => {
@@ -138,6 +144,10 @@ export function PublicEnrollmentPage() {
     };
     const submit = (event: React.FormEvent) => {
         event.preventDefault();
+        if (showPaymentStep && !paymentOption) {
+            setFormError("Elegí cómo vas a pagar la inscripción.");
+            return;
+        }
         performRegistration();
     };
 
@@ -166,8 +176,8 @@ export function PublicEnrollmentPage() {
             return;
         }
         setFormError("");
-        // requirePayment=false: no tiene sentido pedir un método de pago que la organización no exige.
-        if (settings.enrollments.requirePayment) {
+        // A free enrollment has nothing to pay: confirm right away.
+        if (showPaymentStep) {
             setFormStep(3);
         } else {
             performRegistration();
@@ -302,7 +312,7 @@ export function PublicEnrollmentPage() {
                                     >
                                         2 Contacto
                                     </button>
-                                    {settings.enrollments.requirePayment && (
+                                    {showPaymentStep && (
                                         <button
                                             type="button"
                                             className={
@@ -500,7 +510,7 @@ export function PublicEnrollmentPage() {
                                                 type="button"
                                                 onClick={goToContactValidationStep}
                                             >
-                                                {settings.enrollments.requirePayment ? "Continuar" : "Confirmar inscripción"}
+                                                {showPaymentStep ? "Continuar" : "Confirmar inscripción"}
                                             </button>
                                         </div>
                                     </>
@@ -511,7 +521,7 @@ export function PublicEnrollmentPage() {
                                             <strong>Elegí el método de pago</strong>
                                             <span>Seleccioná cómo querés abonar la inscripción.</span>
                                         </div>
-                                        {hasAnyPaymentMethod ? (
+                                        {/* Never empty: getPublicPaymentOptions falls back to paying in person. */}
                                             <div className="payment-method-options">
                                                 {canUseMercadoPago && (
                                                     <button
@@ -574,16 +584,13 @@ export function PublicEnrollmentPage() {
                                                         {paymentOption === "efectivo" && (
                                                             <span className="payment-method-inline-details">
                                                                 <strong>Dirección de la sede</strong>
-                                                                <span>{settings.general.address || "Dirección no configurada"}</span>
+                                                                <span>{inPersonAddress || "Consultá la dirección con la academia."}</span>
                                                                 <span>Indicá el nombre del alumno y presentá su DNI.</span>
                                                             </span>
                                                         )}
                                                     </button>
                                                 )}
                                             </div>
-                                        ) : (
-                                            <p className="form-error-message">No hay medios de pago habilitados. Contactá a la academia para coordinar el pago.</p>
-                                        )}
                                         <div className="public-enrollment-step-actions">
                                             <button
                                                 className="secondary-button"
@@ -614,9 +621,10 @@ export function PublicEnrollmentPage() {
                         </p>
                         {paymentOption === "mercadopago" && <><p>Completá el pago para confirmar tu vacante.</p><a className="mercadopago-button" href={settings.payments.paymentLink} target="_blank" rel="noreferrer">Abrir link de pago</a></>}
                         {paymentOption === "transferencia" && <><p>Realizá la transferencia con estos datos y aguardá la verificación.</p><div className="transfer-details public-final-transfer-details"><div><dt>Alias</dt><dd>{settings.payments.transferAlias || "Sin configurar"}<button type="button" aria-label="Copiar alias" onClick={() => void copyPaymentValue("Alias", settings.payments.transferAlias)}><Copy size={14} /></button></dd></div><div><dt>CBU / CVU</dt><dd>{settings.payments.transferCbu || "Sin configurar"}<button type="button" aria-label="Copiar CBU o CVU" onClick={() => void copyPaymentValue("CBU / CVU", settings.payments.transferCbu)}><Copy size={14} /></button></dd></div><div><dt>Titular</dt><dd>{settings.payments.accountHolder}</dd></div><div><dt>CUIT</dt><dd>{settings.payments.accountTaxId}</dd></div></div>{copyFeedback && <small className="payment-copy-feedback">{copyFeedback}</small>}</>}
-                        {paymentOption === "efectivo" && <p>Quedó pendiente de pago en sede. Acercate a {settings.general.address || "la sede"} para completar el pago.</p>}
+                        {paymentOption === "efectivo" && <p>Quedó pendiente de pago en sede. Acercate a {inPersonAddress || "la sede"} para completar el pago.</p>}
                     </div>
                 )}
+                <PlatformCredit />
             </section>
         </main>
     );

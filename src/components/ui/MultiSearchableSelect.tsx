@@ -1,4 +1,6 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { useFloatingPanel } from './useFloatingPanel'
 import type { SearchableSelectOption } from './SearchableSelect'
 
 type MultiSearchableSelectProps = {
@@ -7,13 +9,17 @@ type MultiSearchableSelectProps = {
     onChange: (values: string[]) => void
     placeholder?: string
     emptyLabel?: string
+    name?: string
+    // Optional action pinned below the options (e.g. "Crear profesor nuevo"); closes the list on click.
+    footerAction?: { label: string; icon?: ReactNode; onClick: () => void }
 }
 
 // Same searchable combobox as SearchableSelect, but picking an option toggles it into/out of a set
 // instead of replacing the current value and closing — for filters, where "Inglés y Francés" is a
 // valid thing to ask for, not just one or the other.
-export function MultiSearchableSelect({ values, options, onChange, placeholder = 'Buscar...', emptyLabel = 'No hay opciones disponibles.' }: MultiSearchableSelectProps) {
+export function MultiSearchableSelect({ values, options, onChange, placeholder = 'Buscar...', emptyLabel = 'No hay opciones disponibles.', name, footerAction }: MultiSearchableSelectProps) {
     const containerRef = useRef<HTMLDivElement>(null)
+    const panelRef = useRef<HTMLDivElement>(null)
     const listboxId = `multi-searchable-select-options-${useId()}`
     const [query, setQuery] = useState('')
     const [open, setOpen] = useState(false)
@@ -21,7 +27,9 @@ export function MultiSearchableSelect({ values, options, onChange, placeholder =
 
     useEffect(() => {
         const handlePointerDown = (event: PointerEvent) => {
-            if (!containerRef.current?.contains(event.target as Node)) {
+            const target = event.target as Node
+            // The options panel is portaled outside the container, so it counts as "inside" too.
+            if (!containerRef.current?.contains(target) && !panelRef.current?.contains(target)) {
                 setOpen(false)
                 setQuery('')
             }
@@ -30,6 +38,7 @@ export function MultiSearchableSelect({ values, options, onChange, placeholder =
         return () => document.removeEventListener('pointerdown', handlePointerDown)
     }, [])
 
+    const panelStyle = useFloatingPanel(containerRef, open)
     const filteredOptions = options.filter((option) => option.label.toLocaleLowerCase('es-AR').includes(query.toLocaleLowerCase('es-AR')))
     const toggleOption = (option: SearchableSelectOption) => {
         onChange(values.includes(option.value) ? values.filter((value) => value !== option.value) : [...values, option.value])
@@ -58,6 +67,7 @@ export function MultiSearchableSelect({ values, options, onChange, placeholder =
 
     return <div className="student-picker" ref={containerRef}>
         <input
+            name={name}
             className="form-input"
             value={displayValue}
             onChange={(event) => { setQuery(event.target.value); setOpen(true); setHighlightedIndex(0) }}
@@ -69,7 +79,7 @@ export function MultiSearchableSelect({ values, options, onChange, placeholder =
             aria-controls={listboxId}
             autoComplete="off"
         />
-        {open && <div className="student-picker-options" id={listboxId} role="listbox">
+        {open && panelStyle && createPortal(<div className="student-picker-options" id={listboxId} role="listbox" ref={panelRef} style={panelStyle}>
             {filteredOptions.length > 0 ? filteredOptions.map((option, index) => (
                 <button
                     key={option.value}
@@ -83,6 +93,7 @@ export function MultiSearchableSelect({ values, options, onChange, placeholder =
                     {option.label}
                 </button>
             )) : <span className="student-picker-empty">{emptyLabel}</span>}
-        </div>}
+            {footerAction && <button type="button" className="student-picker-footer-action" onClick={() => { setOpen(false); setQuery(''); footerAction.onClick() }}>{footerAction.icon}{footerAction.label}</button>}
+        </div>, document.body)}
     </div>
 }

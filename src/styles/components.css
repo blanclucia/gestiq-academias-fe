@@ -5,12 +5,37 @@
     margin-top: 12px;
 }
 
+/* Date range on top of a summary tab (Cobros and Finanzas), right-aligned above the KPIs. */
+.summary-date-range {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+    .summary-date-range,
+    .summary-date-range .toolbar-date-range {
+        width: 100%;
+    }
+
+    .summary-date-range .form-input {
+        flex: 1 1 140px;
+        width: auto;
+    }
+}
+
 .kpi-card,
 .chart-card {
-    background: rgba(255, 255, 255, 0.52);
+    background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 18px;
     box-shadow: none;
+}
+
+/* Nested inside a page container (Cobros and Finanzas summaries): a subtle tint so they stand apart. */
+.data-table-card .kpi-card,
+.data-table-card .chart-card {
+    background: var(--surface-subtle);
 }
 
 .kpi-card {
@@ -60,34 +85,13 @@
 
 .dashboard-progress-list { margin-top: 18px; }
 
-.dashboard-summary-icon {
-    display: grid;
-    width: 42px;
-    height: 42px;
-    place-items: center;
-    margin-top: 24px;
-    border-radius: 12px;
-}
-
-.dashboard-summary-icon.positive { color: var(--green); background: var(--green-soft); }
-.dashboard-summary-icon.warning { color: var(--red); background: var(--red-soft); }
-
 .chart-card.dashboard-payment-card {
-    position: relative;
     min-height: 98px;
-    padding: 18px 20px 18px 78px;
 }
 
 .dashboard-payment-card .card-header-row {
     align-items: flex-start;
     margin-bottom: 0;
-}
-
-.dashboard-payment-card .dashboard-summary-icon {
-    position: absolute;
-    top: 18px;
-    left: 20px;
-    margin-top: 0;
 }
 
 .dashboard-commission-list { display: grid; gap: 14px; margin-top: 18px; }
@@ -132,6 +136,8 @@
     font-size: 1.5rem;
     font-weight: 700;
     letter-spacing: -0.04em;
+    /* An amount like "$ 96.000" must never break between the sign and the number. */
+    white-space: nowrap;
 }
 
 .chart-visual {
@@ -496,7 +502,10 @@
     }
 }
 
-.no-branch-banner {
+/* Shared by NoBranchBanner (global, in AppShell) and any page-level "missing prerequisite"
+   banner (e.g. "no academic cycle yet" in Ofertas académicas) — same edge-to-edge warning strip
+   with an icon, a message, and an optional CTA button. */
+.inline-warning-banner {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -508,22 +517,112 @@
     line-height: 1.4;
 }
 
-.no-branch-banner svg {
+.inline-warning-banner svg {
     flex-shrink: 0;
 }
 
-.no-branch-banner span {
+.inline-warning-banner span {
     flex: 1;
 }
 
-.no-branch-banner .primary-button {
+.inline-warning-banner .primary-button {
     flex-shrink: 0;
     text-decoration: none;
 }
 
 @media (max-width: 640px) {
-    .no-branch-banner {
+    .inline-warning-banner {
         padding: 10px 16px;
         flex-wrap: wrap;
     }
+}
+
+.info-tooltip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.info-tooltip-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.info-tooltip-trigger:hover,
+.info-tooltip-trigger:focus-visible {
+    color: var(--text);
+    background: var(--surface-subtle);
+}
+
+/* Wider variant for multi-line help such as a status legend (<StatusHelp />). */
+.info-tooltip-panel.wide {
+    max-width: 320px;
+}
+
+.status-help-list {
+    display: grid;
+    gap: 6px;
+}
+
+.info-tooltip-panel {
+    /* Portaled to document.body (see InfoTooltip.tsx) so a clipping ancestor — e.g. EntityFormModal's
+       scrollable, rounded .entity-modal — can't cut it off. top/left come from the trigger's own
+       getBoundingClientRect(), set inline; this just handles appearance and centering under it. */
+    position: fixed;
+    z-index: 200;
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 230px;
+    padding: 9px 11px;
+    border: 1px solid color-mix(in srgb, var(--info) 30%, var(--border));
+    border-radius: 10px;
+    background: var(--panel-strong);
+    box-shadow: var(--shadow);
+    color: var(--text);
+    font-size: 12.5px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    line-height: 1.4;
+    pointer-events: none;
+}
+
+.info-tooltip-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: var(--info);
+}
+
+.info-tooltip-panel::before,
+.info-tooltip-panel::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+}
+
+.info-tooltip-panel::before {
+    top: -7px;
+    border-bottom: 7px solid color-mix(in srgb, var(--info) 30%, var(--border));
+}
+
+.info-tooltip-panel::after {
+    top: -6px;
+    border-bottom: 6px solid var(--panel-strong);
 }

@@ -7,16 +7,27 @@ export function getExpenseDisplayStatus(expense: ExpenseDisplayInput, today: str
     return expense.dueDate && expense.dueDate < today ? 'Vencido' : 'Pendiente'
 }
 
+// One date decides which period an expense belongs to, in the list and in the summary alike: when it
+// was paid, or when it is due. A pending expense with no due date is an open commitment, so it shows
+// in every period until it is paid.
+export function isExpenseInPeriod(expense: ExpenseDisplayInput & { paidDate?: string }, from: string, to: string) {
+    const date = expense.status === 'Pagado' ? expense.paidDate : expense.dueDate
+    if (!date) return expense.status !== 'Pagado'
+    return (!from || date >= from) && (!to || date <= to)
+}
+
 type ProjectedIncome = { amount: number; status: BillingDisplayStatus }
 type PlannedExpense = { amount: number }
 
 export function calculateFinancialProjection(incomes: ProjectedIncome[], expenses: PlannedExpense[]) {
     const projectedIncome = incomes
-        .filter((income) => income.status !== 'Rechazado' && income.status !== 'Anulado')
+        // A rejected transfer is still owed (Cobros keeps it as collectable); only a voided charge is not income.
+        .filter((income) => income.status !== 'Anulado')
         .reduce((total, income) => total + Math.max(0, income.amount), 0)
     const plannedExpenses = expenses.reduce((total, expense) => total + Math.max(0, expense.amount), 0)
     const projectedBalance = projectedIncome - plannedExpenses
-    const coverageRate = plannedExpenses > 0 ? (projectedIncome / plannedExpenses) * 100 : projectedIncome > 0 ? 100 : 0
+    // Without planned expenses there is nothing to cover: null, instead of a misleading 100%.
+    const coverageRate = plannedExpenses > 0 ? (projectedIncome / plannedExpenses) * 100 : null
 
     return { projectedIncome, plannedExpenses, projectedBalance, coverageRate }
 }

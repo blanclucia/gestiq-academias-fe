@@ -143,6 +143,12 @@
     min-width: 0;
 }
 
+/* Optional help icon after a field's label (FormField/SettingsField `info`). */
+.form-field-label-text .info-tooltip {
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
 .form-field-label {
     display: flex;
     flex-direction: column;
@@ -265,12 +271,17 @@ select.form-input {
     white-space: nowrap;
 }
 
+/* The class sits on SearchableSelect's wrapper, so sizing goes there and padding on the inner input. */
 .time-range-select {
-    width: 96px;
-    min-width: 96px;
-    flex: 0 0 96px;
-    padding: 7px 9px;
-    padding-right: 26px;
+    width: 104px;
+    min-width: 104px;
+    flex: 0 0 104px;
+}
+
+.time-range-select .form-input {
+    padding-right: 10px;
+    padding-left: 12px;
+    font-variant-numeric: tabular-nums;
 }
 
 .time-range-separator {
@@ -286,9 +297,9 @@ select.form-input {
     }
 
     .time-range-select {
-        width: 92px;
-        min-width: 92px;
-        flex: 0 0 92px;
+        width: 100px;
+        min-width: 100px;
+        flex: 0 0 100px;
     }
 }
 

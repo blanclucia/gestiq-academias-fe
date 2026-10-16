@@ -1,62 +1,13 @@
-import { Check, ChevronDown, Plus, Search } from 'lucide-react'
 import { FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
 import { WeekDaysCheckboxGroup } from '@/components/forms/WeekDaysCheckboxGroup'
 import { TimeRangeField } from '@/components/forms/TimeRangeField'
-import { QuickCreateTeacherModal } from '@/features/staff'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { getActiveAcademicCycleId, listCourses, listStaff, useAcademyRepositoryVersion } from '@/services/academyRepository'
-import { useEffect, useRef, useState } from 'react'
-
-const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-
-function TeacherMultiSelect({ options, value, onChange }: { options: Array<{ id: string; fullName: string }>; value: string[]; onChange: (value: string[]) => void }) {
-    const [open, setOpen] = useState(false)
-    const [search, setSearch] = useState('')
-    const [isCreateTeacherOpen, setIsCreateTeacherOpen] = useState(false)
-    const pickerRef = useRef<HTMLDivElement>(null)
-    const filteredOptions = options.filter((teacher) => teacher.fullName.toLocaleLowerCase('es-AR').includes(search.trim().toLocaleLowerCase('es-AR')))
-    const summary = value.length === 0 ? 'Seleccionar profesores' : value.length === 1 ? value[0] : `${value.length} profesores seleccionados`
-
-    useEffect(() => {
-        const closeOnOutsideClick = (event: MouseEvent) => {
-            if (!pickerRef.current?.contains(event.target as Node)) setOpen(false)
-        }
-        document.addEventListener('mousedown', closeOnOutsideClick)
-        return () => document.removeEventListener('mousedown', closeOnOutsideClick)
-    }, [])
-
-    return <div className="commission-teacher-select" ref={pickerRef}>
-        <button type="button" className="commission-teacher-trigger" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
-            <span className={value.length === 0 ? 'placeholder' : ''}>{summary}</span>
-            <ChevronDown size={16} />
-        </button>
-        {open && <div className="commission-teacher-dropdown">
-            <div className="commission-teacher-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar profesor" aria-label="Buscar profesor" autoFocus /></div>
-            <div className="commission-teacher-options" role="listbox" aria-multiselectable="true">
-                {filteredOptions.map((teacher) => {
-                    const selected = value.includes(teacher.fullName)
-                    return <button type="button" role="option" aria-selected={selected} key={teacher.id} onClick={() => onChange(selected ? value.filter((name) => name !== teacher.fullName) : [...value, teacher.fullName])}>
-                        <span className={`commission-teacher-checkbox${selected ? ' selected' : ''}`}>{selected && <Check size={12} />}</span>
-                        <span>{teacher.fullName}</span>
-                    </button>
-                })}
-                {filteredOptions.length === 0 && <div className="commission-teacher-no-results">No se encontraron profesores.</div>}
-            </div>
-            <button type="button" className="commission-teacher-create" onClick={() => setIsCreateTeacherOpen(true)}>
-                <Plus size={14} /> Crear profesor nuevo
-            </button>
-        </div>}
-        <QuickCreateTeacherModal
-            open={isCreateTeacherOpen}
-            onClose={() => setIsCreateTeacherOpen(false)}
-            onCreated={(fullName) => {
-                onChange([...value, fullName])
-                setIsCreateTeacherOpen(false)
-                setOpen(false)
-            }}
-        />
-    </div>
-}
+import { useState } from 'react'
+import { TeacherMultiSelect } from './TeacherMultiSelect'
+import { StatusHelp } from '@/components/ui/StatusHelp'
+import { commissionStatusHelp } from '../model/commissionStatusHelp'
+import { commissionWeekDays as weekDays, parseCommissionSchedule } from '../model/commissionSchedule'
 
 export type CommissionFormValue = {
     name: string
@@ -73,7 +24,6 @@ export type CommissionFormValue = {
 }
 
 function getInitialValue(initialValues?: { name?: string; teacher?: string; teachers?: string[]; capacity?: number; amount?: number; startDate?: string; endDate?: string; dueDay?: number; status?: CommissionFormValue['status']; schedule?: string }): CommissionFormValue {
-    const schedule = initialValues?.schedule ?? ''
     return {
         name: initialValues?.name ?? '',
         teachers: initialValues?.teachers ?? (initialValues?.teacher && initialValues.teacher !== 'Docente por asignar' ? [initialValues.teacher] : []),
@@ -83,9 +33,7 @@ function getInitialValue(initialValues?: { name?: string; teacher?: string; teac
         endDate: initialValues?.endDate ?? '2026-12-15',
         dueDay: initialValues?.dueDay ?? 10,
         status: initialValues?.status ?? 'Programada',
-        days: weekDays.filter((day) => schedule.includes(day.slice(0, 3))),
-        fromTime: schedule.match(/(\d{2}:\d{2})/)?.[1] ?? '18:30',
-        toTime: schedule.match(/-\s*(\d{2}:\d{2})/)?.[1] ?? '20:00',
+        ...parseCommissionSchedule(initialValues?.schedule),
     }
 }
 
@@ -93,7 +41,10 @@ export function CommissionForm({
     initialValues,
     value,
     onValueChange,
+    branchId,
 }: {
+    // Branch of the offer: a teacher created from here is assigned to it.
+    branchId?: string
     initialValues?: {
         name?: string
         course?: string
@@ -144,7 +95,7 @@ export function CommissionForm({
                     </FormField>
 
                     <FormField label="Profesores asignados">
-                        <TeacherMultiSelect options={teacherOptions} value={formValue.teachers} onChange={(teachers) => update({ teachers })} />
+                        <TeacherMultiSelect options={teacherOptions} value={formValue.teachers} onChange={(teachers) => update({ teachers })} branchId={branchId} />
                     </FormField>
 
                     <FormField label="Cupo máximo" required>
@@ -185,8 +136,8 @@ export function CommissionForm({
 
             <FormSection title="Estado" description="Controla el ciclo de la comisión.">
                 <FormGrid>
-                    <FormField label="Estado inicial">
-                        <SearchableSelect value={formValue.status} onChange={(status) => update({ status: status as CommissionFormValue['status'] })} options={[{ value: 'Programada', label: 'Programada' }, { value: 'Activa', label: 'Activa' }, { value: 'Cerrada', label: 'Cerrada' }]} />
+                    <FormField label="Estado inicial" info={<StatusHelp label="Qué significa cada estado" items={commissionStatusHelp} />}>
+                        <SearchableSelect value={formValue.status} onChange={(status) => update({ status: status as CommissionFormValue['status'] })} options={[{ value: 'Programada', label: 'Programada' }, { value: 'Activa', label: 'Activa' }]} />
                     </FormField>
                 </FormGrid>
             </FormSection>

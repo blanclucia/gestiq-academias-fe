@@ -1,7 +1,10 @@
-import { ArrowLeft, CalendarDays, CheckCircle2, CreditCard, ExternalLink, StickyNote, Users } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CheckCircle2, CreditCard, ExternalLink, Lock, RotateCcw, StickyNote, Users, Wallet } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Card } from '@/components/ui/Card'
+import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import { SectionHeading } from '@/components/ui/SectionHeading'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -10,31 +13,38 @@ import {
 } from '@/services/academyRepository'
 import { chargeMethodToApi } from '@/services/organization/chargesMapping'
 import { DeleteConfirmationModal, EntityFormModal, FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
-import { EnrollmentForm, type EnrollmentFormValue } from '../components/EnrollmentForm'
+import { EnrollmentSettingsCards } from '../components/EnrollmentSettingsCards'
 import { EnrollmentSharePanel } from '../components/EnrollmentSharePanel'
 import type { Payment } from '@/types/domain'
-import { validateEnrollment } from '../model/enrollmentValidation'
 import { validateConditions } from '@/components/forms/formValidation'
 import { useToast } from '@/components/ui/ToastContext'
 import { useWorkspace } from '@/workspace/useWorkspace'
 import { getEligibleCommissions } from '@/domain/commissions/commissionRules'
+import { formatCurrencyARS, formatShortDate } from '@/domain/shared/formattingRules'
+import { getRecordablePaymentMethods } from '@/domain/billing/paymentMethods'
+import { useAcademySettings } from '@/services/academySettingsRepository'
 
 function getTodayString() {
     const date = new Date()
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
+type EnrollmentTab = 'overview' | 'students'
+
 export function EnrollmentDetailPage() {
     const { organization, path } = useWorkspace()
     useAcademyRepositoryVersion()
     const { courseId, enrollmentId } = useParams()
     const { showToast } = useToast()
-    const [activeTab, setActiveTab] = useState<'overview' | 'students'>('overview')
-    const [isEditOpen, setIsEditOpen] = useState(false)
+    const { settings: academySettings } = useAcademySettings()
+    // The active tab lives in the URL (?tab=students), like the offer and commission details.
+    const [searchParams, setSearchParams] = useSearchParams()
+    const activeTab: EnrollmentTab = searchParams.get('tab') === 'students' ? 'students' : 'overview'
+    const setActiveTab = (tab: EnrollmentTab) => setSearchParams(tab === 'overview' ? {} : { tab }, { replace: true })
     const [isCloseOpen, setIsCloseOpen] = useState(false)
-    const [formValue, setFormValue] = useState<EnrollmentFormValue | null>(null)
     const [collectTarget, setCollectTarget] = useState<EnrollmentRegistrationRow | null>(null)
     const [collectForm, setCollectForm] = useState<{ date: string; method: Payment['method'] }>({ date: getTodayString(), method: 'Transferencia' })
+    const [confirmTarget, setConfirmTarget] = useState<EnrollmentRegistrationRow | null>(null)
     const [noteTarget, setNoteTarget] = useState<EnrollmentRegistrationRow | null>(null)
     const [noteDraft, setNoteDraft] = useState('')
     const updateOpening = useUpdateEnrollmentOpening()
@@ -61,7 +71,7 @@ export function EnrollmentDetailPage() {
 
     const enrollment = {
         id: opening.id,
-        commissions: getEligibleCommissions(course.commissions, opening.startDate, opening.endDate, opening.commissionIds),
+        commissions: getEligibleCommissions(course.commissions, opening.startDate, opening.commissionIds),
         amount: opening.amount,
         startDate: opening.startDate,
         endDate: opening.endDate,
@@ -78,8 +88,10 @@ export function EnrollmentDetailPage() {
         }))
         .filter((commission) => enrollment.commissions.some((eligible) => eligible.id === commission.id) || commission.students.length > 0)
     const unassignedStudents = registrations.filter((registration) => !course.commissions.some((commission) => commission.id === registration.commissionId))
-    const paidCount = registrations.filter((registration) => registration.payment === 'Pagado').length
-    const pendingCount = registrations.length - paidCount
+    const paidRegistrations = registrations.filter((registration) => registration.payment === 'Pagado')
+    const collectedAmount = paidRegistrations.reduce((total, registration) => total + registration.chargeAmount, 0)
+    const periodLabel = `${formatShortDate(enrollment.startDate)} al ${formatShortDate(enrollment.endDate)}`
+    const shortPeriodLabel = `${formatShortDate(enrollment.startDate).slice(0, 5)} al ${formatShortDate(enrollment.endDate).slice(0, 5)}`
     const saveRegistrationNote = () => {
         if (!noteTarget) return
         updateNotes.mutate({ id: noteTarget.id, notes: noteDraft.trim() }, {
@@ -104,33 +116,10 @@ export function EnrollmentDetailPage() {
                 </FormField>
             </EntityFormModal>
 
-            <EntityFormModal
-                open={isEditOpen}
-                title="Editar inscripción"
-                subtitle="Actualizá el período, costo o estado de esta inscripción."
-                validate={() => formValue ? validateEnrollment(formValue, course.commissions) : { valid: false, message: 'No hay datos de inscripción para guardar.' }}
-                onClose={() => setIsEditOpen(false)}
-                onSubmit={() => {
-                    if (formValue) updateOpening.mutate({ id: enrollment.id, changes: formValue }, {
-                        onSuccess: () => showToast('success', 'Inscripción actualizada correctamente.'),
-                        onError: () => showToast('error', 'No se pudo actualizar la inscripción. Intentá nuevamente.'),
-                    })
-                    setIsEditOpen(false)
-                }}
-            >
-                {formValue && <EnrollmentForm
-                    courseName={course.name}
-                    commissions={course.commissions}
-                    value={formValue}
-                    onValueChange={setFormValue}
-                    publicLink={publicEnrollmentLink}
-                />}
-            </EntityFormModal>
-
             <DeleteConfirmationModal
                 open={isCloseOpen}
                 title="Cerrar inscripción"
-                description="El link público dejará de aceptar nuevas inscripciones. Los registros y pagos ya realizados se conservarán."
+                description="El link público dejará de aceptar inscripciones nuevas. Los inscriptos, sus notas y los pagos ya registrados se conservan. Podés reabrirla cuando quieras."
                 confirmLabel="Cerrar inscripción"
                 onClose={() => setIsCloseOpen(false)}
                 onConfirm={() => {
@@ -142,16 +131,33 @@ export function EnrollmentDetailPage() {
                 }}
             />
 
+            {/* Paying the fee is what formalizes a registration; this is the exception for a scholarship
+                or a fee paid later, so it asks first. */}
+            <DeleteConfirmationModal
+                open={Boolean(confirmTarget)}
+                title="Confirmar sin pago"
+                description={`${confirmTarget?.name ?? 'El alumno'} pasará a ser alumno activo de la comisión sin haber pagado la inscripción. El cobro queda pendiente y podés registrarlo más adelante.`}
+                confirmLabel="Confirmar sin pago"
+                onClose={() => setConfirmTarget(null)}
+                onConfirm={() => {
+                    if (confirmTarget) confirmRegistration.mutate(confirmTarget.id, {
+                        onSuccess: () => showToast('success', 'Inscripción confirmada correctamente.'),
+                        onError: () => showToast('error', 'No se pudo confirmar la inscripción. Intentá nuevamente.'),
+                    })
+                    setConfirmTarget(null)
+                }}
+            />
+
             <EntityFormModal
                 open={Boolean(collectTarget)}
                 title="Registrar cobro"
-                subtitle="Confirmá fecha y medio de pago del cargo real de esta inscripción."
+                subtitle="Al registrar el pago, el alumno queda confirmado en la comisión."
                 submitLabel="Confirmar pago"
                 validate={() => validateConditions({ collectionTarget: !collectTarget && 'No hay una inscripción seleccionada.', collectionDate: !collectForm.date && 'Ingresá la fecha del cobro.' }, 'Revisá los datos del cobro.')}
                 onClose={() => setCollectTarget(null)}
                 onSubmit={() => {
                     if (collectTarget) updateCharge.mutate({ id: collectTarget.chargeId, changes: { status: 'paid', method: chargeMethodToApi(collectForm.method), paidAt: collectForm.date, paidAmount: collectTarget.chargeAmount } }, {
-                        onSuccess: () => showToast('success', 'Cobro registrado correctamente.'),
+                        onSuccess: () => showToast('success', 'Pago registrado: el alumno quedó confirmado en la comisión.'),
                         onError: () => showToast('error', 'No se pudo registrar el cobro. Intentá nuevamente.'),
                     })
                     setCollectTarget(null)
@@ -163,112 +169,78 @@ export function EnrollmentDetailPage() {
                             <FormField label="Alumno"><input className="form-input" value={collectTarget?.name ?? ''} readOnly /></FormField>
                             <FormField label="Importe"><input className="form-input" value={`$${(collectTarget?.chargeAmount ?? enrollment.amount).toLocaleString('es-AR')}`} readOnly /></FormField>
                             <FormField label="Fecha de cobro"><input name="collectionDate" className="form-input" type="date" value={collectForm.date} onChange={(event) => setCollectForm((current) => ({ ...current, date: event.target.value }))} /></FormField>
-                            <FormField label="Medio de pago"><SearchableSelect value={collectForm.method} onChange={(method) => setCollectForm((current) => ({ ...current, method: method as Payment['method'] }))} options={[{ value: 'Transferencia', label: 'Transferencia' }, { value: 'Tarjeta', label: 'Tarjeta' }, { value: 'Efectivo', label: 'Efectivo' }]} /></FormField>
+                            <FormField label="Medio de pago"><SearchableSelect value={collectForm.method} onChange={(method) => setCollectForm((current) => ({ ...current, method: method as Payment['method'] }))} options={getRecordablePaymentMethods(academySettings?.payments.enabledMethods).map((method) => ({ value: method, label: method }))} /></FormField>
                         </FormGrid>
                     </FormSection>
                 </div>
             </EntityFormModal>
 
-            <div className="page-header compact detail-page-header">
-                <div className="detail-page-heading">
-                    <div className="detail-breadcrumb">
-                        <Link to={path(`oferta/${course.id}`)} className="detail-breadcrumb-link">
+            <div className="page-header compact">
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: 'var(--muted)', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                        <Link to={path(`oferta/${course.id}?tab=enrollments`)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--muted)', textDecoration: 'none' }}>
                             <ArrowLeft size={14} />
                             {course.name}
                         </Link>
                         <span>›</span>
                         <span>Inscripción</span>
                     </div>
-                    <h1 className="detail-page-title">Inscripción · {course.name}</h1>
+                    {/* The period tells apart several enrollments of the same offer. */}
+                    <h1 style={{ marginTop: 16 }}>Inscripción del {periodLabel}</h1>
                 </div>
-
-                <div className="detail-header-actions">
-                    <button type="button" className="secondary-button compact-button" onClick={() => {
-                        setFormValue({ courseId: course.id, commissionIds: enrollment.commissions.map((commission) => commission.id), amount: enrollment.amount, startDate: enrollment.startDate, endDate: enrollment.endDate, status: enrollment.status })
-                        setIsEditOpen(true)
-                    }}>Editar inscripción</button>
-                    {enrollment.status !== 'Cerrada' && <button type="button" className="secondary-button compact-button" onClick={() => setIsCloseOpen(true)}>Cerrar</button>}
+                <div className="page-header-actions">
+                    {enrollment.status === 'Cerrada'
+                        ? <button type="button" className="secondary-button compact-button" disabled={updateOpening.isPending} onClick={() => updateOpening.mutate({ id: enrollment.id, changes: { status: 'Abierta' } }, {
+                            onSuccess: () => showToast('success', 'Inscripción reabierta: vuelve a estar Abierta.'),
+                            onError: () => showToast('error', 'No se pudo reabrir la inscripción. Intentá nuevamente.'),
+                        })}><RotateCcw size={15} />Reabrir inscripción</button>
+                        : <button type="button" className="secondary-button compact-button" onClick={() => setIsCloseOpen(true)}><Lock size={15} />Cerrar inscripción</button>}
                 </div>
             </div>
 
-            <div className="data-table-card detail-card">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'students')}>
+            <div className="academy-tabs-wrap">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as EnrollmentTab)}>
                     <TabsList variant="line" aria-label="Detalle de inscripción">
                         <TabsTrigger value="overview">Resumen</TabsTrigger>
                         <TabsTrigger value="students">Inscriptos</TabsTrigger>
                     </TabsList>
                 </Tabs>
 
+                <div className="offer-detail-stack">
                 {activeTab === 'overview' && (
-                    <div className="detail-section">
-                        <div className="detail-metric-grid">
-                            <div className="detail-metric-card">
-                                <div className="detail-metric-label">
-                                    <Users size={14} />
-                                    Inscriptos
-                                </div>
-                                <div className="detail-metric-value detail-metric-value-large">{enrollment.studentsCount}</div>
-                            </div>
-
-                            <div className="detail-metric-card">
-                                <div className="detail-metric-label">
-                                    <CreditCard size={14} />
-                                    Costo
-                                </div>
-                                <div className="detail-metric-value detail-metric-value-large">${enrollment.amount.toLocaleString('es-AR')}</div>
-                            </div>
-
-                            <div className="detail-metric-card">
-                                <div className="detail-metric-label">
-                                    <CalendarDays size={14} />
-                                    Periodo
-                                </div>
-                                <div className="detail-metric-value detail-metric-value-medium">{enrollment.startDate} → {enrollment.endDate}</div>
-                            </div>
-
-                            <div className="detail-metric-card">
-                                <div className="detail-metric-label">
-                                    Estado
-                                </div>
-                                <div className="detail-status">
-                                    <StatusBadge label={enrollment.status} tone={statusTone} />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="detail-info-grid">
-                            <div className="detail-info-card">
-                                <h3 className="detail-info-title">Datos de inscripción</h3>
-                                <ul className="detail-info-list">
-                                    <li>Oferta académica: {course.name}</li>
-                                    <li>Comisiones disponibles: {enrollment.commissions.map((commission) => commission.name).join(', ') || 'Ninguna'}</li>
-                                    <li>Inicio: {enrollment.startDate}</li>
-                                    <li>Cierre: {enrollment.endDate}</li>
-                                    <li>Estado: {enrollment.status}</li>
-                                </ul>
-                            </div>
-
-                            <div className="detail-info-card">
-                                <h3 className="detail-info-title">Cobranzas</h3>
-                                <ul className="detail-info-list">
-                                    <li>Monto base: ${enrollment.amount.toLocaleString('es-AR')}</li>
-                                    <li>Pagos realizados: {paidCount}</li>
-                                    <li>Pagos pendientes: {pendingCount}</li>
-                                    <li>Ingresos estimados: ${(enrollment.amount * paidCount).toLocaleString('es-AR')}</li>
-                                </ul>
-                            </div>
-                        </div>
-
-                        <EnrollmentSharePanel publicLink={publicEnrollmentLink} fileName={`inscripcion-${course.name}`.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')} />
-                    </div>
+                    <MetricTileGrid>
+                        <MetricTile icon={<Users size={20} />} label="Inscriptos" value={enrollment.studentsCount} caption={`a ${formatCurrencyARS(enrollment.amount)} cada uno`} />
+                        <MetricTile icon={<CheckCircle2 size={20} />} label="Pagos" value={`${paidRegistrations.length} de ${registrations.length}`} caption="inscripciones pagadas" />
+                        <MetricTile icon={<Wallet size={20} />} label="Cobrado" value={formatCurrencyARS(collectedAmount)} caption={`${registrations.length - paidRegistrations.length} pago${registrations.length - paidRegistrations.length === 1 ? '' : 's'} pendiente${registrations.length - paidRegistrations.length === 1 ? '' : 's'}`} />
+                        <MetricTile icon={<CalendarDays size={20} />} label="Período" value={shortPeriodLabel} caption={<StatusBadge label={enrollment.status} tone={statusTone} />} />
+                    </MetricTileGrid>
                 )}
 
+                {activeTab === 'overview' && (
+                    <EnrollmentSettingsCards
+                        // Remount on every saved change (own save, closing/reopening) so the draft restarts from it.
+                        key={`${opening.id}:${opening.status}:${opening.startDate}:${opening.endDate}:${opening.amount}:${opening.commissionIds.join(',')}`}
+                        opening={opening}
+                        commissions={course.commissions}
+                        branchId={course.branchId}
+                        afterData={<EnrollmentSharePanel publicLink={publicEnrollmentLink} fileName={`inscripcion-${course.name}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')} />}
+                        saving={updateOpening.isPending}
+                        onSave={async (changes) => {
+                            try {
+                                await updateOpening.mutateAsync({ id: enrollment.id, changes })
+                                showToast('success', 'Inscripción actualizada correctamente.')
+                                return true
+                            } catch {
+                                return false
+                            }
+                        }}
+                    />
+                )}
+
+
                 {activeTab === 'students' && (
-                    <div className="enrollment-students-view">
-                        <div className="detail-list-heading">
-                            <div><strong>Inscriptos</strong><span className="detail-list-meta">{registrations.length} alumnos</span></div>
-                            {publicEnrollmentLink && <a className="secondary-button compact-button" href={publicEnrollmentLink} target="_blank" rel="noreferrer"><ExternalLink size={15} />Abrir formulario público</a>}
-                        </div>
+                    <Card className="enrollment-students-view">
+                        <SectionHeading icon={<Users size={20} />} title="Inscriptos" description={`${registrations.length} alumno${registrations.length === 1 ? '' : 's'} inscripto${registrations.length === 1 ? '' : 's'}`} actions={publicEnrollmentLink ? <a className="secondary-button compact-button" href={publicEnrollmentLink} target="_blank" rel="noreferrer"><ExternalLink size={15} />Abrir formulario público</a> : undefined} />
 
                         <div className="enrollment-commission-groups">
                             {[...commissionGroups, ...(unassignedStudents.length > 0 ? [{ id: 'unassigned', name: 'Sin comisión asignada', schedule: 'Requiere revisión', capacity: unassignedStudents.length, students: unassignedStudents }] : [])].map((commission) => (
@@ -276,7 +248,7 @@ export function EnrollmentDetailPage() {
                                     <header className="enrollment-commission-header">
                                         <div>
                                             <h3>{commission.name}</h3>
-                                            <p>{commission.schedule}</p>
+                                            <p>{commission.schedule}{'startDate' in commission && commission.startDate ? ` · Cursada del ${formatShortDate(commission.startDate)} al ${formatShortDate(commission.endDate)}` : ''}</p>
                                         </div>
                                         <span>{commission.students.length} de {commission.capacity} lugares</span>
                                     </header>
@@ -286,16 +258,13 @@ export function EnrollmentDetailPage() {
                                             <div className="enrollment-student-row" key={student.id}>
                                                 <div>
                                                     <div className="detail-row-title">{student.name}</div>
-                                                    <div className="detail-row-meta">{student.rosterConfirmed ? 'Alumno activo' : 'Inscripción recibida'}</div>
+                                                    <div className="detail-row-meta">{student.rosterConfirmed ? 'Alumno activo' : student.payment === 'Pagado' ? 'Pago registrado, sin confirmar' : 'Se confirma al registrar el pago'}</div>
                                                     {student.notes && <div className="enrollment-student-note-preview"><StickyNote size={13} />{student.notes}</div>}
                                                 </div>
                                                 <div className="detail-row-actions">
                                                     <StatusBadge label={student.payment} tone={student.payment === 'Pagado' ? 'success' : student.payment === 'En verificación' ? 'warning' : 'neutral'} />
                                                     <button type="button" className="secondary-button compact-button" onClick={() => { setNoteTarget(student); setNoteDraft(student.notes) }}><StickyNote size={15} />{student.notes ? 'Editar nota' : 'Agregar nota'}</button>
-                                                    {!student.rosterConfirmed && <button type="button" className="secondary-button compact-button" onClick={() => confirmRegistration.mutate(student.id, {
-                                                        onSuccess: () => showToast('success', 'Inscripción confirmada correctamente.'),
-                                                        onError: () => showToast('error', 'No se pudo confirmar la inscripción. Intentá nuevamente.'),
-                                                    })}><CheckCircle2 size={15} /> Confirmar</button>}
+                                                    {!student.rosterConfirmed && <button type="button" className="secondary-button compact-button" onClick={() => setConfirmTarget(student)}><CheckCircle2 size={15} /> {student.payment === 'Pagado' ? 'Confirmar' : 'Confirmar sin pago'}</button>}
                                                     {student.payment !== 'Pagado' && <button type="button" className="primary-button compact-button" onClick={() => {
                                                         setCollectForm({ date: getTodayString(), method: 'Transferencia' })
                                                         setCollectTarget(student)
@@ -308,9 +277,9 @@ export function EnrollmentDetailPage() {
                                 </section>
                             ))}
                         </div>
-                    </div>
+                    </Card>
                 )}
-
+                </div>
             </div>
         </div>
     )

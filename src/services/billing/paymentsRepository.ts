@@ -108,7 +108,16 @@ export function useUpdateCharge() {
             if (!organizationSlug) throw new Error('No hay organización activa.')
             return updateChargeApi(organizationSlug, id, changes)
         },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['charges', organizationSlug] }),
+        onSuccess: (_result, { changes }) => {
+            queryClient.invalidateQueries({ queryKey: ['charges', organizationSlug] })
+            // Paying an enrollment fee confirms its registration backend-side (the student joins the
+            // commission), so the registrations, course counts and rosters go stale too.
+            if (changes.status === 'paid') {
+                queryClient.invalidateQueries({ queryKey: ['enrollment-registrations', organizationSlug] })
+                queryClient.invalidateQueries({ queryKey: ['courses', organizationSlug] })
+                queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === 'commission-roster' })
+            }
+        },
     })
 }
 

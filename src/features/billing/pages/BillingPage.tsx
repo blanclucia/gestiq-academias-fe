@@ -1,4 +1,5 @@
-import { endOfMonth, format, isWithinInterval, parseISO, startOfDay, startOfMonth } from 'date-fns'
+import { endOfMonth, format, isAfter, isWithinInterval, parseISO, startOfDay, startOfMonth } from 'date-fns'
+import { useSearchParams } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { CrudListPage } from '@/components/crud/CrudListPage'
 import { DeleteConfirmationModal } from '@/components/crud/EntityFormModal'
@@ -7,7 +8,8 @@ import type { Payment } from '@/types/domain'
 import { confirmPaymentRecord, getPaymentRemovalBlocker, listPayments, listStudents, updatePaymentRecord, useAcademyRepositoryVersion, useCreateCharge, useDeleteCharge, useUpdateCharge } from '@/services/academyRepository'
 import { chargeMethodToApi, chargeStatusToApi } from '@/services/organization/chargesMapping'
 import { getNextDueDateForDay } from '@/domain/billing/billingRules'
-import { getPaymentReferenceDate as getReferenceDate, resolveChargeCollectionStatus } from '@/domain/billing/paymentRules'
+import { getRecordablePaymentMethods, paymentMethods } from '@/domain/billing/paymentMethods'
+import { getPaymentReferenceDate as getReferenceDate, resolveChargeCollectionStatus, summarizeChargesToManage } from '@/domain/billing/paymentRules'
 import { useAcademySettings } from '@/services/academySettingsRepository'
 import { useToast } from '@/components/ui/ToastContext'
 import { ManualChargeModal } from '../components/ManualChargeModal'
@@ -21,6 +23,7 @@ import { PaymentEditModal } from '../components/PaymentEditModal'
 import { PaymentLinkModal } from '../components/PaymentLinkModal'
 import { splitFilterValue } from '@/components/crud/filterValues'
 import { useWorkspace } from '@/workspace/useWorkspace'
+import { useSelectedBranchId } from '@/services/branchRepository'
 
 const defaultAdjustmentForm: PaymentAdjustmentValue = {
     type: 'Bonificacion total',
@@ -29,7 +32,6 @@ const defaultAdjustmentForm: PaymentAdjustmentValue = {
     reason: '',
 }
 
-const paymentMethods: Payment['method'][] = ['Transferencia', 'Tarjeta', 'Efectivo']
 
 export function BillingPage() {
     const { organization } = useWorkspace()
@@ -39,10 +41,12 @@ export function BillingPage() {
     const updateCharge = useUpdateCharge()
     const deleteCharge = useDeleteCharge()
     const { settings: academySettings } = useAcademySettings()
-    const enabledPaymentMethods = paymentMethods.filter((method) => academySettings?.payments.enabledMethods.includes(method))
-    // Never leave staff unable to register any payment at all if the org hasn't enabled any method yet.
-    const availablePaymentMethods = enabledPaymentMethods.length > 0 ? enabledPaymentMethods : paymentMethods
-    const [activeTab, setActiveTab] = useState<BillingTab>('resumen')
+    const availablePaymentMethods = getRecordablePaymentMethods(academySettings?.payments.enabledMethods)
+    // The active tab lives in the URL (?tab=pendientes) so the dashboard cards can link straight to it.
+    const [searchParams, setSearchParams] = useSearchParams()
+    const requestedTab = searchParams.get('tab')
+    const activeTab: BillingTab = requestedTab === 'recibidos' || requestedTab === 'pendientes' || requestedTab === 'vencidos' ? requestedTab : 'resumen'
+    const setActiveTab = (tab: BillingTab) => setSearchParams(tab === 'resumen' ? {} : { tab }, { replace: true })
     const today = startOfDay(new Date())
     const suggestedDueDate = getNextDueDateForDay(academySettings?.payments.defaultDueDay ?? 10, format(today, 'yyyy-MM-dd'))
     const [dateRange, setDateRange] = useState({
@@ -52,7 +56,10 @@ export function BillingPage() {
     const [openMenuId, setOpenMenuId] = useState<string | null>(null)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [editingPayment, setEditingPayment] = useState<BillingPaymentRecord | null>(null)
-    const [editingPaymentForm, setEditingPaymentForm] = useState({ method: 'Transferencia' as Payment['method'], amount: 0, dueDate: '', status: 'Pendiente' as Payment['status'] })
+    const [editingPaymentForm, setEditingPaymentForm] = useState({ method: 'Transferencia' as Payment['method'], amount: 0, dueDate: '' })
+    const [revertTarget, setRevertTarget] = useState<BillingPaymentRecord | null>(null)
+    const [rejectTarget, setRejectTarget] = useState<BillingPaymentRecord | null>(null)
+    const [isBulkCollectOpen, setIsBulkCollectOpen] = useState(false)
     const [collectTarget, setCollectTarget] = useState<BillingPaymentRecord | null>(null)
     const [collectForm, setCollectForm] = useState<{ date: string; method: Payment['method'] }>({
         date: format(today, 'yyyy-MM-dd'),
@@ -66,8 +73,11 @@ export function BillingPage() {
     const [activeFilters, setActiveFilters] = useState({ student: '' })
     const [isManualChargeOpen, setIsManualChargeOpen] = useState(false)
     const [manualChargeForm, setManualChargeForm] = useState({ studentId: '', category: 'Examen', detail: '', amount: '', status: 'Pendiente' as 'Pendiente' | 'Pagado', method: 'Transferencia' as Payment['method'], dueDate: suggestedDueDate, date: format(today, 'yyyy-MM-dd'), notes: '' })
-    const paymentList = listPayments()
-    const studentOptions = listStudents()
+    // Like the dashboard and Finanzas: a charge belongs to the selected sede through its student.
+    const selectedBranchId = useSelectedBranchId()
+    const studentOptions = listStudents().filter((student) => student.branchId === selectedBranchId)
+    const studentIdsInBranch = new Set(studentOptions.map((student) => student.id))
+    const paymentList = listPayments().filter((payment) => payment.studentId !== undefined && studentIdsInBranch.has(payment.studentId))
     const paymentRemovalBlocker = deleteTarget ? getPaymentRemovalBlocker() : null
 
     const graceDays = academySettings?.payments.graceDays ?? 0
@@ -105,6 +115,9 @@ export function BillingPage() {
             }
 
             const referenceDate = getReferenceDate(payment, payment.statusView)
+            // Vencidos/Pendientes are work queues: a charge left unpaid from an earlier month still needs
+            // managing, so for them the range only caps the end date (same as the dashboard card).
+            if (activeTab === 'vencidos' || activeTab === 'pendientes') return !isAfter(parseISO(referenceDate), rangeEnd)
             return isWithinInterval(parseISO(referenceDate), { start: rangeStart, end: rangeEnd })
         })
     }, [activeFilters.student, activeTab, dateRange.from, dateRange.to, paymentRows, today])
@@ -163,27 +176,30 @@ export function BillingPage() {
         // Exam-fee installments (examinationsRepository.ts, still 100% mock) are rendered as table
         // rows like any other charge, but they have no backing row in the backend — they shouldn't
         // inflate the rolled-up KPI totals here the way a real charge does.
-        const monthPayments = paymentRows.filter((payment) => {
-            if (!payment.isReal) return false
+        const realPayments = paymentRows.filter((payment) => payment.isReal)
+        const monthPayments = realPayments.filter((payment) => {
             const referenceDate = parseISO(getReferenceDate(payment, payment.statusView))
             return isWithinInterval(referenceDate, { start: summaryInterval.start, end: summaryInterval.end })
         })
+        // Pendiente and Vencido count what is still to collect up to the end of the range — unpaid
+        // charges from earlier months included — with the same rule as the Pendientes/Vencidos tabs and
+        // the dashboard's "Cobros a gestionar" card, so the three show the same numbers.
+        const toManage = summarizeChargesToManage(realPayments.map((payment) => ({ ...payment, status: payment.statusView })), format(summaryInterval.end, 'yyyy-MM-dd'))
 
         return {
             totalReceived: monthPayments
                 .filter((payment) => payment.statusView === 'Pagado')
                 .reduce((acc, payment) => acc + payment.amount, 0),
             receivedCount: monthPayments.filter((payment) => payment.statusView === 'Pagado').length,
-            totalPending: monthPayments
-                .filter((payment) => payment.statusView === 'Pendiente' || payment.statusView === 'En verificación' || payment.statusView === 'Rechazado')
-                .reduce((acc, payment) => acc + payment.amount, 0),
-            pendingCount: monthPayments.filter((payment) => payment.statusView === 'Pendiente' || payment.statusView === 'Rechazado').length,
-            totalOverdue: monthPayments
-                .filter((payment) => payment.statusView === 'Vencido')
-                .reduce((acc, payment) => acc + payment.amount, 0),
-            overdueCount: monthPayments.filter((payment) => payment.statusView === 'Vencido').length,
+            totalPending: toManage.pending.reduce((acc, payment) => acc + payment.amount, 0),
+            pendingCount: toManage.pending.length,
+            totalOverdue: toManage.overdue.reduce((acc, payment) => acc + payment.amount, 0),
+            overdueCount: toManage.overdue.length,
             remindersSent: monthPayments.filter((payment) => Boolean(payment.lastReminderAt)).length,
-            receivedByMethod: paymentMethods.map((method) => {
+            // Only the methods enabled in Mi academia → Cobros, plus any disabled one that still collected
+            // money in the period (hiding it would hide real income).
+            receivedByMethod: paymentMethods.filter((method) => availablePaymentMethods.includes(method)
+                || monthPayments.some((payment) => payment.statusView === 'Pagado' && payment.method === method)).map((method) => {
                 const methodPayments = monthPayments.filter(
                     (payment) => payment.statusView === 'Pagado' && payment.method === method,
                 )
@@ -195,7 +211,7 @@ export function BillingPage() {
                 }
             }),
         }
-    }, [paymentRows, summaryInterval.end, summaryInterval.start])
+    }, [availablePaymentMethods, paymentRows, summaryInterval.end, summaryInterval.start])
 
     const paymentById = useMemo(() => new Map(paymentRows.map((payment) => [payment.id, payment])), [paymentRows])
 
@@ -211,6 +227,24 @@ export function BillingPage() {
     const selectedPendingCount = filteredByContext.filter(
         (payment) => selectedIds.includes(payment.id) && (payment.statusView === 'Pendiente' || payment.statusView === 'En verificación' || payment.statusView === 'Vencido'),
     ).length
+
+    const isCollectable = (payment: BillingPaymentRecord) => ['Pendiente', 'En verificación', 'Vencido', 'Rechazado'].includes(resolveChargeCollectionStatus(payment.chargeSnapshot, today, graceDays))
+    const editingPaymentPaid = editingPayment ? resolveChargeCollectionStatus(editingPayment.chargeSnapshot, today, graceDays) === 'Pagado' : false
+    const bulkCollectTargets: BillingPaymentRecord[] = selectedIds.flatMap((id) => {
+        const payment = paymentById.get(id)
+        return payment && isCollectable(payment) ? [payment] : []
+    })
+
+    // One payment, recorded with the date and method from the collection modal (single row or bulk).
+    // The modals await these saves: they stay open and show the error if the backend refuses (see
+    // EntityFormModal), instead of closing as if the change had been saved.
+    const recordPayment = async (target: BillingPaymentRecord) => {
+        if (target.isReal) {
+            await updateCharge.mutateAsync({ id: target.id, changes: { status: 'paid', method: chargeMethodToApi(collectForm.method), paidAt: collectForm.date, paidAmount: target.amount } })
+        } else {
+            confirmPaymentRecord(target.id, collectForm.method, collectForm.date)
+        }
+    }
 
     const sendReminder = (target: BillingPaymentRecord) => {
         updatePaymentRecord(target.id, { lastReminderAt: format(today, 'yyyy-MM-dd') })
@@ -266,15 +300,13 @@ export function BillingPage() {
         return Math.max(0, originalAmount - numericValue)
     }, [adjustTarget, adjustmentForm.mode, adjustmentForm.type, adjustmentForm.value])
 
-    const submitAdjustment = () => {
+    const submitAdjustment = async () => {
         if (!adjustTarget) {
             return
         }
 
         if (adjustTarget.isReal) {
-            updateCharge.mutate({ id: adjustTarget.id, changes: { amount: adjustedAmountPreview, notes: adjustmentForm.reason.trim() } }, {
-                onError: () => showToast('error', 'No se pudo ajustar el cargo. Intentá nuevamente.'),
-            })
+            await updateCharge.mutateAsync({ id: adjustTarget.id, changes: { amount: adjustedAmountPreview, notes: adjustmentForm.reason.trim() } })
         } else {
             updatePaymentRecord(adjustTarget.id, { amount: adjustedAmountPreview })
         }
@@ -283,30 +315,39 @@ export function BillingPage() {
         setAdjustmentForm(defaultAdjustmentForm)
     }
 
-    const submitCollection = () => {
-        if (!collectTarget || !collectForm.date) {
+    const submitCollection = async () => {
+        if (!collectForm.date) return
+        if (isBulkCollectOpen) {
+            const results = await Promise.allSettled(bulkCollectTargets.map(recordPayment))
+            const recorded = results.filter((result) => result.status === 'fulfilled').length
+            if (recorded > 0) showToast('success', `${recorded} cobro${recorded === 1 ? '' : 's'} registrado${recorded === 1 ? '' : 's'}.`)
+            // The ones recorded drop out of the selection once paid; retrying only touches the rest.
+            if (recorded < results.length) throw new Error('bulk collection partially failed')
+            setIsBulkCollectOpen(false)
+            resetSelection()
             return
         }
-
-        if (collectTarget.isReal) {
-            updateCharge.mutate({ id: collectTarget.id, changes: { status: 'paid', method: chargeMethodToApi(collectForm.method), paidAt: collectForm.date, paidAmount: collectTarget.amount } }, {
-                onError: () => showToast('error', 'No se pudo registrar el cobro. Intentá nuevamente.'),
-            })
-        } else {
-            confirmPaymentRecord(collectTarget.id, collectForm.method, collectForm.date)
-        }
-
+        if (collectTarget) await recordPayment(collectTarget)
         setCollectTarget(null)
+    }
+
+    const openBulkCollect = () => {
+        if (bulkCollectTargets.length === 0) {
+            showToast('error', 'Los cobros seleccionados ya están pagados.')
+            return
+        }
+        setCollectForm({ date: format(today, 'yyyy-MM-dd'), method: availablePaymentMethods[0] })
+        setIsBulkCollectOpen(true)
     }
 
     const resetManualChargeForm = () => {
         setManualChargeForm({ studentId: '', category: 'Examen', detail: '', amount: '', status: 'Pendiente', method: 'Transferencia', dueDate: suggestedDueDate, date: format(today, 'yyyy-MM-dd'), notes: '' })
     }
 
-    const submitManualCharge = () => {
+    const submitManualCharge = async () => {
         const amount = Number(manualChargeForm.amount)
         const concept = `${manualChargeForm.category}${manualChargeForm.detail.trim() ? ` · ${manualChargeForm.detail.trim()}` : ''}`
-        createCharge.mutate({
+        await createCharge.mutateAsync({
             studentId: manualChargeForm.studentId,
             concept,
             amount,
@@ -316,10 +357,8 @@ export function BillingPage() {
             paidAt: manualChargeForm.status === 'Pagado' ? manualChargeForm.date : undefined,
             paidAmount: manualChargeForm.status === 'Pagado' ? amount : undefined,
             notes: manualChargeForm.notes.trim(),
-        }, {
-            onSuccess: () => showToast('success', 'Cobro creado correctamente.'),
-            onError: () => showToast('error', 'No se pudo crear el cobro. Intentá nuevamente.'),
         })
+        showToast('success', 'Cobro creado correctamente.')
         resetManualChargeForm()
         setIsManualChargeOpen(false)
     }
@@ -366,34 +405,72 @@ export function BillingPage() {
                 onCopy={copyPaymentLink}
             />
 
-            <PaymentCollectionModal target={collectTarget} value={collectForm} paymentMethods={availablePaymentMethods} onChange={setCollectForm} onClose={() => setCollectTarget(null)} onSubmit={submitCollection} />
+            <PaymentCollectionModal
+                target={isBulkCollectOpen
+                    ? { student: `${bulkCollectTargets.length} cobro${bulkCollectTargets.length === 1 ? '' : 's'} seleccionado${bulkCollectTargets.length === 1 ? '' : 's'}`, concept: `Total $${bulkCollectTargets.reduce((total, payment) => total + payment.amount, 0).toLocaleString('es-AR')}` }
+                    : collectTarget}
+                value={collectForm}
+                paymentMethods={availablePaymentMethods}
+                onChange={setCollectForm}
+                onClose={() => { setCollectTarget(null); setIsBulkCollectOpen(false) }}
+                onSubmit={submitCollection}
+            />
+            <DeleteConfirmationModal
+                open={Boolean(revertTarget)}
+                title="Revertir a pendiente"
+                description={`El cobro de "${revertTarget?.student ?? ''}" vuelve a quedar pendiente y se borran la fecha y el medio de pago registrados. Usalo para corregir un pago registrado por error.`}
+                confirmLabel="Revertir a pendiente"
+                onClose={() => setRevertTarget(null)}
+                onConfirm={async () => {
+                    if (revertTarget?.isReal) {
+                        await updateCharge.mutateAsync({ id: revertTarget.id, changes: { status: 'pending' } })
+                        showToast('success', 'El cobro volvió a pendiente.')
+                    } else if (revertTarget) {
+                        updatePaymentRecord(revertTarget.id, { status: 'Pendiente', date: '-' })
+                    }
+                    setRevertTarget(null)
+                }}
+            />
+            <DeleteConfirmationModal
+                open={Boolean(rejectTarget)}
+                title="Rechazar transferencia"
+                description={`La transferencia informada por "${rejectTarget?.student ?? ''}" se marca como rechazada y el cobro sigue sin pagar.`}
+                confirmLabel="Rechazar transferencia"
+                onClose={() => setRejectTarget(null)}
+                onConfirm={async () => {
+                    if (rejectTarget?.isReal) {
+                        await updateCharge.mutateAsync({ id: rejectTarget.id, changes: { status: 'rejected' } })
+                        showToast('success', 'Transferencia rechazada.')
+                    } else if (rejectTarget) {
+                        updatePaymentRecord(rejectTarget.id, { status: 'Rechazado' })
+                    }
+                    setRejectTarget(null)
+                }}
+            />
             <PaymentEditModal
                 open={isEditModalOpen}
                 target={editingPayment}
+                paid={editingPaymentPaid}
+                paymentMethods={availablePaymentMethods}
                 value={editingPaymentForm}
                 onChange={setEditingPaymentForm}
                 onClose={() => {
                     setIsEditModalOpen(false)
                     setEditingPayment(null)
                 }}
-                onSubmit={() => {
+                onSubmit={async () => {
                     if (editingPayment) {
                         if (editingPayment.isReal) {
-                            updateCharge.mutate({
+                            await updateCharge.mutateAsync({
                                 id: editingPayment.id,
-                                changes: {
-                                    amount: editingPaymentForm.amount,
-                                    dueDate: editingPaymentForm.dueDate,
-                                    status: chargeStatusToApi(editingPaymentForm.status as 'Pendiente' | 'Pagado' | 'En verificación' | 'Rechazado'),
-                                    method: chargeMethodToApi(editingPaymentForm.method),
-                                    ...(editingPaymentForm.status === 'Pagado' && editingPayment.date === '-' ? { paidAt: format(today, 'yyyy-MM-dd'), paidAmount: editingPaymentForm.amount } : {}),
-                                },
-                            }, { onError: () => showToast('error', 'No se pudo actualizar el pago. Intentá nuevamente.') })
-                        } else {
-                            updatePaymentRecord(editingPayment.id, {
-                                ...editingPaymentForm,
-                                date: editingPaymentForm.status === 'Pagado' && editingPayment.date === '-' ? format(today, 'yyyy-MM-dd') : editingPayment.date,
+                                changes: editingPaymentPaid
+                                    ? { amount: editingPaymentForm.amount, paidAmount: editingPaymentForm.amount, method: chargeMethodToApi(editingPaymentForm.method) }
+                                    : { amount: editingPaymentForm.amount, dueDate: editingPaymentForm.dueDate },
                             })
+                        } else {
+                            updatePaymentRecord(editingPayment.id, editingPaymentPaid
+                                ? { amount: editingPaymentForm.amount, method: editingPaymentForm.method }
+                                : { amount: editingPaymentForm.amount, dueDate: editingPaymentForm.dueDate })
                         }
                     }
                     setIsEditModalOpen(false)
@@ -420,10 +497,10 @@ export function BillingPage() {
                 description={paymentRemovalBlocker ?? `¿Estás seguro que querés eliminar el pago de "${deleteTarget?.student}"? Esta acción no se puede deshacer.`}
                 confirmLabel={paymentRemovalBlocker ? 'Entendido' : undefined}
                 onClose={() => setDeleteTarget(null)}
-                onConfirm={() => {
+                onConfirm={async () => {
                     if (deleteTarget && !paymentRemovalBlocker) {
                         if (deleteTarget.isReal) {
-                            deleteCharge.mutate(deleteTarget.id, { onError: () => showToast('error', 'No se pudo eliminar el pago. Intentá nuevamente.') })
+                            await deleteCharge.mutateAsync(deleteTarget.id)
                         } else {
                             updatePaymentRecord(deleteTarget.id, { deleted: true })
                         }
@@ -463,25 +540,15 @@ export function BillingPage() {
                 ) : undefined}
                 selectedCount={activeTab === 'resumen' ? 0 : selectedCount}
                 bulkActionItems={[
-                    {
-                        label: 'Marcar pagado',
-                        onClick: () => {
-                            selectedIds.forEach((id) => {
-                                const payment = paymentById.get(id)
-                                if (payment?.isReal) {
-                                    updateCharge.mutate({ id, changes: { status: 'paid', paidAt: format(today, 'yyyy-MM-dd'), paidAmount: payment.amount } })
-                                } else {
-                                    updatePaymentRecord(id, { status: 'Pagado', date: format(today, 'yyyy-MM-dd') })
-                                }
-                            })
-                        },
-                    },
-                    {
-                        label: selectedPendingCount > 0 ? `Recordar (${selectedPendingCount})` : 'Recordar',
-                        onClick: () => {
-                            selectedIds.forEach((id) => updatePaymentRecord(id, { lastReminderAt: format(today, 'yyyy-MM-dd') }))
-                        },
-                    },
+                    { label: selectedPendingCount > 0 ? `Registrar cobro (${selectedPendingCount})` : 'Registrar cobro', onClick: openBulkCollect },
+                    // Próximamente, con Comunicaciones: hoy "Recordar" solo anotaba una fecha en este navegador,
+                    // sin avisarle nada al alumno.
+                    // {
+                    //     label: selectedPendingCount > 0 ? `Recordar (${selectedPendingCount})` : 'Recordar',
+                    //     onClick: () => {
+                    //         selectedIds.forEach((id) => updatePaymentRecord(id, { lastReminderAt: format(today, 'yyyy-MM-dd') }))
+                    //     },
+                    // },
                     { label: 'Exportar', onClick: exportPayments },
                 ]}
                 postHeaderContent={<BillingContextHeader activeTab={activeTab} onTabChange={setActiveTab} onNewCharge={() => setIsManualChargeOpen(true)} />}
@@ -496,20 +563,21 @@ export function BillingPage() {
                         selectedIds={selectedIds}
                         selectAllChecked={isSelectAllChecked}
                         openMenuId={openMenuId}
-                        canAdjust={activeTab === 'pendientes'}
                         onPageChange={setCurrentPage}
                         onToggleSelection={toggleSelection}
                         onToggleSelectAll={toggleSelectAll}
                         onToggleMenu={(id) => setOpenMenuId((current) => current === id ? null : id)}
                         onEdit={(payment) => {
                             setEditingPayment(payment)
-                            setEditingPaymentForm({ method: payment.method, amount: payment.amount, dueDate: payment.dueDate, status: payment.status })
+                            setEditingPaymentForm({ method: payment.method, amount: payment.amount, dueDate: payment.dueDate })
                             setIsEditModalOpen(true)
                         }}
                         onPaymentLink={setPaymentLinkTarget}
                         onCollect={openCollectModal}
                         onAdjust={openAdjustModal}
                         onRemind={sendReminder}
+                        onRejectTransfer={setRejectTarget}
+                        onRevertPayment={setRevertTarget}
                         onDelete={setDeleteTarget}
                     />
                 )}

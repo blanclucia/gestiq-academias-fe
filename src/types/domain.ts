@@ -16,7 +16,7 @@ export type ChargePaymentSnapshot = {
     dueDate: string
     paidAt?: string
 }
-export type PaymentMethod = 'Transferencia' | 'Tarjeta' | 'Efectivo'
+export type PaymentMethod = 'Transferencia' | 'Mercado Pago' | 'Tarjeta' | 'Efectivo'
 export type TeacherRole = 'Docente' | 'Administrativo'
 export type TeacherStatus = 'Activo' | 'Inactivo'
 export type ClassModality = 'Grupo' | 'Particular'

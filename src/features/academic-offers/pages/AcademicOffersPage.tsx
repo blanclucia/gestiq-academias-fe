@@ -1,4 +1,4 @@
-import { Eye, PencilLine, Trash2, BookOpen, CalendarPlus } from 'lucide-react'
+import { Trash2, BookOpen, CalendarDays, CalendarPlus } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CourseForm, type CourseFormValue } from '../components/CourseForm'
@@ -12,7 +12,8 @@ import { EntityCell } from '@/components/ui/PersonCell'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
 import { StatusBadge, type StatusBadgeTone } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { type AcademicCourse, getActiveAcademicCycleId, getCourseRemovalBlockers, listAcademicCycles, listCourses, listPrivateLessons, listStaff, listStudents, useAcademyRepositoryVersion, useActivateCycle, useCreateCourse, useCreateCycle, useCreatePrivateLesson, useDeleteCourse, useUpdateCourse, useUpdatePrivateLesson } from '@/services/academyRepository'
+import { type AcademicCourse, getActiveAcademicCycleId, getCourseRemovalBlockers, listAcademicCycles, listCourses, listPrivateLessons, listStaff, listStudents, useAcademyRepositoryVersion, useActivateCycle, useCreateCourse, useCreateCycle, useCreatePrivateLesson, useDeleteCourse, useUpdatePrivateLesson } from '@/services/academyRepository'
+import { isCycleOverlap } from '@/services/organization/academicOffersApi'
 import { PrivateLessonsTable, type PrivateStudentRow } from '../components/PrivateLessonsTable'
 import { splitFilterValue } from '@/components/crud/filterValues'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
@@ -40,19 +41,16 @@ export function AcademicOffersPage() {
     const [openMenuId, setOpenMenuId] = useState<string | null>(null)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [createCourseError, setCreateCourseError] = useState('')
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-    const [editCourseError, setEditCourseError] = useState('')
-    const [editingCourse, setEditingCourse] = useState<Course | null>(null)
     const [courseForm, setCourseForm] = useState<CourseFormValue>({ name: '', description: '', status: 'Borrador' })
     const [deleteTarget, setDeleteTarget] = useState<Course | null>(null)
     const cycles = listAcademicCycles()
     const activeCycleId = getActiveAcademicCycleId()
     const [isCreateCycleOpen, setIsCreateCycleOpen] = useState(false)
     const [cycleForm, setCycleForm] = useState({ name: '', startDate: '2027-01-01', endDate: '2027-12-31' })
+    const [createCycleError, setCreateCycleError] = useState('')
     const createCycle = useCreateCycle()
     const activateCycle = useActivateCycle()
     const createCourse = useCreateCourse()
-    const updateCourse = useUpdateCourse()
     const deleteCourse = useDeleteCourse()
     const createPrivateLesson = useCreatePrivateLesson()
     const updatePrivateLesson = useUpdatePrivateLesson()
@@ -208,25 +206,27 @@ export function AcademicOffersPage() {
                 subtitle="Creá el período que organizará la oferta, las comisiones y sus inscripciones."
                 submitLabel="Crear ciclo"
                 validate={() => validateConditions({ cycleName: !cycleForm.name.trim() && 'Ingresá el nombre.', cycleStartDate: !cycleForm.startDate && 'Ingresá el inicio.', cycleEndDate: (!cycleForm.endDate || cycleForm.endDate < cycleForm.startDate) && 'Ingresá una fecha de fin válida.' }, 'Revisá los datos del ciclo.')}
-                onClose={() => setIsCreateCycleOpen(false)}
+                onClose={() => { setIsCreateCycleOpen(false); setCreateCycleError('') }}
                 onSubmit={() => {
+                    setCreateCycleError('')
                     createCycle.mutate({ ...cycleForm, name: cycleForm.name.trim(), status: 'Borrador' }, {
                         onSuccess: (created) => {
+                            setIsCreateCycleOpen(false)
                             activateCycle.mutate(created.id, {
                                 onSuccess: () => showToast('success', 'Ciclo lectivo creado y activado correctamente.'),
                                 onError: () => showToast('error', 'El ciclo se creó, pero no se pudo activar automáticamente. Activalo desde el selector de ciclo lectivo.'),
                             })
                         },
-                        onError: () => showToast('error', 'No se pudo crear el ciclo lectivo. Intentá nuevamente.'),
+                        onError: (error) => setCreateCycleError(isCycleOverlap(error) ? 'Las fechas se solapan con otro ciclo lectivo que no está cerrado. Ajustá el rango o cerrá el ciclo anterior.' : 'No se pudo crear el ciclo lectivo. Intentá nuevamente.'),
                     })
-                    setIsCreateCycleOpen(false)
                 }}
             >
                 <div className="form-grid">
-                    <label className="form-field"><span className="form-field-label"><span>Nombre <b className="form-required-mark">*</b></span></span><input name="cycleName" className="form-input" value={cycleForm.name} onChange={(event) => setCycleForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ej: Ciclo lectivo 2027" /></label>
-                    <label className="form-field"><span className="form-field-label"><span>Fecha de inicio <b className="form-required-mark">*</b></span></span><input name="cycleStartDate" className="form-input" type="date" value={cycleForm.startDate} onChange={(event) => setCycleForm((current) => ({ ...current, startDate: event.target.value }))} /></label>
-                    <label className="form-field"><span className="form-field-label"><span>Fecha de cierre <b className="form-required-mark">*</b></span></span><input name="cycleEndDate" className="form-input" type="date" value={cycleForm.endDate} onChange={(event) => setCycleForm((current) => ({ ...current, endDate: event.target.value }))} /></label>
+                    <label className="form-field"><span className="form-field-label"><span>Nombre <b className="form-required-mark">*</b></span></span><input name="cycleName" className="form-input" value={cycleForm.name} onChange={(event) => { setCycleForm((current) => ({ ...current, name: event.target.value })); setCreateCycleError('') }} placeholder="Ej: Ciclo lectivo 2027" /></label>
+                    <label className="form-field"><span className="form-field-label"><span>Fecha de inicio <b className="form-required-mark">*</b></span></span><input name="cycleStartDate" className="form-input" type="date" value={cycleForm.startDate} onChange={(event) => { setCycleForm((current) => ({ ...current, startDate: event.target.value })); setCreateCycleError('') }} /></label>
+                    <label className="form-field"><span className="form-field-label"><span>Fecha de cierre <b className="form-required-mark">*</b></span></span><input name="cycleEndDate" className="form-input" type="date" value={cycleForm.endDate} onChange={(event) => { setCycleForm((current) => ({ ...current, endDate: event.target.value })); setCreateCycleError('') }} /></label>
                 </div>
+                {createCycleError && <p className="form-error-message" role="alert">{createCycleError}</p>}
             </EntityFormModal>
 
             <EntityFormModal
@@ -257,44 +257,6 @@ export function AcademicOffersPage() {
             >
                 <CourseForm value={courseForm} onValueChange={setCourseForm} />
                 {createCourseError && <p className="form-error-message" role="alert">{createCourseError}</p>}
-            </EntityFormModal>
-
-            <EntityFormModal
-                open={isEditModalOpen}
-                title="Editar oferta académica"
-                subtitle="Actualiza los datos principales de la oferta académica."
-                validate={() => validateConditions({ courseName: !courseForm.name.trim() && 'Ingresá el nombre de la oferta.' })}
-                onClose={() => {
-                    setIsEditModalOpen(false)
-                    setEditingCourse(null)
-                    setEditCourseError('')
-                }}
-                onSubmit={() => {
-                    setEditCourseError('')
-                    if (!editingCourse || !courseForm.name.trim()) {
-                        setIsEditModalOpen(false)
-                        setEditingCourse(null)
-                        return
-                    }
-                    updateCourse.mutate({ id: editingCourse.id, changes: courseForm }, {
-                        onSuccess: () => {
-                            setIsEditModalOpen(false)
-                            setEditingCourse(null)
-                            showToast('success', 'Oferta académica actualizada correctamente.')
-                        },
-                        onError: () => setEditCourseError('No se pudo actualizar la oferta académica. Intentá nuevamente.'),
-                    })
-                }}
-            >
-                <CourseForm
-                    value={courseForm}
-                    onValueChange={setCourseForm}
-                    initialValues={{
-                        name: editingCourse?.name,
-                        description: 'Oferta académica orientada a nivel inicial con foco en speaking y listening.',
-                    }}
-                />
-                {editCourseError && <p className="form-error-message" role="alert">{editCourseError}</p>}
             </EntityFormModal>
 
             <DeleteConfirmationModal
@@ -328,6 +290,14 @@ export function AcademicOffersPage() {
             >
                 <PrivateLessonForm value={privateLessonForm} onChange={setPrivateLessonForm} studentOptions={privateStudentOptions} teacherOptions={teacherOptions} />
             </EntityFormModal>
+
+            {cycles.length === 0 && (
+                <div className="inline-warning-banner" role="status">
+                    <CalendarDays size={16} />
+                    <span>Todavía no creaste ningún ciclo lectivo — es la base de la oferta académica (cursos, comisiones, inscripciones). Creá el primero para empezar a cargar datos.</span>
+                    <button type="button" className="primary-button compact-button" onClick={() => setIsCreateCycleOpen(true)}>Crear ciclo lectivo</button>
+                </div>
+            )}
 
             <CrudListPage
                 contentInset
@@ -399,7 +369,18 @@ export function AcademicOffersPage() {
                             {
                                 key: 'course',
                                 header: 'Oferta académica',
-                                accessor: (course) => <EntityCell name={course.name} subtitle={`${course.commissions.length} comisiones`} avatar={course.name.charAt(0)} />,
+                                accessor: (course) => <EntityCell name={course.name} avatar={course.name.charAt(0)} />,
+                            },
+                            {
+                                key: 'description',
+                                header: 'Descripción',
+                                accessor: (course) => course.description ? <span className="table-description" title={course.description}>{course.description}</span> : <span className="table-secondary-text">Sin descripción</span>,
+                            },
+                            {
+                                key: 'commissions',
+                                header: 'Comisiones',
+                                accessor: (course) => <strong>{course.commissions.length}</strong>,
+                                align: 'center',
                             },
                             {
                                 key: 'students',
@@ -421,14 +402,6 @@ export function AcademicOffersPage() {
                                 onToggle={() => setOpenMenuId((current) => (current === course.id ? null : course.id))}
                                 actions={[
                                     { label: 'Ver oferta académica', icon: <BookOpen size={15} />, onClick: () => navigate(path(`offers/${course.id}`)) },
-                                    {
-                                        label: 'Editar', icon: <PencilLine size={15} />, onClick: () => {
-                                            setEditingCourse(course)
-                                            setCourseForm({ name: course.name, description: course.description ?? '', status: course.status })
-                                            setIsEditModalOpen(true)
-                                        }
-                                    },
-                                    { label: 'Detalle', icon: <Eye size={15} />, onClick: () => navigate(path(`offers/${course.id}`)) },
                                     { label: 'Eliminar', icon: <Trash2 size={15} />, onClick: () => setDeleteTarget(course), variant: 'danger' },
                                 ]}
                             />

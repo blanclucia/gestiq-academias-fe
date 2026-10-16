@@ -13,7 +13,7 @@ const apiExpenseSchema = z.object({
     dueDate: z.string().optional(),
     status: z.enum(['pending', 'paid']),
     paidDate: z.string().optional(),
-    method: z.enum(['transfer', 'card', 'cash']).optional(),
+    method: z.enum(['transfer', 'card', 'cash', 'mercado_pago']).optional(),
     notes: z.string(),
     recurrence: z.enum(['single', 'monthly']),
 })
@@ -29,7 +29,7 @@ export type ApiExpenseCreate = {
     dueDate?: string
     status?: 'pending' | 'paid'
     paidDate?: string
-    method?: 'transfer' | 'card' | 'cash'
+    method?: 'transfer' | 'card' | 'cash' | 'mercado_pago'
     notes: string
     recurrence: 'single' | 'monthly'
     repeatUntil?: string

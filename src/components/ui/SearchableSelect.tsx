@@ -1,4 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { X } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { useFloatingPanel } from './useFloatingPanel'
 
 export type SearchableSelectOption = {
     value: string
@@ -20,10 +23,15 @@ type SearchableSelectProps = {
     // Extra class on the wrapper — used to carry layout rules (fixed width, etc.) that previously
     // targeted a plain <select> directly, since the real input now sits one level deeper.
     className?: string
+    // Shows a × to undo a pick (back to ''), for a value chosen by mistake. A required field still
+    // fails validation afterwards; the point is not being stuck with the wrong option.
+    clearable?: boolean
+    clearLabel?: string
 }
 
-export function SearchableSelect({ value, options, onChange, placeholder = 'Buscar...', emptyLabel = 'No hay opciones disponibles.', name, disabled = false, 'aria-label': ariaLabel, className = '' }: SearchableSelectProps) {
+export function SearchableSelect({ value, options, onChange, placeholder = 'Buscar...', emptyLabel = 'No hay opciones disponibles.', name, disabled = false, 'aria-label': ariaLabel, className = '', clearable = false, clearLabel = 'Quitar selección' }: SearchableSelectProps) {
     const containerRef = useRef<HTMLDivElement>(null)
+    const panelRef = useRef<HTMLDivElement>(null)
     const listboxId = `searchable-select-options-${useId()}`
     const selectedOption = options.find((option) => option.value === value)
     const [query, setQuery] = useState(selectedOption?.label ?? '')
@@ -38,7 +46,9 @@ export function SearchableSelect({ value, options, onChange, placeholder = 'Busc
 
     useEffect(() => {
         const handlePointerDown = (event: PointerEvent) => {
-            if (!containerRef.current?.contains(event.target as Node)) {
+            const target = event.target as Node
+            // The options panel is portaled outside the container, so it counts as "inside" too.
+            if (!containerRef.current?.contains(target) && !panelRef.current?.contains(target)) {
                 setOpen(false)
                 // Without a pick, the box should go back to showing the real selection (or blank
                 // for "Todas") instead of staying on whatever the user typed to search with.
@@ -49,6 +59,7 @@ export function SearchableSelect({ value, options, onChange, placeholder = 'Busc
         return () => document.removeEventListener('pointerdown', handlePointerDown)
     }, [])
 
+    const panelStyle = useFloatingPanel(containerRef, open && !disabled)
     const filteredOptions = options.filter((option) => option.label.toLocaleLowerCase('es-AR').includes(query.toLocaleLowerCase('es-AR')))
     const selectOption = (option: SearchableSelectOption) => {
         onChange(option.value)
@@ -73,12 +84,15 @@ export function SearchableSelect({ value, options, onChange, placeholder = 'Busc
         }
     }
 
-    return <div className={`student-picker${disabled ? ' disabled' : ''}${className ? ` ${className}` : ''}`} ref={containerRef}>
+    const showClear = clearable && !disabled && Boolean(value)
+    return <div className={`student-picker${disabled ? ' disabled' : ''}${showClear ? ' clearable' : ''}${className ? ` ${className}` : ''}`} ref={containerRef}>
         <input
             name={name}
             aria-label={ariaLabel}
             className="form-input"
-            value={query}
+            // While closed, always show the current selection — the query only matters while searching,
+            // and reading it here would leave stale text whenever `value` changes from outside.
+            value={open ? query : selectedOption?.label ?? ''}
             disabled={disabled}
             onChange={(event) => { setQuery(event.target.value); setOpen(true); setHighlightedIndex(0) }}
             // Clear the query on focus so the full option list shows right away — otherwise it's
@@ -92,8 +106,9 @@ export function SearchableSelect({ value, options, onChange, placeholder = 'Busc
             aria-controls={listboxId}
             autoComplete="off"
         />
-        {open && !disabled && <div className="student-picker-options" id={listboxId} role="listbox">
+        {showClear && <button type="button" className="student-picker-clear" aria-label={clearLabel} title={clearLabel} onClick={() => { onChange(''); setQuery(''); setOpen(false) }}><X size={15} /></button>}
+        {open && !disabled && panelStyle && createPortal(<div className="student-picker-options" id={listboxId} role="listbox" ref={panelRef} style={panelStyle}>
             {filteredOptions.length > 0 ? filteredOptions.map((option, index) => <button key={option.value} type="button" role="option" aria-selected={option.value === value} disabled={option.disabled} className={index === highlightedIndex ? 'highlighted' : ''} onMouseEnter={() => setHighlightedIndex(index)} onClick={() => selectOption(option)}>{option.label}</button>) : <span className="student-picker-empty">{emptyLabel}</span>}
-        </div>}
+        </div>, document.body)}
     </div>
 }

@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { getActiveAcademicCycleId, listCourses, listEnrollmentOpenings, listPrivateLessons, listStaff, listStudents } from '@/services/academyRepository'
 import { createRepositoryEvents } from '@/services/shared/repositoryEvents'
 import { readStoredValue, writeStoredValue } from '@/services/shared/storage'
-import { getWeeklyAgendaDates, shiftAgendaDate } from '@/domain/agenda/agendaRules'
+import { getWeeklyAgendaDates, isAgendaEventInBranch, shiftAgendaDate, type AgendaBranchScope } from '@/domain/agenda/agendaRules'
 
 export type AgendaEventType = 'feriado' | 'cumpleanos' | 'clase' | 'inscripcion' | 'academico' | 'reunion' | 'recordatorio' | 'otro'
 export type AgendaEventScope = 'general' | 'commission'
@@ -22,6 +22,10 @@ export type AgendaEvent = {
     endTime?: string
     source: 'system' | 'admin' | 'teacher'
     createdAt: string
+    // Sede a la que pertenece el evento; sin valor aplica a toda la academia (feriados, eventos generales).
+    branchId?: string
+    // Cumpleaños de staff: un docente puede estar en varias sedes, así que se resuelve contra el roster de cada una.
+    staffUserId?: string
 }
 
 const storageKey = 'gestiq-agenda-events-v1'
@@ -61,8 +65,8 @@ function derivedBirthdayEvents(year: number): AgendaEvent[] {
     const students = listStudents().filter((student) => student.birthDate)
     const teachers = listStaff().filter((teacher) => teacher.birthDate)
     return [
-        ...students.map((student) => ({ id: `BIRTHDAY-ST-${student.id}-${year}`, title: `Cumpleaños · ${student.fullName}`, type: 'cumpleanos' as const, scope: 'general' as const, date: dateForBirthday(student.birthDate!, year), allDay: true, source: 'system' as const, createdAt: `${year}-01-01`, personId: student.id, personType: 'student' as const })),
-        ...teachers.map((teacher) => ({ id: `BIRTHDAY-T-${teacher.id}-${year}`, title: `Cumpleaños · ${teacher.fullName}`, type: 'cumpleanos' as const, scope: 'general' as const, date: dateForBirthday(teacher.birthDate!, year), allDay: true, source: 'system' as const, createdAt: `${year}-01-01`, personId: teacher.id, personType: 'teacher' as const })),
+        ...students.map((student) => ({ id: `BIRTHDAY-ST-${student.id}-${year}`, title: `Cumpleaños · ${student.fullName}`, type: 'cumpleanos' as const, scope: 'general' as const, date: dateForBirthday(student.birthDate!, year), allDay: true, source: 'system' as const, createdAt: `${year}-01-01`, branchId: student.branchId, personId: student.id, personType: 'student' as const })),
+        ...teachers.map((teacher) => ({ id: `BIRTHDAY-T-${teacher.id}-${year}`, title: `Cumpleaños · ${teacher.fullName}`, type: 'cumpleanos' as const, scope: 'general' as const, date: dateForBirthday(teacher.birthDate!, year), allDay: true, source: 'system' as const, createdAt: `${year}-01-01`, staffUserId: teacher.userId, personId: teacher.id, personType: 'teacher' as const })),
     ].filter((event) => event.date)
 }
 
@@ -89,6 +93,7 @@ function derivedClassEvents(year: number): AgendaEvent[] {
             type: 'clase' as const,
             scope: 'commission' as const,
             commissionId: commission.id,
+            branchId: course.branchId,
             date,
             allDay: false,
             source: 'system' as const,
@@ -121,7 +126,7 @@ function derivedEnrollmentEvents(year: number): AgendaEvent[] {
     const coursesById = new Map(listCourses().filter((course) => course.cycleId === activeCycleId).map((course) => [course.id, course]))
     return listEnrollmentOpenings().filter((opening) => opening.startDate.startsWith(`${year}-`) && coursesById.has(opening.courseId)).flatMap((opening) => {
         const course = coursesById.get(opening.courseId)
-        return [{ id: `ENROLLMENT-OPEN-${opening.id}`, title: `Inscripciones abiertas · ${course?.name ?? 'Oferta académica'}`, type: 'inscripcion' as const, scope: 'general' as const, date: opening.startDate, endDate: opening.endDate, allDay: true, source: 'system' as const, createdAt: `${year}-01-01` }]
+        return [{ id: `ENROLLMENT-OPEN-${opening.id}`, title: `Inscripciones abiertas · ${course?.name ?? 'Oferta académica'}`, type: 'inscripcion' as const, scope: 'general' as const, branchId: course?.branchId, date: opening.startDate, endDate: opening.endDate, allDay: true, source: 'system' as const, createdAt: `${year}-01-01` }]
     })
 }
 
@@ -136,8 +141,11 @@ export function listAgendaEvents(year: number) {
     return [...holidays, ...derivedBirthdayEvents(year), ...derivedClassEvents(year), ...derivedEnrollmentEvents(year), ...stored.filter((event) => event.date.startsWith(`${year}-`))].sort((a, b) => a.date.localeCompare(b.date))
 }
 
-export function listUpcomingAgendaEvents(fromDate: string, limit = 6, excludedTypes: AgendaEventType[] = []) {
-    return listAgendaEvents(Number(fromDate.slice(0, 4))).filter((event) => event.date >= fromDate && !excludedTypes.includes(event.type)).slice(0, limit)
+export function listUpcomingAgendaEvents(fromDate: string, limit = 6, excludedTypes: AgendaEventType[] = [], branchScope?: AgendaBranchScope) {
+    const commissionBranchIds = new Map(listCourses().flatMap((course) => course.commissions.map((commission) => [commission.id, course.branchId] as const)))
+    return listAgendaEvents(Number(fromDate.slice(0, 4)))
+        .filter((event) => event.date >= fromDate && !excludedTypes.includes(event.type) && (!branchScope || isAgendaEventInBranch(event, branchScope, commissionBranchIds)))
+        .slice(0, limit)
 }
 
 export function createAgendaEvent(event: Omit<AgendaEvent, 'id' | 'source' | 'createdAt'>) {

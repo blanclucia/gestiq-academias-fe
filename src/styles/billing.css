@@ -4,13 +4,10 @@
 
 .billing-page .data-table-card {
     gap: 16px;
-    padding: 18px;
+    /* Same padding as .finance-main-card, so both summaries line up. */
+    padding: 20px;
 }
 
-.billing-summary-date-range {
-    display: flex;
-    justify-content: flex-end;
-}
 
 @media (max-width: 640px) {
     .billing-page {
@@ -19,15 +16,5 @@
 
     .billing-page .data-table-card {
         padding: 14px;
-    }
-
-    .billing-summary-date-range,
-    .billing-summary-date-range .toolbar-date-range {
-        width: 100%;
-    }
-
-    .billing-summary-date-range .form-input {
-        flex: 1 1 140px;
-        width: auto;
     }
 }

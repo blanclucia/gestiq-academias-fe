@@ -64,6 +64,19 @@ Este proyecto debe seguir la estrategia definida en `estrategia-frontend-platafo
 - Pensar en bulk actions, importación masiva, asignación grupal y flujo de trabajo como parte de la base del producto.
 - La experiencia debe ser simple, clara y operativa para el usuario final, aunque la arquitectura interna sea sólida.
 
+### Contenido de tabs
+
+- En páginas de detalle (oferta, comisión, inscripción, alumno, configuración), el contenido de cada tab va dentro de `Card` con un `SectionHeading`: ícono, título y, si aplica, descripción y acciones. Nunca tablas o listas sueltas sobre el fondo de la página.
+- La tab activa vive en la URL (`?tab=...`, sin parámetro para la primera), así se puede enlazar a una sección y volver atrás a la misma tab (ej. `academy?tab=cobros`, `oferta/:id?tab=commissions`).
+- El título es obligatorio aunque la tab tenga una sola card y repita su nombre (ej. tab "Alumnos" → card "Alumnos"). Preferir un título más específico cuando aporte información (ej. tab "Cobros" → "Configuración de cobros").
+- El contador de registros va como `description` del `SectionHeading` (ej. "2 alumnos asignados") y la acción principal de la card en `actions`, no en una barra aparte.
+- Las cards de una tab se apilan dentro de `.offer-detail-stack`: el `gap` del contenedor define la separación, sin márgenes propios.
+- Los datos de una entidad se editan en su propio detalle, no en un modal: las cards muestran los campos ya como formulario (`SettingsField` dentro de `form-grid academy-settings-grid`) y un pie `academy-form-actions` con "Descartar cambios" y "Guardar cambios" (como Mis sedes, Mi academia, oferta académica y comisión). Validar con `markInvalidFields` y que el título de la página cambie recién al guardar.
+- Los modales (`EntityFormModal`) quedan para crear desde un listado y para acciones puntuales (asignar, registrar un pago, confirmar). La acción "Editar" de una fila lleva al detalle de la entidad.
+- Las acciones sobre toda la entidad (cerrar, reabrir) van en el encabezado de la página (`.page-header-actions`), visibles desde cualquier tab, no en el pie del formulario. Si tienen consecuencias, piden confirmación explicando qué implica, y ese estado no se ofrece como opción editable del campo Estado.
+- Los campos cuyas opciones no se explican solas (estados, tipos, roles) llevan ayuda junto a la etiqueta con la prop `info` de `FormField` / `SettingsField`: `<StatusHelp>` para una leyenda de opciones, o `<InfoTooltip>` para una explicación suelta. Los textos viven en el `model/` de la feature y describen lo que cada opción permite o bloquea según las reglas reales del backend.
+- Excepción: cuando las tabs filtran o cambian el listado de una página (Cobros, Finanzas → Egresos, Oferta académica → Cursos/Particulares), el título es el de la página y la tab funciona como filtro; no se agrega un título por tab.
+
 ## Arquitectura y organización por módulos
 
 GestIQ utiliza una arquitectura **feature-first**. Las pantallas y componentes de negocio deben organizarse por módulo funcional, no agruparse en una carpeta global `pages` ni mezclarse con las primitivas compartidas.

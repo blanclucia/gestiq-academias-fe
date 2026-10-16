@@ -18,8 +18,9 @@ import { useBranches, useSelectedBranchId } from '@/services/branchRepository'
 import { validateConditions } from '@/components/forms/formValidation'
 import { formatCurrencyARS, formatShortDate as formatDate } from '@/domain/shared/formattingRules'
 import { DateRangeControl } from '@/components/ui/DateRangeControl'
-import { calculateFinancialProjection } from '@/domain/finance/expenseRules'
+import { calculateFinancialProjection, isExpenseInPeriod } from '@/domain/finance/expenseRules'
 import { useToast } from '@/components/ui/ToastContext'
+import { paymentMethods } from '@/domain/billing/paymentMethods'
 
 type FinanceTab = 'summary' | 'expenses'
 const currency = { format: formatCurrencyARS }
@@ -74,7 +75,7 @@ export function FinancePage() {
     const isInDateRange = (date?: string) => Boolean(date)
         && (!dateRange.from || date! >= dateRange.from)
         && (!dateRange.to || date! <= dateRange.to)
-    const periodExpenses = expenses.filter((expense) => isInDateRange(expense.status === 'Pagado' ? expense.paidDate : expense.dueDate))
+    const periodExpenses = expenses.filter((expense) => isExpenseInPeriod(expense, dateRange.from, dateRange.to))
     const periodPayments = payments.filter((payment) => isInDateRange(payment.status === 'Pagado' ? payment.date : payment.dueDate))
     const received = periodPayments.filter((payment) => payment.status === 'Pagado').reduce((total, payment) => total + payment.amount, 0)
     const paid = periodExpenses.filter((expense) => expense.status === 'Pagado').reduce((total, expense) => total + expense.amount, 0)
@@ -86,8 +87,7 @@ export function FinancePage() {
         const statuses = splitFilterValue(filters.status)
         const selectedCategories = splitFilterValue(filters.category)
         const recurrences = splitFilterValue(filters.recurrence)
-        return (!expense.dueDate || !dateRange.from || expense.dueDate >= dateRange.from)
-            && (!expense.dueDate || !dateRange.to || expense.dueDate <= dateRange.to)
+        return isExpenseInPeriod(expense, dateRange.from, dateRange.to)
             && (statuses.length === 0 || statuses.includes(status))
             && (selectedCategories.length === 0 || selectedCategories.includes(expense.category))
             && (recurrences.length === 0 || recurrences.includes(expense.recurrence))
@@ -98,48 +98,43 @@ export function FinancePage() {
     const openEdit = (expense: Expense) => { setEditingExpense(expense); setEditScope(expense.seriesId ? 'future' : 'single'); setExpenseForm({ ...expense, repeatUntil: '' }); setIsExpenseOpen(true) }
 
     return <div className="dashboard-page finance-page">
-        <EntityFormModal open={isExpenseOpen} title={editingExpense ? 'Editar egreso' : 'Nuevo egreso'} subtitle={editingExpense ? 'Actualizá este vencimiento o los pendientes de la serie.' : 'Registrá un gasto único o calendarizá sus próximos vencimientos.'} submitLabel={editingExpense ? 'Guardar cambios' : 'Crear egreso'} validate={() => validateConditions({ expenseConcept: !expenseForm.concept.trim() && 'Ingresá el concepto.', expenseAmount: expenseForm.amount <= 0 && 'Ingresá un importe válido.', expenseDueDate: expenseForm.recurrence === 'Mensual' && !expenseForm.dueDate && 'Ingresá el primer vencimiento.', expensePaidDate: expenseForm.recurrence === 'Único' && expenseForm.status === 'Pagado' && !expenseForm.paidDate && 'Ingresá la fecha de pago.' }, 'Revisá los datos del egreso.')} onClose={() => setIsExpenseOpen(false)} onSubmit={() => {
+        <EntityFormModal open={isExpenseOpen} title={editingExpense ? 'Editar egreso' : 'Nuevo egreso'} subtitle={editingExpense ? 'Actualizá este vencimiento o los pendientes de la serie.' : 'Registrá un gasto único o calendarizá sus próximos vencimientos.'} submitLabel={editingExpense ? 'Guardar cambios' : 'Crear egreso'} validate={() => validateConditions({ expenseConcept: !expenseForm.concept.trim() && 'Ingresá el concepto.', expenseAmount: expenseForm.amount <= 0 && 'Ingresá un importe válido.', expenseDueDate: expenseForm.recurrence === 'Mensual' && !expenseForm.dueDate && 'Ingresá el primer vencimiento.', expensePaidDate: expenseForm.recurrence === 'Único' && expenseForm.status === 'Pagado' && !expenseForm.paidDate && 'Ingresá la fecha de pago.' }, 'Revisá los datos del egreso.')} onClose={() => setIsExpenseOpen(false)} onSubmit={async () => {
+            // Awaited: on failure the modal stays open with the error (EntityFormModal) and keeps the data.
             if (editingExpense) {
-                updateExpense.mutate({ id: editingExpense.id, changes: expenseForm, scope: editScope }, {
-                    onSuccess: () => showToast('success', 'Egreso actualizado correctamente.'),
-                    onError: () => showToast('error', 'No se pudo actualizar el egreso. Intentá nuevamente.'),
-                })
+                await updateExpense.mutateAsync({ id: editingExpense.id, changes: expenseForm, scope: editScope })
+                showToast('success', 'Egreso actualizado correctamente.')
             } else {
-                createExpense.mutate(expenseForm, {
-                    onSuccess: () => showToast('success', 'Egreso creado correctamente.'),
-                    onError: () => showToast('error', 'No se pudo crear el egreso. Intentá nuevamente.'),
-                })
+                await createExpense.mutateAsync(expenseForm)
+                showToast('success', 'Egreso creado correctamente.')
             }
             setActiveTab('expenses')
             setIsExpenseOpen(false)
         }}>
             <div className="form-stack"><FormSection title="Datos del egreso"><FormGrid>
-                <FormField label="Concepto" required><input className="form-input" value={expenseForm.concept} onChange={(event) => setExpenseForm((current) => ({ ...current, concept: event.target.value }))} placeholder="Ej: Alquiler de la sede" /></FormField>
+                <FormField label="Concepto" required><input name="expenseConcept" className="form-input" value={expenseForm.concept} onChange={(event) => setExpenseForm((current) => ({ ...current, concept: event.target.value }))} placeholder="Ej: Alquiler de la sede" /></FormField>
                 <FormField label="Categoría" required><SearchableSelect value={expenseForm.category} onChange={(category) => setExpenseForm((current) => ({ ...current, category: category as ExpenseCategory }))} options={categories.map((item) => ({ value: item, label: item }))} /></FormField>
-                <FormField label="Proveedor o beneficiario" required><input className="form-input" value={expenseForm.beneficiary} onChange={(event) => setExpenseForm((current) => ({ ...current, beneficiary: event.target.value }))} /></FormField>
-                <FormField label="Importe" required><input className="form-input" type="number" min={0} value={expenseForm.amount || ''} onChange={(event) => setExpenseForm((current) => ({ ...current, amount: Number(event.target.value) }))} /></FormField>
-                {expenseForm.status !== 'Pagado' && <FormField label={expenseForm.recurrence === 'Mensual' ? 'Primer vencimiento' : 'Vencimiento (opcional)'}><input className="form-input" type="date" value={expenseForm.dueDate} onChange={(event) => setExpenseForm((current) => ({ ...current, dueDate: event.target.value }))} /></FormField>}
+                <FormField label="Proveedor o beneficiario (opcional)"><input className="form-input" value={expenseForm.beneficiary} onChange={(event) => setExpenseForm((current) => ({ ...current, beneficiary: event.target.value }))} /></FormField>
+                <FormField label="Importe" required><input name="expenseAmount" className="form-input" type="number" min={0} value={expenseForm.amount || ''} onChange={(event) => setExpenseForm((current) => ({ ...current, amount: Number(event.target.value) }))} /></FormField>
+                {expenseForm.status !== 'Pagado' && <FormField label={expenseForm.recurrence === 'Mensual' ? 'Primer vencimiento' : 'Vencimiento (opcional)'}><input name="expenseDueDate" className="form-input" type="date" value={expenseForm.dueDate} onChange={(event) => setExpenseForm((current) => ({ ...current, dueDate: event.target.value }))} /></FormField>}
             </FormGrid></FormSection>
             {editingExpense?.seriesId && <FormSection title="Alcance del cambio" description="Los vencimientos que ya fueron pagados nunca se modificarán."><FormGrid><FormField label="Aplicar cambios a"><SearchableSelect value={editScope} onChange={(scope) => setEditScope(scope as typeof editScope)} options={[{ value: 'future', label: 'Este y los siguientes' }, { value: 'single', label: 'Solo este vencimiento' }, { value: 'series', label: 'Toda la serie pendiente' }]} /></FormField></FormGrid></FormSection>}
             {!editingExpense && <FormSection title="Calendarización"><FormGrid>
                 <FormField label="Frecuencia"><SearchableSelect value={expenseForm.recurrence} onChange={(recurrence) => setExpenseForm((current) => ({ ...current, recurrence: recurrence as ExpenseInput['recurrence'] }))} options={[{ value: 'Único', label: 'Pago único' }, { value: 'Mensual', label: 'Todos los meses' }]} /></FormField>
                 {expenseForm.recurrence === 'Único' && <FormField label="Estado"><SearchableSelect value={expenseForm.status} onChange={(status) => setExpenseForm((current) => ({ ...current, status: status as ExpenseInput['status'], dueDate: status === 'Pagado' ? '' : current.dueDate, paidDate: status === 'Pagado' ? (current.paidDate || localDate()) : current.paidDate }))} options={[{ value: 'Pendiente', label: 'Pendiente' }, { value: 'Pagado', label: 'Pagado' }]} /></FormField>}
-                {expenseForm.recurrence === 'Único' && expenseForm.status === 'Pagado' && <><FormField label="Fecha de pago"><input className="form-input" type="date" value={expenseForm.paidDate ?? ''} onChange={(event) => setExpenseForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio de pago"><SearchableSelect value={expenseForm.method ?? 'Transferencia'} onChange={(method) => setExpenseForm((current) => ({ ...current, method: method as PaymentMethod }))} options={[{ value: 'Transferencia', label: 'Transferencia' }, { value: 'Tarjeta', label: 'Tarjeta' }, { value: 'Efectivo', label: 'Efectivo' }]} /></FormField></>}
+                {expenseForm.recurrence === 'Único' && expenseForm.status === 'Pagado' && <><FormField label="Fecha de pago"><input name="expensePaidDate" className="form-input" type="date" value={expenseForm.paidDate ?? ''} onChange={(event) => setExpenseForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio de pago"><SearchableSelect value={expenseForm.method ?? 'Transferencia'} onChange={(method) => setExpenseForm((current) => ({ ...current, method: method as PaymentMethod }))} options={paymentMethods.map((method) => ({ value: method, label: method }))} /></FormField></>}
                 {expenseForm.recurrence === 'Mensual' && <FormField label="Generar vencimientos hasta"><div className="finance-date-with-help"><input className="form-input" type="date" min={expenseForm.dueDate} value={expenseForm.repeatUntil} onChange={(event) => setExpenseForm((current) => ({ ...current, repeatUntil: event.target.value }))} /><small>Opcional · por defecto 12 meses</small></div></FormField>}
             </FormGrid></FormSection>}</div>
         </EntityFormModal>
 
-        <EntityFormModal open={Boolean(payTarget)} title="Registrar pago" subtitle={payTarget ? `${payTarget.concept} · ${currency.format(payTarget.amount)}` : ''} submitLabel="Confirmar pago" onClose={() => setPayTarget(null)} onSubmit={() => {
+        <EntityFormModal open={Boolean(payTarget)} title="Registrar pago" subtitle={payTarget ? `${payTarget.concept} · ${currency.format(payTarget.amount)}` : ''} submitLabel="Confirmar pago" validate={() => validateConditions({ payPaidDate: !paymentForm.paidDate && 'Ingresá la fecha de pago.' }, 'Revisá los datos del pago.')} onClose={() => setPayTarget(null)} onSubmit={async () => {
             if (payTarget) {
-                updateExpense.mutate({ id: payTarget.id, changes: { status: 'Pagado', paidDate: paymentForm.paidDate, method: paymentForm.method } }, {
-                    onError: () => showToast('error', 'No se pudo registrar el pago. Intentá nuevamente.'),
-                })
+                await updateExpense.mutateAsync({ id: payTarget.id, changes: { status: 'Pagado', paidDate: paymentForm.paidDate, method: paymentForm.method } })
             }
             setPayTarget(null)
-        }}><FormGrid><FormField label="Fecha de pago"><input className="form-input" type="date" value={paymentForm.paidDate} onChange={(event) => setPaymentForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio"><SearchableSelect value={paymentForm.method} onChange={(method) => setPaymentForm((current) => ({ ...current, method: method as PaymentMethod }))} options={[{ value: 'Transferencia', label: 'Transferencia' }, { value: 'Tarjeta', label: 'Tarjeta' }, { value: 'Efectivo', label: 'Efectivo' }]} /></FormField></FormGrid></EntityFormModal>
-        <DeleteConfirmationModal open={Boolean(deleteTarget)} title="Eliminar egreso" description={`Se eliminará solamente el vencimiento de “${deleteTarget?.concept ?? ''}”.`} onClose={() => setDeleteTarget(null)} onConfirm={() => {
+        }}><FormGrid><FormField label="Fecha de pago"><input name="payPaidDate" className="form-input" type="date" value={paymentForm.paidDate} onChange={(event) => setPaymentForm((current) => ({ ...current, paidDate: event.target.value }))} /></FormField><FormField label="Medio"><SearchableSelect value={paymentForm.method} onChange={(method) => setPaymentForm((current) => ({ ...current, method: method as PaymentMethod }))} options={paymentMethods.map((method) => ({ value: method, label: method }))} /></FormField></FormGrid></EntityFormModal>
+        <DeleteConfirmationModal open={Boolean(deleteTarget)} title="Eliminar egreso" description={`Se eliminará solamente el vencimiento de “${deleteTarget?.concept ?? ''}”.`} onClose={() => setDeleteTarget(null)} onConfirm={async () => {
             if (deleteTarget) {
-                deleteExpense.mutate(deleteTarget.id, { onError: () => showToast('error', 'No se pudo eliminar el egreso. Intentá nuevamente.') })
+                await deleteExpense.mutateAsync(deleteTarget.id)
             }
             setDeleteTarget(null)
         }} />
@@ -149,9 +144,9 @@ export function FinancePage() {
         <div className="finance-page-tabs"><Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as FinanceTab)}><TabsList variant="line" aria-label="Secciones de finanzas"><TabsTrigger value="summary">Resumen</TabsTrigger><TabsTrigger value="expenses">Egresos</TabsTrigger></TabsList></Tabs><button type="button" className="primary-button compact-button context-primary-action" onClick={openCreate}><Plus size={16} /> Nuevo egreso</button></div>
         <div className="data-table-card finance-main-card">
             {activeTab === 'summary' && <div className="finance-tab-content">
-                <div className="finance-summary-date-range"><DateRangeControl value={dateRange} onChange={setDateRange} /></div>
-                <div className="kpi-grid"><KpiCard title="Ingresos cobrados" value={currency.format(received)} change="En el período" /><KpiCard title="Ingresos proyectados" value={currency.format(projection.projectedIncome)} change="Cobrados y por cobrar" /><KpiCard title="Egresos planificados" value={currency.format(projection.plannedExpenses)} change={`${currency.format(paid)} pagados · ${currency.format(committed)} pendientes`} positive={false} /><KpiCard title="Resultado proyectado" value={currency.format(projection.projectedBalance)} change={`${projection.coverageRate.toFixed(1)}% de cobertura`} positive={projection.projectedBalance >= 0} /></div>
-                <div className="finance-summary-grid"><section className="finance-panel"><div className="finance-panel-heading"><div><h3>Próximos vencimientos</h3><p>Obligaciones a atender en los próximos 14 días.</p></div><CalendarClock size={20} /></div><div className="finance-reminder-list">{reminders.map((expense) => <button type="button" key={expense.id} onClick={() => { setActiveTab('expenses'); setSearch(expense.concept) }}><span className={getExpenseDisplayStatus(expense, today) === 'Vencido' ? 'danger' : 'warning'}>{getExpenseDisplayStatus(expense, today) === 'Vencido' ? <AlertTriangle size={17} /> : <CalendarClock size={17} />}</span><span><strong>{expense.concept}</strong><small>{expense.category} · vence {formatDate(expense.dueDate)}</small></span><b>{currency.format(expense.amount)}</b></button>)}{reminders.length === 0 && <div className="finance-empty"><CheckCircle2 size={22} /> No hay vencimientos próximos.</div>}</div></section><section className="finance-panel"><div className="finance-panel-heading"><div><h3>Balance del mes</h3><p>Movimientos efectivamente realizados.</p></div><WalletCards size={20} /></div><div className="finance-balance"><div><span><ArrowUpRight size={17} /> Ingresos</span><strong>{currency.format(received)}</strong></div><div><span><ArrowDownRight size={17} /> Egresos</span><strong>{currency.format(paid)}</strong></div><div className="total"><span>Resultado</span><strong>{currency.format(received - paid)}</strong></div></div></section></div>
+                <div className="summary-date-range"><DateRangeControl value={dateRange} onChange={setDateRange} /></div>
+                <div className="kpi-grid"><KpiCard title="Ingresos cobrados" value={currency.format(received)} change="En el período" /><KpiCard title="Ingresos proyectados" value={currency.format(projection.projectedIncome)} change="Cobrados y por cobrar" /><KpiCard title="Egresos planificados" value={currency.format(projection.plannedExpenses)} change={`${currency.format(paid)} pagados · ${currency.format(committed)} pendientes`} positive={false} /><KpiCard title="Resultado proyectado" value={currency.format(projection.projectedBalance)} change={projection.coverageRate === null ? 'Sin egresos planificados' : `${projection.coverageRate.toFixed(1)}% de cobertura`} positive={projection.projectedBalance >= 0} /></div>
+                <div className="finance-summary-grid"><section className="finance-panel"><div className="finance-panel-heading"><div><h3>Próximos vencimientos</h3><p>Obligaciones a atender en los próximos 14 días.</p></div><CalendarClock size={20} /></div><div className="finance-reminder-list">{reminders.map((expense) => <button type="button" key={expense.id} onClick={() => { setActiveTab('expenses'); setSearch(expense.concept) }}><span className={getExpenseDisplayStatus(expense, today) === 'Vencido' ? 'danger' : 'warning'}>{getExpenseDisplayStatus(expense, today) === 'Vencido' ? <AlertTriangle size={17} /> : <CalendarClock size={17} />}</span><span><strong>{expense.concept}</strong><small>{expense.category} · vence {formatDate(expense.dueDate)}</small></span><b>{currency.format(expense.amount)}</b></button>)}{reminders.length === 0 && <div className="finance-empty"><CheckCircle2 size={22} /> No hay vencimientos próximos.</div>}</div></section><section className="finance-panel"><div className="finance-panel-heading"><div><h3>Balance del período</h3><p>Movimientos efectivamente realizados en el rango elegido.</p></div><WalletCards size={20} /></div><div className="finance-balance"><div><span><ArrowUpRight size={17} /> Ingresos</span><strong>{currency.format(received)}</strong></div><div><span><ArrowDownRight size={17} /> Egresos</span><strong>{currency.format(paid)}</strong></div><div className="total"><span>Resultado</span><strong>{currency.format(received - paid)}</strong></div></div></section></div>
             </div>}
 
             {activeTab === 'expenses' && <div className="finance-tab-content">

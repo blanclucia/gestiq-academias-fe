@@ -13,7 +13,7 @@ const apiRegistration = {
 }
 const apiPublicOffer = {
     openingId: 'o1', slug: 'curso-abcd1234', courseId: 'c1', courseName: 'Curso Inglés', amount: 48000, status: 'open' as const,
-    startDate: '2026-08-01', endDate: '2026-09-30',
+    startDate: '2026-08-01', endDate: '2026-09-30', branchAddress: 'Av. Siempreviva 742, Rosario',
     commissions: [{ id: 'm1', name: 'Grupo A', schedule: 'Lun 18:00', amount: 48000, capacity: 20, occupied: 3, startDate: '2026-08-01', endDate: '2026-12-15' }],
 }
 const apiRegistrationResult = { id: 'r1', fullName: 'Lucía Gómez', chargeId: 'ch1', amount: 48000 }

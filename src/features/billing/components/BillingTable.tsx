@@ -1,4 +1,4 @@
-import { BellRing, CreditCard, Link2, PencilLine, Trash2 } from 'lucide-react'
+import { CreditCard, Link2, PencilLine, RotateCcw, Trash2, XCircle } from 'lucide-react'
 import { DataTable } from '@/components/ui/DataTable'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
 import { StatusBadge, type StatusBadgeTone } from '@/components/ui/StatusBadge'
@@ -27,7 +27,6 @@ type BillingTableProps = {
     selectedIds: string[]
     selectAllChecked: boolean
     openMenuId: string | null
-    canAdjust: boolean
     onPageChange: (page: number) => void
     onToggleSelection: (id: string) => void
     onToggleSelectAll: () => void
@@ -37,6 +36,8 @@ type BillingTableProps = {
     onCollect: (payment: BillingPaymentRecord) => void
     onAdjust: (payment: BillingPaymentRecord) => void
     onRemind: (payment: BillingPaymentRecord) => void
+    onRejectTransfer: (payment: BillingPaymentRecord) => void
+    onRevertPayment: (payment: BillingPaymentRecord) => void
     onDelete: (payment: BillingPaymentRecord) => void
 }
 
@@ -99,9 +100,16 @@ export function BillingTable(props: BillingTableProps) {
                         { label: 'Generar link de pago', icon: <Link2 size={15} />, onClick: () => props.onPaymentLink(payment) },
                         { label: status === 'En verificación' ? 'Confirmar transferencia' : 'Registrar cobro', icon: <CreditCard size={15} />, onClick: () => props.onCollect(payment) },
                     ] : []),
-                    ...(props.canAdjust ? [{ label: 'Ajustar pago', icon: <PencilLine size={15} />, onClick: () => props.onAdjust(payment) }] : []),
-                    ...(status === 'Pendiente' || status === 'Vencido' ? [{ label: status === 'Vencido' ? 'Recordar vencido' : 'Recordar próximo vencimiento', icon: <BellRing size={15} />, onClick: () => props.onRemind(payment) }] : []),
-                    { label: 'Eliminar', icon: <Trash2 size={15} />, onClick: () => props.onDelete(payment), variant: 'danger' },
+                    // A discount or surcharge applies to anything still unpaid — overdue included (late fees).
+                    ...(status !== 'Pagado' && status !== 'Anulado' ? [{ label: 'Ajustar pago', icon: <PencilLine size={15} />, onClick: () => props.onAdjust(payment) }] : []),
+                    ...(status === 'En verificación' ? [{ label: 'Rechazar transferencia', icon: <XCircle size={15} />, onClick: () => props.onRejectTransfer(payment) }] : []),
+                    // Próximamente, con Comunicaciones: recordar hoy no le envía nada al alumno.
+                    // ...(status === 'Pendiente' || status === 'Vencido' ? [{ label: status === 'Vencido' ? 'Recordar vencido' : 'Recordar próximo vencimiento', icon: <BellRing size={15} />, onClick: () => props.onRemind(payment) }] : []),
+                    // A paid charge is the record of money received: it can't be deleted (the backend refuses
+                    // too). Reverting it to pending is the deliberate step that makes it editable or removable.
+                    ...(status === 'Pagado'
+                        ? [{ label: 'Revertir a pendiente', icon: <RotateCcw size={15} />, onClick: () => props.onRevertPayment(payment), variant: 'danger' as const }]
+                        : [{ label: 'Eliminar', icon: <Trash2 size={15} />, onClick: () => props.onDelete(payment), variant: 'danger' as const }]),
                 ]} />
             }}
             emptyLabel="No se encontraron pagos con esos filtros."

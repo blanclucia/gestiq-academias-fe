@@ -10,93 +10,8 @@
 }
 
 .offer-detail-stack { display: grid; gap: 16px; }
-
-.offer-overview-hero {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 24px;
-  padding: 4px 0 8px;
-}
-
-.offer-overview-eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.offer-overview-description {
-  max-width: 720px;
-  margin: 10px 0;
-  color: var(--text);
-  font-size: 1rem;
-  line-height: 1.6;
-}
-
-.offer-overview-meta,
-.offer-overview-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.offer-overview-meta>span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 0.86rem;
-  font-weight: 650;
-}
-
-.offer-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.offer-kpi {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  column-gap: 8px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--panel) 94%, var(--primary) 6%);
-}
-
-.offer-kpi>svg {
-  color: var(--primary);
-}
-
-.offer-kpi>span {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.offer-kpi>strong {
-  grid-column: 1 / -1;
-  margin-top: 8px;
-  font-size: 1.75rem;
-  letter-spacing: -0.04em;
-}
-
-.offer-kpi>small {
-  grid-column: 1 / -1;
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 0.76rem;
-}
+/* The gap owns the spacing here — without this, consecutive cards add their sibling margin on top of it. */
+.offer-detail-stack > .academy-settings-card + .academy-settings-card { margin-top: 0; }
 
 .offer-overview-columns {
   display: grid;
@@ -128,32 +43,6 @@
   margin: 4px 0 0;
   color: var(--muted);
   font-size: 0.78rem;
-}
-
-.offer-detail-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin: 0;
-}
-
-.offer-detail-list div {
-  display: grid;
-  gap: 5px;
-}
-
-.offer-detail-list dt {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 750;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.offer-detail-list dd {
-  margin: 0;
-  font-size: 0.91rem;
-  font-weight: 750;
 }
 
 .offer-alert-list {
@@ -346,15 +235,11 @@
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.2fr) minmax(140px, 0.8fr) minmax(130px, 0.7fr) auto;
 }
 
-.share-enrollment-panel {
+/* QR + link/actions of the "Compartir inscripción" panel. */
+.share-enrollment-body {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
   gap: 22px;
-  margin-top: 16px;
-  padding: 20px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--panel);
 }
 
 .share-enrollment-qr {
@@ -381,27 +266,6 @@
   min-width: 0;
 }
 
-.share-enrollment-content h3 {
-  margin: 2px 0 0;
-  font-size: 1.05rem;
-}
-
-.share-enrollment-content p {
-  margin: 5px 0 0;
-  max-width: 650px;
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
-
-.share-enrollment-eyebrow {
-  color: var(--primary) !important;
-  font-size: 0.7rem !important;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .share-enrollment-link {
   display: block;
   padding: 10px 12px;
@@ -425,20 +289,6 @@
 
 .share-enrollment-actions a {
   text-decoration: none;
-}
-
-.share-enrollment-feedback {
-  min-height: 18px;
-  color: var(--muted);
-  font-size: 0.76rem;
-}
-
-.share-enrollment-empty {
-  margin-top: 16px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  color: var(--muted);
 }
 
 .academy-tab-panel {
@@ -786,6 +636,14 @@
   border-top: 1px solid var(--border);
 }
 
+/* Inline warning inside a settings section (the base banner is page-wide, with only a bottom border). */
+.inline-warning-banner.academy-options-warning {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
+  border-radius: 10px;
+}
+
 .academy-options-section h3 {
   margin: 0 0 12px;
   font-size: .88rem;
@@ -1108,6 +966,12 @@
   gap: 11px;
 }
 
+.branch-section-heading-copy>svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--primary);
+}
+
 .branch-add-button {
   display: inline-flex;
   align-items: center;
@@ -1273,8 +1137,46 @@
   font-size: .74rem;
 }
 
+/* Long free text in a table cell: two lines max, full text on hover (title attribute). */
+.table-description {
+  display: -webkit-box;
+  max-width: 420px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: .82rem;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .student-picker {
   position: relative;
+}
+
+.student-picker.clearable .form-input {
+  padding-right: 36px;
+}
+
+.student-picker-clear {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.student-picker-clear:hover {
+  background: var(--surface-subtle);
+  color: var(--text);
 }
 
 .student-picker.disabled .form-input {
@@ -1336,6 +1238,27 @@
   padding: 10px;
   color: var(--muted);
   font-size: .76rem;
+}
+
+/* Optional action pinned under the options of a MultiSearchableSelect (e.g. "Crear profesor nuevo"). */
+.student-picker-options .student-picker-footer-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 9px 10px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--primary);
+  font-size: .78rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.student-picker-options .student-picker-footer-action:hover {
+  background: var(--primary-soft);
 }
 
 .form-field-full {

@@ -22,6 +22,8 @@ export type PublicEnrollmentOffer = {
     status: 'Abierta' | 'Programada' | 'Cerrada'
     startDate: string
     endDate: string
+    // Where the course is taught (for paying in person); empty when the branch has no address.
+    branchAddress: string
     commissions: Array<{ id: string; name: string; schedule: string; amount: number; capacity: number; occupied: number; startDate: string; endDate: string }>
 }
 
@@ -187,7 +189,7 @@ export function useConfirmRegistration() {
 function fromApiPublicOffer(offer: Awaited<ReturnType<typeof fetchPublicOffer>>): PublicEnrollmentOffer {
     return {
         slug: offer.slug, openingId: offer.openingId, courseId: offer.courseId, courseName: offer.courseName, amount: offer.amount,
-        status: openingStatusFromApi(offer.status), startDate: offer.startDate, endDate: offer.endDate,
+        status: openingStatusFromApi(offer.status), startDate: offer.startDate, endDate: offer.endDate, branchAddress: offer.branchAddress,
         commissions: offer.commissions.map((commission) => ({
             id: commission.id, name: commission.name, schedule: commission.schedule, amount: commission.amount,
             capacity: commission.capacity, occupied: commission.occupied, startDate: commission.startDate, endDate: commission.endDate,

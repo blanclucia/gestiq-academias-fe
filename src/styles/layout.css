@@ -40,6 +40,15 @@
     padding-top: 2px;
 }
 
+/* Entity-level actions on a detail page header (e.g. Cerrar comisión), visible from every tab. */
+.page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+    align-self: flex-end;
+}
+
 .page-header h1 {
     margin: 0;
     font-size: clamp(2rem, 2.5vw, 2.5rem);

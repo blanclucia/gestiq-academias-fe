@@ -7,7 +7,8 @@
     width: 100%;
     padding: 0;
     border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.46);
+    /* Same solid surface token as Card (detail pages); it also covers dark mode. */
+    background: var(--panel);
     border-radius: 16px;
     box-shadow: none;
     overflow: visible;

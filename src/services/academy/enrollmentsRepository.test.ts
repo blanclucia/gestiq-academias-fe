@@ -25,7 +25,7 @@ describe('enrollments repository', () => {
 describe('getPublicEnrollmentAvailability', () => {
     const offer: PublicEnrollmentOffer = {
         slug: 'curso-abcd1234', openingId: 'o1', courseId: 'c1', courseName: 'Curso Inglés', amount: 48000,
-        status: 'Abierta', startDate: '2026-08-01', endDate: '2026-09-30',
+        status: 'Abierta', startDate: '2026-08-01', endDate: '2026-09-30', branchAddress: '',
         commissions: [{ id: 'com1', name: 'Grupo A', schedule: 'Lun 18:00', amount: 48000, capacity: 2, occupied: 0, startDate: '2026-08-01', endDate: '2026-12-15' }],
     }
 

@@ -24,7 +24,8 @@ export function ChartCard({
                     <h3>{title}</h3>
                     {subtitle && <p>{subtitle}</p>}
                 </div>
-                {action ?? (value ? <div className="card-metric">{value}</div> : null)}
+                {/* The action keeps the top-right corner (like the other cards); a metric sits under it. */}
+                {value && action ? <div className="card-header-side">{action}<div className="card-metric">{value}</div></div> : action ?? (value ? <div className="card-metric">{value}</div> : null)}
             </div>
             {children}
         </section>

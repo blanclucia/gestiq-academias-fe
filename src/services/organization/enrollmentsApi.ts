@@ -54,6 +54,8 @@ const apiPublicOfferSchema = z.object({
     status: z.enum(['open', 'scheduled', 'closed']),
     startDate: z.string(),
     endDate: z.string(),
+    // Where the course is taught, for paying in person; empty when the branch has no address.
+    branchAddress: z.string().default(''),
     commissions: z.array(apiPublicEligibleCommissionSchema),
 })
 

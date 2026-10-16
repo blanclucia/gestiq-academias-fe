@@ -45,11 +45,6 @@
   margin-top: 0;
 }
 
-.finance-summary-date-range {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 16px;
-}
 
 .finance-date-with-help {
   display: grid;
@@ -263,16 +258,6 @@
 }
 
 @media (max-width: 600px) {
-  .finance-summary-date-range,
-  .finance-summary-date-range .toolbar-date-range {
-    width: 100%;
-  }
-
-  .finance-summary-date-range .form-input {
-    flex: 1 1 140px;
-    width: auto;
-  }
-
   .finance-header {
     align-items: stretch;
     flex-direction: column;

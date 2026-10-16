@@ -16,6 +16,8 @@ describe('charge status and method mapping', () => {
         expect(chargeMethodToApi('Transferencia')).toBe('transfer')
         expect(chargeMethodToApi('Tarjeta')).toBe('card')
         expect(chargeMethodToApi('Efectivo')).toBe('cash')
+        expect(chargeMethodToApi('Mercado Pago')).toBe('mercado_pago')
+        expect(chargeMethodFromApi('mercado_pago')).toBe('Mercado Pago')
         expect(chargeMethodFromApi('transfer')).toBe('Transferencia')
         expect(chargeMethodFromApi('card')).toBe('Tarjeta')
         expect(chargeMethodFromApi('cash')).toBe('Efectivo')

@@ -13,8 +13,12 @@ import { isMemberConflict } from '@/services/organization/membersApi'
 import { isStaffDniConflict } from '@/services/organization/staffApi'
 import { validateConditions } from '@/components/forms/formValidation'
 import { splitFilterValue } from '@/components/crud/filterValues'
+import { InfoTooltip } from '@/components/ui/InfoTooltip'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { useToast } from '@/components/ui/ToastContext'
+
+const teacherRoleHelp = 'Queda vinculada como docente de esta sede: disponible para comisiones y clases particulares, con acceso para loguearse con ese rol.'
+const administratorRoleHelp = 'Queda asignada como administradora de esta sede automáticamente, sin pasos extra. Para revocarlo, desmarcá la fila después.'
 
 type StaffPageProps = {
     compact?: boolean
@@ -167,7 +171,18 @@ export function StaffPage({
                                 <input className="form-input" type="text" value={newTeacher.specialty} onChange={(event) => setNewTeacher((current) => ({ ...current, specialty: event.target.value }))} placeholder="Ej. Inglés, Administración" />
                             </FormField>
                             <FormField label="Roles">
-                                <div className="staff-role-picker"><label><input type="checkbox" checked={newTeacher.role === 'Docente'} onChange={(event) => { setNewTeacher((current) => ({ ...current, role: event.target.checked ? 'Docente' : 'Administrativo' })); if (!event.target.checked) setNewIsAdministrator(true) }} />Profesor</label>{onToggleAdministrator && <label><input type="checkbox" checked={newIsAdministrator} onChange={(event) => { setNewIsAdministrator(event.target.checked); if (!event.target.checked && newTeacher.role !== 'Docente') setNewTeacher((current) => ({ ...current, role: 'Docente' })) }} />Administrador</label>}</div>
+                                <div className="staff-role-picker">
+                                    <div className="staff-role-option">
+                                        <label><input type="checkbox" checked={newTeacher.role === 'Docente'} onChange={(event) => { setNewTeacher((current) => ({ ...current, role: event.target.checked ? 'Docente' : 'Administrativo' })); if (!event.target.checked) setNewIsAdministrator(true) }} />Profesor</label>
+                                        <InfoTooltip label="Qué implica el rol Profesor">{teacherRoleHelp}</InfoTooltip>
+                                    </div>
+                                    {onToggleAdministrator && (
+                                        <div className="staff-role-option">
+                                            <label><input type="checkbox" checked={newIsAdministrator} onChange={(event) => { setNewIsAdministrator(event.target.checked); if (!event.target.checked && newTeacher.role !== 'Docente') setNewTeacher((current) => ({ ...current, role: 'Docente' })) }} />Administrador</label>
+                                            <InfoTooltip label="Qué implica el rol Administrador">{administratorRoleHelp}</InfoTooltip>
+                                        </div>
+                                    )}
+                                </div>
                             </FormField>
                             <FormField label="Estado">
                                 <SearchableSelect value={newTeacher.status} onChange={(status) => setNewTeacher((current) => ({ ...current, status: status as Teacher['status'] }))} options={[{ value: 'Activo', label: 'Activo' }, { value: 'Inactivo', label: 'Inactivo' }]} />
@@ -241,7 +256,18 @@ export function StaffPage({
                                 <input className="form-input" type="text" value={editingTeacherForm.specialty} onChange={(event) => setEditingTeacherForm((current) => ({ ...current, specialty: event.target.value }))} />
                             </FormField>
                             <FormField label="Roles">
-                                <div className="staff-role-picker"><label><input type="checkbox" checked={editingTeacherForm.role === 'Docente'} onChange={(event) => { setEditingTeacherForm((current) => ({ ...current, role: event.target.checked ? 'Docente' : 'Administrativo' })); if (!event.target.checked) setEditingIsAdministrator(true) }} />Profesor</label>{onToggleAdministrator && <label><input type="checkbox" checked={editingIsAdministrator} onChange={(event) => { setEditingIsAdministrator(event.target.checked); if (!event.target.checked && editingTeacherForm.role !== 'Docente') setEditingTeacherForm((current) => ({ ...current, role: 'Docente' })) }} />Administrador</label>}</div>
+                                <div className="staff-role-picker">
+                                    <div className="staff-role-option">
+                                        <label><input type="checkbox" checked={editingTeacherForm.role === 'Docente'} onChange={(event) => { setEditingTeacherForm((current) => ({ ...current, role: event.target.checked ? 'Docente' : 'Administrativo' })); if (!event.target.checked) setEditingIsAdministrator(true) }} />Profesor</label>
+                                        <InfoTooltip label="Qué implica el rol Profesor">{teacherRoleHelp}</InfoTooltip>
+                                    </div>
+                                    {onToggleAdministrator && (
+                                        <div className="staff-role-option">
+                                            <label><input type="checkbox" checked={editingIsAdministrator} onChange={(event) => { setEditingIsAdministrator(event.target.checked); if (!event.target.checked && editingTeacherForm.role !== 'Docente') setEditingTeacherForm((current) => ({ ...current, role: 'Docente' })) }} />Administrador</label>
+                                            <InfoTooltip label="Qué implica el rol Administrador">{administratorRoleHelp}</InfoTooltip>
+                                        </div>
+                                    )}
+                                </div>
                             </FormField>
                             <FormField label="Estado">
                                 <SearchableSelect value={editingTeacherForm.status} onChange={(status) => setEditingTeacherForm((current) => ({ ...current, status: status as Teacher['status'] }))} options={[{ value: 'Activo', label: 'Activo' }, { value: 'Inactivo', label: 'Inactivo' }]} />

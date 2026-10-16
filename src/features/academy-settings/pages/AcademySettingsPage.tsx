@@ -1,4 +1,4 @@
-import { Ban, Building2, CalendarDays, Check, CheckCircle2, CreditCard, FileCheck2, GraduationCap, Palette, RotateCcw, Save, Settings2, Users } from 'lucide-react'
+import { AlertTriangle, Ban, Building2, CalendarDays, Check, CheckCircle2, CreditCard, FileCheck2, GraduationCap, Palette, RotateCcw, Save, Settings2, Users } from 'lucide-react'
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EntityFormModal, FormField, FormGrid, FormSection } from '@/components/crud/EntityFormModal'
@@ -13,11 +13,16 @@ import { listExpenses, useFinanceRepositoryVersion } from '@/services/financeRep
 import { getActiveAcademicCycleId, listCourses, listStaff, listStudents, useAcademyRepositoryVersion } from '@/services/academyRepository'
 import { DataTable } from '@/components/ui/DataTable'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
+import { Card } from '@/components/ui/Card'
+import { MetricTile, MetricTileGrid } from '@/components/ui/MetricTile'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import { SectionHeading } from '@/components/ui/SectionHeading'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { formatCurrencyARS } from '@/domain/shared/formattingRules'
 import { validateConditions } from '@/components/forms/formValidation'
+import { markInvalidFields } from '@/components/forms/markInvalidFields'
+import { validatePaymentSettings } from '../model/paymentSettingsValidation'
 import { SettingsField as Field, SettingsToggleOption as ToggleOption } from '@/components/forms/SettingsControls'
 import { WeekDaysCheckboxGroup } from '@/components/forms/WeekDaysCheckboxGroup'
 import { useToast } from '@/components/ui/ToastContext'
@@ -31,6 +36,8 @@ const tabs = [
     { id: 'cobros', label: 'Cobros' },
     { id: 'inscripciones', label: 'Inscripciones' },
 ] as const
+
+type SettingsTab = (typeof tabs)[number]['id']
 const paymentMethods = ['Transferencia', 'Efectivo', 'Mercado Pago', 'Tarjeta']
 const enrollmentFields = ['Documento', 'Email', 'Teléfono', 'Fecha de nacimiento', 'Dirección']
 
@@ -60,7 +67,11 @@ export function AcademySettingsPage() {
     useAcademyRepositoryVersion()
     const navigate = useNavigate()
     const { path } = useWorkspace()
-    const [activeTab, setActiveTab] = useState<(typeof tabs)[number]['id']>('resumen')
+    // The active tab lives in the URL (?tab=cobros) so other screens can link straight to a section.
+    const [searchParams, setSearchParams] = useSearchParams()
+    const activeTab: SettingsTab = tabs.find((tab) => tab.id === searchParams.get('tab'))?.id ?? 'resumen'
+    const setActiveTab = (tab: SettingsTab) => setSearchParams(tab === 'resumen' ? {} : { tab }, { replace: true })
+    const tabPanelRef = useRef<HTMLDivElement>(null)
     const { settings: remoteSettings, isLoading: isSettingsLoading } = useAcademySettings()
     const saveSettings = useSaveAcademySettings()
     const [settings, setSettings] = useState<AcademySettings | null>(null)
@@ -81,6 +92,9 @@ export function AcademySettingsPage() {
     const [openBranchMenuId, setOpenBranchMenuId] = useState<string | null>(null)
 
     if (!settings) return <div className="dashboard-page academy-settings-page"><p>{isSettingsLoading ? 'Cargando configuración…' : 'No se pudo cargar la configuración.'}</p></div>
+
+    /* The header reflects persisted data only; the draft in `settings` changes on every keystroke. */
+    const savedGeneral = (remoteSettings ?? settings).general
 
     const toggleBranchStatus = (branch: (typeof branches)[number]) => {
         const nextStatus = branch.status === 'Activa' ? 'Inactiva' : 'Activa'
@@ -125,6 +139,15 @@ export function AcademySettingsPage() {
     const save = () => {
         if (!settings.general.commercialName.trim()) { setActiveTab('general'); showToast('error', 'El nombre comercial es obligatorio.'); return }
         if (!settings.general.email.includes('@')) { setActiveTab('general'); showToast('error', 'Ingresá un email institucional válido.'); return }
+        const paymentCheck = validatePaymentSettings(settings.payments)
+        if (!paymentCheck.valid) {
+            setActiveTab('cobros')
+            // The Cobros fields may only exist after the tab switch renders.
+            requestAnimationFrame(() => markInvalidFields(tabPanelRef.current, paymentCheck))
+            showToast('error', Object.values(paymentCheck.fieldErrors ?? {}).join(' ') || paymentCheck.message || 'Revisá los medios de pago.')
+            return
+        }
+        markInvalidFields(tabPanelRef.current, paymentCheck)
         const normalized: AcademySettings = { ...settings, general: { ...settings.general, commercialName: settings.general.commercialName.trim(), email: settings.general.email.trim() }, brand: { ...settings.brand, name: settings.general.commercialName.trim() } }
         saveSettings.mutate(normalized, {
             onSuccess: (saved) => {
@@ -174,12 +197,17 @@ export function AcademySettingsPage() {
         </EntityFormModal>
 
         <div className="page-header academy-settings-header">
-            <div><div className="academy-title-row"><h1>{settings.general.commercialName || 'Mi academia'}</h1><span className={`academy-status ${settings.general.status === 'Activa' ? 'active' : ''}`}>{settings.general.status}</span></div><p>Administrá los datos y reglas generales de tu academia.</p></div>
+            <div><div className="academy-title-row"><h1>{savedGeneral.commercialName || 'Mi academia'}</h1><span className={`academy-status ${savedGeneral.status === 'Activa' ? 'active' : ''}`}>{savedGeneral.status}</span></div><p>Administrá los datos y reglas generales de tu academia.</p></div>
         </div>
         <div className="academy-tabs-wrap">
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as (typeof tabs)[number]['id'])}><TabsList variant="line" aria-label="Configuración de la academia">{tabs.map((tab) => <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>)}</TabsList></Tabs>
-            <div className="academy-tab-panel">
-                {activeTab === 'resumen' && <div className="academy-overview-content"><div className="academy-overview-grid"><section className="academy-overview-card"><span className="academy-overview-icon"><Building2 size={20} /></span><small>Sedes activas</small><strong>{branches.filter((branch) => branch.status === 'Activa').length}</strong><p>de {branches.length} sedes registradas</p></section><section className="academy-overview-card"><span className="academy-overview-icon"><GraduationCap size={20} /></span><small>Alumnos</small><strong>{students.length}</strong><p>en toda la academia</p></section><section className="academy-overview-card"><span className="academy-overview-icon"><Users size={20} /></span><small>Docentes</small><strong>{activeTeachers.length}</strong><p>activos en la academia</p></section><section className="academy-overview-card"><span className="academy-overview-icon"><CalendarDays size={20} /></span><small>Comisiones vigentes</small><strong>{activeCommissions.length}</strong><p>{courses.length} ofertas activas</p></section></div>
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTab)}><TabsList variant="line" aria-label="Configuración de la academia">{tabs.map((tab) => <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>)}</TabsList></Tabs>
+            <div className="academy-tab-panel" ref={tabPanelRef}>
+                {activeTab === 'resumen' && <div className="academy-overview-content"><MetricTileGrid>
+                    <MetricTile icon={<Building2 size={20} />} label="Sedes activas" value={branches.filter((branch) => branch.status === 'Activa').length} caption={`de ${branches.length} sedes registradas`} />
+                    <MetricTile icon={<GraduationCap size={20} />} label="Alumnos" value={students.length} caption="en toda la academia" />
+                    <MetricTile icon={<Users size={20} />} label="Docentes" value={activeTeachers.length} caption="activos en la academia" />
+                    <MetricTile icon={<CalendarDays size={20} />} label="Comisiones vigentes" value={activeCommissions.length} caption={`${courses.length} ofertas activas`} />
+                </MetricTileGrid>
                     <div className="academy-overview-layout"><div className="data-table-card academy-branches-overview"><DataTable title="Estado de las sedes" subtitle="Resumen académico y financiero del mes por sede." onAdd={() => setIsCreateBranchOpen(true)} addLabel="Nueva sede" addButtonVariant="primary" rows={branches} getRowKey={(branch) => branch.id} onRowClick={(branch) => { setSelectedBranchId(branch.id); navigate(path(`sedes/${branch.id}`)) }} columns={[
                         { key: 'branch', header: 'Sede', accessor: (branch) => <strong>{branch.name}</strong> },
                         { key: 'status', header: 'Estado', accessor: (branch) => <StatusBadge label={branch.status} tone={branch.status === 'Activa' ? 'success' : 'neutral'} />, align: 'center' },
@@ -196,8 +224,8 @@ export function AcademySettingsPage() {
                             : { label: 'Activar sede', icon: <CheckCircle2 size={15} />, onClick: () => toggleBranchStatus(branch) },
                     ]} />} /></div></div>
                 </div>}
-                {activeTab === 'general' && <section className="academy-settings-card">
-                    <div className="academy-section-heading"><FileCheck2 size={20} /><div><h2>Información general</h2><p>Datos institucionales visibles en la plataforma y documentos.</p></div></div>
+                {activeTab === 'general' && <Card>
+                    <SectionHeading icon={<FileCheck2 size={20} />} title="Información general" description="Datos institucionales visibles en la plataforma y documentos." />
                     <div className="form-grid academy-settings-grid">
                         <Field label="Nombre comercial" required><input className="form-input" value={settings.general.commercialName} onChange={(event) => update('general', { commercialName: event.target.value })} /></Field>
                         <Field label="Estado"><SearchableSelect value={settings.general.status} onChange={(status) => update('general', { status: status as 'Activa' | 'Inactiva' })} options={[{ value: 'Activa', label: 'Activa' }, { value: 'Inactiva', label: 'Inactiva' }]} /></Field>
@@ -205,9 +233,9 @@ export function AcademySettingsPage() {
                         <Field label="Teléfono"><input className="form-input" type="tel" value={settings.general.phone} onChange={(event) => update('general', { phone: event.target.value })} /></Field>
                         <Field label="Dirección principal"><input className="form-input" value={settings.general.address} onChange={(event) => update('general', { address: event.target.value })} /></Field>
                     </div>
-                </section>}
+                </Card>}
                 {activeTab === 'general' && <div className="academy-brand-layout">
-                    <section className="academy-settings-card"><div className="academy-section-heading"><Palette size={20} /><div><h2>Identidad visual</h2><p>Personalizá la experiencia sin perder legibilidad.</p></div></div>
+                    <Card><SectionHeading icon={<Palette size={20} />} title="Identidad visual" description="Personalizá la experiencia sin perder legibilidad." />
                         <div className="academy-logo-field">
                             <div className={`academy-logo-preview ${settings.brand.logoDataUrl ? 'has-image' : ''}`}>{settings.brand.logoDataUrl ? <img src={settings.brand.logoDataUrl} alt="Vista previa del logo" /> : <span>{settings.brand.shortName || 'A'}</span>}</div>
                             <div className="academy-logo-copy"><strong>Logo de la academia</strong><small>PNG, JPG, WebP o SVG. Máximo 1 MB.</small><div><input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={uploadLogo} hidden /><button type="button" className="secondary-button" onClick={() => logoInputRef.current?.click()}>{settings.brand.logoDataUrl ? 'Cambiar logo' : 'Subir logo'}</button>{settings.brand.logoDataUrl && <button type="button" className="academy-remove-logo" onClick={() => previewBrand({ ...settings.brand, logoDataUrl: undefined })}>Quitar</button>}</div></div>
@@ -217,32 +245,35 @@ export function AcademySettingsPage() {
                             <Field label="Color principal"><div className="academy-color-field"><input type="color" value={settings.brand.primary} onChange={(event) => { const next = withPrimaryColor(settings, event.target.value); setSettings(next); setBrand(next.brand) }} /><input className="form-input" value={settings.brand.primary} onChange={(event) => { const next = withPrimaryColor(settings, event.target.value); setSettings(next); if (hexToRgb(event.target.value)) setBrand(next.brand) }} /></div></Field>
                             <Field label="Color secundario"><div className="academy-color-field"><input type="color" value={settings.brand.accent ?? '#22c55e'} onChange={(event) => previewBrand({ ...settings.brand, accent: event.target.value })} /><input className="form-input" value={settings.brand.accent ?? ''} onChange={(event) => { update('brand', { accent: event.target.value }); if (hexToRgb(event.target.value)) setBrand({ ...settings.brand, accent: event.target.value }) }} /></div></Field>
                         </div><button type="button" className="secondary-button academy-reset-button" onClick={resetBrand}><RotateCcw size={15} />Restaurar colores predeterminados</button>
-                    </section>
+                    </Card>
                     <aside className="academy-brand-preview"><span className="academy-preview-label">Vista previa</span><div className="academy-preview-brand"><span className={settings.brand.logoDataUrl ? 'has-image' : ''}>{settings.brand.logoDataUrl ? <img src={settings.brand.logoDataUrl} alt="Logo" /> : settings.brand.shortName || 'A'}</span><strong>{settings.general.commercialName}</strong></div><div className="academy-preview-nav"><span className="active">Elemento seleccionado</span><span>Elemento del menú</span></div><button type="button">Acción principal</button></aside>
                 </div>}
-                {activeTab === 'cobros' && <section className="academy-settings-card">
-                    <div className="academy-section-heading"><CreditCard size={20} /><div><h2>Configuración de cobros</h2><p>Valores predeterminados para cuotas y nuevos cargos.</p></div></div>
+                {activeTab === 'cobros' && <Card>
+                    <SectionHeading icon={<CreditCard size={20} />} title="Configuración de cobros" description="Valores predeterminados para cuotas y nuevos cargos." />
                     <div className="form-grid academy-settings-grid">
                         <Field label="Día de vencimiento"><input className="form-input" type="number" min={1} max={28} value={settings.payments.defaultDueDay} onChange={(event) => update('payments', { defaultDueDay: Number(event.target.value) })} /></Field>
                         <Field label="Días de tolerancia"><input className="form-input" type="number" min={0} value={settings.payments.graceDays} onChange={(event) => update('payments', { graceDays: Number(event.target.value) })} /></Field>
                         <Field label="Recargo por mora (%)"><input className="form-input" type="number" min={0} step="0.5" value={settings.payments.lateFeePercent} onChange={(event) => update('payments', { lateFeePercent: Number(event.target.value) })} /></Field>
-                        <Field label="Alias"><input className="form-input" value={settings.payments.transferAlias} onChange={(event) => update('payments', { transferAlias: event.target.value.toUpperCase() })} placeholder="Ej. ACADEMIA.PUENTES" /></Field>
-                        <Field label="CBU / CVU"><input className="form-input" inputMode="numeric" value={settings.payments.transferCbu} onChange={(event) => update('payments', { transferCbu: event.target.value.replace(/\D/g, '').slice(0, 22) })} placeholder="22 dígitos" /></Field>
-                        <Field label="Titular de la cuenta"><input className="form-input" value={settings.payments.accountHolder} onChange={(event) => update('payments', { accountHolder: event.target.value })} /></Field>
-                        <Field label="Link de pago Mercado Pago"><input className="form-input" type="url" value={settings.payments.paymentLink} onChange={(event) => update('payments', { paymentLink: event.target.value })} placeholder="https://mpago.la/..." /></Field>
-                        <Field label="CUIT / CUIL del titular"><input className="form-input" value={settings.payments.accountTaxId} onChange={(event) => update('payments', { accountTaxId: event.target.value })} /></Field>
+                        <Field label="Alias"><input name="paymentsTransferAlias" className="form-input" value={settings.payments.transferAlias} onChange={(event) => update('payments', { transferAlias: event.target.value.toUpperCase() })} placeholder="Ej. ACADEMIA.PUENTES" /></Field>
+                        <Field label="CBU / CVU"><input name="paymentsTransferCbu" className="form-input" inputMode="numeric" value={settings.payments.transferCbu} onChange={(event) => update('payments', { transferCbu: event.target.value.replace(/\D/g, '').slice(0, 22) })} placeholder="22 dígitos" /></Field>
+                        <Field label="Titular de la cuenta"><input name="paymentsAccountHolder" className="form-input" value={settings.payments.accountHolder} onChange={(event) => update('payments', { accountHolder: event.target.value })} /></Field>
+                        <Field label="Link de pago Mercado Pago"><input name="paymentsPaymentLink" className="form-input" type="url" value={settings.payments.paymentLink} onChange={(event) => update('payments', { paymentLink: event.target.value })} placeholder="https://mpago.la/..." /></Field>
+                        <Field label="CUIT / CUIL del titular"><input name="paymentsAccountTaxId" className="form-input" value={settings.payments.accountTaxId} onChange={(event) => update('payments', { accountTaxId: event.target.value })} /></Field>
                         <Field label="Mensaje para enlaces de pago" full><textarea className="form-textarea academy-textarea-compact" value={settings.payments.paymentMessage} onChange={(event) => update('payments', { paymentMessage: event.target.value })} /></Field>
-                    </div><div className="academy-options-section"><h3>Medios de pago habilitados</h3><div className="academy-options-grid">{paymentMethods.map((method) => <ToggleOption key={method} label={method} checked={settings.payments.enabledMethods.includes(method)} onChange={(checked) => toggleListValue('payments', method, checked)} />)}</div></div>
-                </section>}
-                {activeTab === 'inscripciones' && <section className="academy-settings-card">
-                    <div className="academy-section-heading"><Check size={20} /><div><h2>Configuración de inscripciones</h2><p>Reglas aplicadas al crear nuevas aperturas de inscripción.</p></div></div>
+                    </div><div className="academy-options-section"><h3>Medios de pago habilitados</h3><div className="academy-options-grid">{paymentMethods.map((method) => <ToggleOption key={method} label={method} checked={settings.payments.enabledMethods.includes(method)} onChange={(checked) => toggleListValue('payments', method, checked)} />)}</div>
+                        {/* An enabled method needs the data the public enrollment form shows for it (validatePaymentSettings). */}
+                        {settings.payments.enabledMethods.includes('Transferencia') && [settings.payments.transferAlias, settings.payments.transferCbu, settings.payments.accountHolder, settings.payments.accountTaxId].some((value) => !value.trim()) && <div className="inline-warning-banner academy-options-warning" role="status"><AlertTriangle size={16} /><span>Para habilitar Transferencia cargá alias, CBU / CVU, titular de la cuenta y CUIT / CUIL.</span></div>}
+                        {settings.payments.enabledMethods.includes('Mercado Pago') && !settings.payments.paymentLink.trim() && <div className="inline-warning-banner academy-options-warning" role="status"><AlertTriangle size={16} /><span>Para habilitar Mercado Pago cargá el link de pago.</span></div>}
+                    </div>
+                </Card>}
+                {activeTab === 'inscripciones' && <Card>
+                    <SectionHeading icon={<Check size={20} />} title="Configuración de inscripciones" description="Reglas aplicadas al crear nuevas aperturas de inscripción." />
                     <div className="form-grid academy-settings-grid">
-                        <Field label="Confirmación"><SearchableSelect value={settings.enrollments.confirmationMode} onChange={(confirmationMode) => update('enrollments', { confirmationMode: confirmationMode as 'Automática' | 'Manual' })} options={[{ value: 'Manual', label: 'Manual' }, { value: 'Automática', label: 'Automática' }]} /></Field>
+                        {/* No confirmation setting: a registration is confirmed when its fee is paid (free ones at once). */}
                         <Field label="Cupo predeterminado" hint="Se usa al crear una comisión nueva"><input className="form-input" type="number" min={1} value={settings.enrollments.defaultCapacity} onChange={(event) => update('enrollments', { defaultCapacity: Number(event.target.value) })} /></Field>
                     </div>
-                    <div className="academy-options-section"><ToggleOption label="Requerir pago para confirmar" description="El formulario público de inscripción incluye el paso de pago; si está desactivado, se lo salteamos." checked={settings.enrollments.requirePayment} onChange={(checked) => update('enrollments', { requirePayment: checked })} /></div>
                     <div className="academy-options-section"><h3>Campos obligatorios</h3><div className="academy-options-grid">{enrollmentFields.map((field) => <ToggleOption key={field} label={field} checked={settings.enrollments.requiredFields.includes(field)} onChange={(checked) => toggleListValue('enrollments', field, checked)} />)}</div></div>
-                </section>}
+                </Card>}
                 {activeTab !== 'resumen' && <div className="academy-form-actions">
                     <span>Los cambios se aplicarán a toda la academia.</span>
                     <button type="button" className="primary-button academy-save-button" onClick={save}><Save size={16} />Guardar cambios</button>
