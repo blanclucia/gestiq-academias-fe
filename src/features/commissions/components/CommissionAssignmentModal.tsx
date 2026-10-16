@@ -114,7 +114,8 @@ export function CommissionAssignmentModal({
                             <label className="search-input-wrap" style={{ flex: '1 1 240px' }}>
                                 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nombre o legajo" />
                             </label>
-                            <div style={{ width: 150 }}>
+                            {/* Wide enough for "Todos los estados" plus the chevron; the search takes the rest. */}
+                            <div style={{ flex: '0 0 200px' }}>
                                 <SearchableSelect
                                     value={statusFilter}
                                     onChange={(status) => setStatusFilter(status as typeof statusFilter)}
