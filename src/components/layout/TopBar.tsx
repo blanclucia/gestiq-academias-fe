@@ -1,8 +1,6 @@
 import {
-    Bell,
     Building2,
     ChevronDown,
-    Globe,
     GraduationCap,
     LogOut,
     Moon,
@@ -151,6 +149,7 @@ export function TopBar({
                     {darkMode ? <SunMedium size={15} /> : <Moon size={15} />}
                 </button>
 
+                {/* Próximamente: idioma y notificaciones todavía no hacen nada, así que no se muestran.
                 <button type="button" className="icon-button topbar-secondary-action" aria-label="Language">
                     <Globe size={15} />
                 </button>
@@ -158,6 +157,7 @@ export function TopBar({
                 <button type="button" className="icon-button topbar-secondary-action" aria-label="Notifications">
                     <Bell size={15} />
                 </button>
+                */}
 
                 <div className="user-menu" ref={userMenuRef}>
                     <button

@@ -97,6 +97,21 @@ export function FinancePage() {
             && `${expense.concept} ${expense.beneficiary}`.toLocaleLowerCase('es-AR').includes(search.toLocaleLowerCase('es-AR'))
     })
 
+    // Same CSV as Cobros → Exportar: the expenses listed with the current range, search and filters.
+    const exportExpenses = () => {
+        const quote = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`
+        const csv = [
+            ['Concepto', 'Categoría', 'Proveedor o beneficiario', 'Vencimiento', 'Fecha de pago', 'Frecuencia', 'Importe', 'Estado'],
+            ...filteredExpenses.map((expense) => [expense.concept, expense.category, expense.beneficiary, expense.dueDate ?? '', expense.status === 'Pagado' ? expense.paidDate ?? '' : '', expense.recurrence, expense.amount, getExpenseDisplayStatus(expense, today)]),
+        ].map((row) => row.map(quote).join(',')).join('\n')
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'egresos.csv'
+        link.click()
+        URL.revokeObjectURL(url)
+    }
+
     const openCreate = () => { setEditingExpense(null); setExpenseForm(emptyExpense(selectedBranchId)); setIsExpenseOpen(true) }
     const openEdit = (expense: Expense) => { setEditingExpense(expense); setEditScope(expense.seriesId ? 'future' : 'single'); setExpenseForm({ ...expense, repeatUntil: '' }); setIsExpenseOpen(true) }
 
@@ -160,7 +175,7 @@ export function FinancePage() {
                         <FilterChips fields={expenseFilterFields} values={filters} onChange={setFilters} />
                     </div>
                     <div className="student-table-toolbar-center"><DateRangeControl value={dateRange} onChange={setDateRange} ariaLabel="Rango de vencimientos" /></div>
-                    <div className="student-table-toolbar-right" />
+                    <div className="student-table-toolbar-right"><button type="button" className="secondary-button compact-button" onClick={exportExpenses}>Exportar</button></div>
                 </div>
                 <DataTable
                     rows={filteredExpenses}
