@@ -12,4 +12,4 @@ export {
 } from '@/services/academy/enrollmentsRepository'
 export { listPrivateLessons, usePrivateLessons, useCreatePrivateLesson, useDeletePrivateLesson, useUpdatePrivateLesson } from '@/services/academy/privateLessonsRepository'
 export { listAttendanceForStudent, listAttendanceRecords, recordAttendance } from '@/services/academy/attendanceRepository'
-export { confirmPaymentRecord, getPaymentRemovalBlocker, listPayments, updatePaymentRecord, useCharges, useCreateCharge, useDeleteCharge, useGenerateTuition, useUpdateCharge, type PaymentRecord } from '@/services/billing/paymentsRepository'
+export { confirmPaymentRecord, getPaymentRemovalBlocker, listPayments, listPendingByPrivateLesson, updatePaymentRecord, useCharges, useCreateCharge, useDeleteCharge, useGenerateTuition, useUpdateCharge, type PaymentRecord } from '@/services/billing/paymentsRepository'

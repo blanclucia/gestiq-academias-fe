@@ -2,10 +2,11 @@ import { AlertTriangle, CalendarClock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ChartCard } from '@/components/layout/ChartCard'
 import { KpiCard } from '@/components/layout/KpiCard'
-import { getActiveAcademicCycleId, listAcademicCycles, listCourses, listPayments, listStaff, listStudents, useAcademyRepositoryVersion } from '@/services/academyRepository'
+import { getActiveAcademicCycleId, listAcademicCycles, listCourses, listPayments, listPrivateLessons, listStaff, listStudents, useAcademyRepositoryVersion } from '@/services/academyRepository'
 import { getExpenseDisplayStatus, listExpenses, useFinanceRepositoryVersion } from '@/services/financeRepository'
 import { useAgendaEvents } from '@/services/agendaRepository'
 import { calculateOccupancy } from '@/domain/commissions/commissionRules'
+import { formatAgendaDate } from '@/domain/agenda/agendaRules'
 import { resolveChargeCollectionStatus, summarizeChargesToManage } from '@/domain/billing/paymentRules'
 import { useAcademySettings } from '@/services/academySettingsRepository'
 import { formatCurrencyARS, formatShortDate } from '@/domain/shared/formattingRules'
@@ -40,6 +41,7 @@ export function AdminDashboardPage() {
     const agendaUntilKey = `${agendaUntil.getFullYear()}-${String(agendaUntil.getMonth() + 1).padStart(2, '0')}-${String(agendaUntil.getDate()).padStart(2, '0')}`
     const { events: agendaEvents } = useAgendaEvents({ from: todayKey, to: agendaUntilKey }, { branchId: selectedBranchId, teacherUserIds: roster.teacherIds })
     const upcomingAgendaEvents = agendaEvents.filter((event) => event.type !== 'clase' && event.date >= todayKey).slice(0, 5)
+    const upcomingPrivateClasses = agendaEvents.filter((event) => event.id.startsWith('PRIVATE-') && event.date >= todayKey).slice(0, 4)
 
     const data = (() => {
         const students = listStudents().filter((student) => student.branchId === selectedBranchId)
@@ -74,6 +76,8 @@ export function AdminDashboardPage() {
             pendingCount: chargesToManage.pending.length,
             receivedAmount: confirmedPayments.reduce((total, payment) => total + payment.amount, 0),
             pendingAmount: pendingPayments.reduce((total, payment) => total + payment.amount, 0),
+            // A private lesson belongs to the branch of its student.
+            activePrivateLessons: listPrivateLessons().filter((lesson) => lesson.status === 'Activa' && studentIdsInBranch.has(lesson.studentId)).length,
             registrations: registrationFees.length,
             unpaidRegistrations: registrationFees.filter((payment) => payment.status !== 'Pagado').length,
         }
@@ -96,7 +100,7 @@ export function AdminDashboardPage() {
             </div>
 
             <div className="content-grid">
-                <ChartCard title="Alumnos por comisión" className="large-panel">
+                <ChartCard title="Alumnos por comisión" className="large-panel full-panel">
                     <div className="progress-list dashboard-progress-list">
                         {data.commissions.map((commission) => {
                             const enrolled = commission.studentsCount
@@ -113,6 +117,14 @@ export function AdminDashboardPage() {
                 <ChartCard title="Comisiones activas" className="medium-panel">
                     <div className="dashboard-commission-list">
                         {data.commissions.map((commission) => <div key={commission.id}><strong>{commission.name}</strong><span>{commission.teachers.join(', ') || 'Sin profesores'} · {commission.schedule}</span></div>)}
+                    </div>
+                </ChartCard>
+
+                {/* The branch's active private lessons and their next classes (from the agenda). */}
+                <ChartCard title="Clases particulares" value={String(data.activePrivateLessons)} subtitle={`${data.activePrivateLessons === 1 ? 'Clase activa' : 'Clases activas'} en la sede`} action={<Link to={path('offers?tab=private')} className="card-header-action">Ver particulares</Link>} className="medium-panel">
+                    <div className="dashboard-commission-list">
+                        {upcomingPrivateClasses.map((event) => <div key={event.id}><strong>{event.title.replace('Particular · ', '')}</strong><span>{formatAgendaDate(event.date)}{event.startTime ? ` · ${event.startTime}` : ''}</span></div>)}
+                        {upcomingPrivateClasses.length === 0 && <span>No hay clases particulares próximas.</span>}
                     </div>
                 </ChartCard>
 

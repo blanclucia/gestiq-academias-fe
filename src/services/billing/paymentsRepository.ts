@@ -40,6 +40,7 @@ function fromApiCharge(charge: ApiCharge): RealCharge {
         method: charge.method ? chargeMethodFromApi(charge.method) : 'Transferencia',
         date: charge.status === 'paid' && charge.paidAt ? charge.paidAt : '-',
         notes: charge.notes,
+        privateLessonId: charge.privateLessonId ?? undefined,
     }
 }
 
@@ -62,6 +63,16 @@ export function listPayments(): PaymentRecord[] {
         .map((payment) => state.paymentUpdates[payment.id] ? { ...payment, ...state.paymentUpdates[payment.id] } : payment)
         .filter((payment) => !state.paymentUpdates[payment.id]?.deleted)
         .map((payment) => ({ ...payment, chargeSnapshot: paymentReadModelToChargeSnapshot(payment) }))
+}
+
+// What each private lesson still has to collect: its unpaid charges (paid and voided ones excluded).
+export function listPendingByPrivateLesson(): Map<string, number> {
+    const pending = new Map<string, number>()
+    for (const charge of readAcademyState().charges) {
+        if (!charge.privateLessonId || charge.status === 'Pagado' || charge.status === 'Anulado') continue
+        pending.set(charge.privateLessonId, (pending.get(charge.privateLessonId) ?? 0) + charge.amount)
+    }
+    return pending
 }
 
 export function useCharges(options: { enabled?: boolean } = {}) {

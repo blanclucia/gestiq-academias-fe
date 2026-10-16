@@ -86,9 +86,11 @@ function derivedClassEvents(year: number): AgendaEvent[] {
         }))
     }))
     const teachersById = new Map(listStaff().map((teacher) => [teacher.id, teacher]))
+    const studentsById = new Map(listStudents().map((student) => [student.id, student]))
     const privateEvents = listPrivateLessons().flatMap((lesson) => getWeeklyAgendaDates(lesson.startDate, lesson.endDate, lesson.days.map((day) => weekdayByShortName[day.slice(0, 3).toLowerCase()]).filter((day): day is number => day !== undefined), year).map((date) => ({
         id: `PRIVATE-${lesson.id}-${date}`,
-        title: `Particular · ${teachersById.get(lesson.teacherId)?.fullName ?? 'Docente no encontrado'}`,
+        title: `Particular · ${studentsById.get(lesson.studentId)?.fullName ?? 'Alumno'} con ${teachersById.get(lesson.teacherId)?.fullName ?? 'docente a confirmar'}`,
+        branchId: studentsById.get(lesson.studentId)?.branchId,
         description: `${lesson.purpose} · ${lesson.fromTime}-${lesson.toTime}`,
         type: 'clase' as const,
         scope: 'general' as const,

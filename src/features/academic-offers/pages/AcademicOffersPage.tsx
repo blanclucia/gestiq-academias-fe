@@ -12,7 +12,7 @@ import { EntityCell } from '@/components/ui/PersonCell'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
 import { StatusBadge, type StatusBadgeTone } from '@/components/ui/StatusBadge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { type AcademicCourse, getActiveAcademicCycleId, getCourseRemovalBlockers, listAcademicCycles, listCourses, listPrivateLessons, listStaff, listStudents, useAcademyRepositoryVersion, useActivateCycle, useDeleteCycle, useDeletePrivateLesson, useUpdateCycle, useCreateCourse, useCreateCycle, useCreatePrivateLesson, useDeleteCourse, useUpdatePrivateLesson } from '@/services/academyRepository'
+import { type AcademicCourse, getActiveAcademicCycleId, getCourseRemovalBlockers, listPendingByPrivateLesson, useCharges, listAcademicCycles, listCourses, listPrivateLessons, listStaff, listStudents, useAcademyRepositoryVersion, useActivateCycle, useDeleteCycle, useDeletePrivateLesson, useUpdateCycle, useCreateCourse, useCreateCycle, useCreatePrivateLesson, useDeleteCourse, useUpdatePrivateLesson } from '@/services/academyRepository'
 import { isCycleOverlap, isCycleWithCourses } from '@/services/organization/academicOffersApi'
 import { PrivateLessonsTable, type PrivateStudentRow } from '../components/PrivateLessonsTable'
 import { splitFilterValue } from '@/components/crud/filterValues'
@@ -34,6 +34,8 @@ export function AcademicOffersPage() {
     const { path } = useWorkspace()
     const [searchParams] = useSearchParams()
     useAcademyRepositoryVersion()
+    // Keeps the charges mirror fresh for the "Pendiente de cobro" of each private lesson.
+    useCharges()
     const students = listStudents()
     const requestedStudentId = searchParams.get('student') ?? students[0]?.id ?? ''
     const opensPrivateLesson = searchParams.get('tab') === 'private' && Boolean(searchParams.get('student'))
@@ -93,10 +95,11 @@ export function AcademicOffersPage() {
     const studentsById = new Map(students.map((student) => [student.id, student]))
     const teacherOptions = listStaff().filter((teacher) => teacher.role === 'Docente' && teacher.status === 'Activo').map((teacher) => ({ id: teacher.id, fullName: teacher.fullName }))
     const teachersById = new Map(listStaff().map((teacher) => [teacher.id, teacher]))
+    // What each lesson still has to collect, from its real charges (linked by privateLessonId).
+    const pendingByLesson = listPendingByPrivateLesson()
     const privateStudentsItems: PrivateStudentRow[] = listPrivateLessons().flatMap((lesson) => {
         const student = studentsById.get(lesson.studentId)
         if (!student) return []
-        const balance = lesson.plan === 'Pack 4 clases' ? 4 : lesson.plan === 'Pack 8 clases' ? 8 : lesson.plan === 'Pack 12 clases' ? 12 : 1
 
         return [{
             id: lesson.id,
@@ -110,7 +113,7 @@ export function AcademicOffersPage() {
             endDate: lesson.endDate,
             costPerClass: lesson.costPerClass,
             nextClass: `${lesson.days.join(', ')} · ${lesson.fromTime} a ${lesson.toTime}`,
-            balance,
+            pendingAmount: pendingByLesson.get(lesson.id) ?? 0,
             days: lesson.days,
             fromTime: lesson.fromTime,
             toTime: lesson.toTime,

@@ -3,6 +3,7 @@ import { DataTable } from '@/components/ui/DataTable'
 import { EntityCell } from '@/components/ui/PersonCell'
 import { RowActionMenu } from '@/components/ui/RowActionMenu'
 import { StatusBadge, type StatusBadgeTone } from '@/components/ui/StatusBadge'
+import { formatCurrencyARS, formatShortDate } from '@/domain/shared/formattingRules'
 
 export type PrivateStudentRow = {
     id: string
@@ -16,7 +17,8 @@ export type PrivateStudentRow = {
     endDate: string
     costPerClass: number
     nextClass: string
-    balance: number
+    // Sum of the lesson's unpaid charges.
+    pendingAmount: number
     days: string[]
     fromTime: string
     toTime: string
@@ -50,14 +52,15 @@ export function PrivateLessonsTable(props: Props) {
         onRowClick={props.onView}
         pagination={{ currentPage: props.currentPage, totalPages: props.totalPages, onPageChange: props.onPageChange }}
         columns={[
-            { key: 'student', header: 'Alumno', accessor: (item) => <EntityCell name={item.student} subtitle={item.teacher} avatar={item.student.charAt(0)} /> },
+            { key: 'student', header: 'Alumno', accessor: (item) => <EntityCell name={item.student} avatar={item.student.charAt(0)} /> },
             { key: 'teacher', header: 'Docente', accessor: (item) => <strong>{item.teacher}</strong> },
             { key: 'purpose', header: 'Motivo', accessor: (item) => item.purpose },
             { key: 'plan', header: 'Plan', accessor: (item) => item.plan },
-            { key: 'costPerClass', header: 'Costo por clase', accessor: (item) => <strong>${item.costPerClass.toLocaleString('es-AR')}</strong>, align: 'right' },
-            { key: 'validity', header: 'Vigencia', accessor: (item) => <span>{item.startDate} al {item.endDate}</span> },
+            // The monthly plan's cost is per month; the other plans', per class.
+            { key: 'costPerClass', header: 'Costo', accessor: (item) => <span><strong>{formatCurrencyARS(item.costPerClass)}</strong><small style={{ display: 'block', color: 'var(--muted)' }}>{item.plan === 'Plan mensual' ? 'por mes' : 'por clase'}</small></span>, align: 'right' },
+            { key: 'validity', header: 'Vigencia', accessor: (item) => <span>{formatShortDate(item.startDate, '-')} al {formatShortDate(item.endDate, '-')}</span> },
             { key: 'nextClass', header: 'Próxima clase', accessor: (item) => item.nextClass },
-            { key: 'balance', header: 'Saldo', accessor: (item) => <strong>{item.balance} clase{item.balance === 1 ? '' : 's'}</strong>, align: 'center' },
+            { key: 'pending', header: 'Pendiente de cobro', accessor: (item) => <strong>{formatCurrencyARS(item.pendingAmount)}</strong>, align: 'right' },
             { key: 'status', header: 'Estado', accessor: (item) => <StatusBadge label={item.status} tone={statusToneMap[item.status]} />, align: 'center' },
         ]}
         renderActions={(item) => <RowActionMenu ariaLabel={`Acciones para ${item.student}`} active={props.openMenuId === item.id} onToggle={() => props.onToggleMenu(item.id)} actions={[

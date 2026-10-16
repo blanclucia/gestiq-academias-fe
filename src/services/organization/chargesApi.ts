@@ -16,6 +16,9 @@ const apiChargeSchema = z.object({
     paidAt: z.string().optional(),
     paidAmount: z.number().optional(),
     notes: z.string(),
+    // What generated the charge (null for commission cuotas and manual charges).
+    privateLessonId: z.string().nullable().optional(),
+    examId: z.string().nullable().optional(),
 })
 const apiChargeListSchema = z.object({ items: z.array(apiChargeSchema) })
 const apiPublicChargeSchema = z.object({
